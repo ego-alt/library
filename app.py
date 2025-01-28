@@ -25,6 +25,11 @@ def load_more(offset):
     return jsonify(images)
 
 @app.route('/read/<filename>')
+def read_book(filename):
+    """Render the reader page."""
+    return render_template('reader.html')
+
+@app.route('/load_book/<filename>')
 def load_book(filename):
     try:
         book_data = get_epub_content(BOOK_DIR, filename)

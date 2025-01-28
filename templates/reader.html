@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EPUB Reader</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .reader-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            padding-top: 10px;
+            transition: padding-top 0.3s ease;
+        }
+        
+        #chapter-content {
+            margin-bottom: 80px;
+            font-size: var(--reader-font-size, 16px);
+        }
+        
+        #chapter-content img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 1em auto;
+        }
+        
+        .controls {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            padding: 15px;
+            box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            align-items: center;
+        }
+        
+        .controls .btn {
+            min-width: 75px;
+            padding: 4px 9px;
+        }
+        
+        .btn-primary, .btn-secondary, .btn-outline-secondary {
+            padding: 6px 12px;
+            font-size: 14px;
+        }
+        
+        .font-size-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .top-controls {
+            position: fixed;
+            top: -60px;
+            left: 0;
+            right: 0;
+            background: white;
+            padding: 15px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            z-index: 100;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: top 0.3s ease;
+        }
+
+        .top-controls.visible {
+            top: 0;
+        }
+
+        .top-trigger {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 20px;
+            z-index: 99;
+        }
+
+        .top-trigger:hover + .top-controls,
+        .top-controls:hover {
+            top: 0;
+        }
+
+        .top-controls.visible + .container .reader-container {
+            padding-top: 70px;
+        }
+    </style>
+</head>
+<body>
+    <div class="top-trigger"></div>
+    <div class="top-controls">
+        <a href="/" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i>
+        </a>
+        <div class="font-size-controls">
+            <button class="btn btn-outline-secondary" onclick="adjustFontSize(-1)">A-</button>
+            <button class="btn btn-outline-secondary" onclick="adjustFontSize(1)">A+</button>
+        </div>
+    </div>
+    <div class="container">
+        <div class="reader-container">
+            <div id="loading-spinner" class="text-center my-5" style="display: none;">
+                <div class="spinner-border text-primary" role="status" style="width: 4rem; height: 4rem;">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-3 h5">Loading book...</p>
+            </div>
+            <div id="reader-content" style="display: none;">
+                <h1 class="my-4" id="book-title"></h1>
+                <p class="text-muted" id="book-author"></p>
+                <div id="chapter-content"></div>
+            </div>
+            <div class="controls">
+                <button class="btn btn-outline-primary" onclick="prevChapter()">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                <span class="text-muted" id="chapter-number"></span>
+                <button class="btn btn-outline-primary" onclick="nextChapter()">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentBook = null;
+        let currentChapter = 0;
+        let currentFontSize = parseInt(localStorage.getItem('readerFontSize')) || 16;
+
+        // Initialize font size from localStorage
+        document.documentElement.style.setProperty('--reader-font-size', currentFontSize + 'px');
+
+        // Load book on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            const filename = window.location.pathname.split('/').pop();
+            document.getElementById('loading-spinner').style.display = 'block';
+            fetch(`/load_book/${filename}`)
+                .then(response => response.json())
+                .then(data => {
+                    currentBook = data;
+                    currentChapter = 0;
+                    document.getElementById('loading-spinner').style.display = 'none';
+                    document.getElementById('reader-content').style.display = 'block';
+                    displayBook();
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    document.getElementById('loading-spinner').style.display = 'none';
+                    document.getElementById('chapter-content').innerHTML = 
+                        '<div class="alert alert-danger">Error loading book. Please try again.</div>';
+                });
+        });
+
+        function adjustFontSize(delta) {
+            currentFontSize = Math.max(12, Math.min(24, currentFontSize + delta));
+            document.documentElement.style.setProperty('--reader-font-size', currentFontSize + 'px');
+            localStorage.setItem('readerFontSize', currentFontSize);
+        }
+
+        function displayBook() {
+            document.getElementById('book-title').textContent = currentBook.title;
+            document.getElementById('book-author').textContent = `by ${currentBook.author}`;
+            displayChapter();
+        }
+
+        function displayChapter() {
+            const content = currentBook.chapters[currentChapter].content;
+            document.getElementById('chapter-content').innerHTML = content;
+            document.getElementById('chapter-number').textContent = 
+                `Chapter ${currentChapter + 1} of ${currentBook.chapters.length}`;
+            
+            // Show controls on chapter load
+            const controls = document.querySelector('.top-controls');
+            controls.classList.add('visible');
+            
+            // Add scroll listener
+            let lastScrollY = window.scrollY;
+            const scrollHandler = () => {
+                const currentScrollY = window.scrollY;
+                if (currentScrollY > lastScrollY && currentScrollY > 100) {
+                    // Scrolling down and past 100px - hide controls
+                    controls.classList.remove('visible');
+                }
+                lastScrollY = currentScrollY;
+            };
+
+            // Remove previous scroll listener if it exists
+            window.removeEventListener('scroll', scrollHandler);
+            // Add new scroll listener
+            window.addEventListener('scroll', scrollHandler);
+        }
+
+        function nextChapter() {
+            if (currentChapter < currentBook.chapters.length - 1) {
+                currentChapter++;
+                displayChapter();
+                window.scrollTo(0, 0);
+            }
+        }
+
+        function prevChapter() {
+            if (currentChapter > 0) {
+                currentChapter--;
+                displayChapter();
+                window.scrollTo(0, 0);
+            }
+        }
+    </script>
+</body>
+</html>

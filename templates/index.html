@@ -21,7 +21,7 @@
         }
         .book {
             position: relative;
-            width: 100%;
+            width: 90%;
             padding-top: 133%;
             overflow: hidden;
             border-radius: 8px;
@@ -81,7 +81,9 @@
                                 <i class="fas fa-ellipsis-h"></i>
                             </button>
                         </div>
-                        <img src="data:image/jpeg;base64, {{book.cover}}" alt="cover">
+                        <a href="{{ url_for('read_book', filename=book.filename) }}">
+                            <img src="data:image/jpeg;base64, {{book.cover}}" alt="cover">
+                        </a>
                     </div>
                 </div>
             {% endfor %}
@@ -126,7 +128,9 @@
                                             <i class="fas fa-ellipsis-h"></i>
                                         </button>
                                     </div>
-                                    <img src="data:image/jpeg;base64, ${book.cover}" alt="cover">
+                                    <a href="/read/${book.filename}">
+                                        <img src="data:image/jpeg;base64, ${book.cover}" alt="cover">
+                                    </a>
                                 </div>
                             </div>
                         `);

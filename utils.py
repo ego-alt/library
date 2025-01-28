@@ -1,6 +1,7 @@
 import base64
 from bs4 import BeautifulSoup
 import ebooklib
+from ebooklib import epub
 import logging
 from lxml import etree
 import os
