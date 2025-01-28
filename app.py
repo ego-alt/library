@@ -1,10 +1,12 @@
-from flask import Flask, render_template, jsonify, send_from_directory
+from flask import Flask, render_template, request, jsonify, send_from_directory
+import logging
 import os
-from utils import get_epub_cover
+from utils import get_epub_cover, get_epub_content
 
 app = Flask(__name__)
  
-BOOK_DIR = "/mnt/backup/books"  # Directory where books are stored
+BOOK_DIR = "static/"
+# BOOK_DIR = "/mnt/backup/books"  # Directory where books are stored
  
 def get_covers(offset=0, limit=10):
     """Returns a list of EPUB filenames and their associated cover image paths."""
@@ -21,6 +23,16 @@ def index():
 def load_more(offset):
     images = get_covers(offset, 10)
     return jsonify(images)
+
+@app.route('/read/<filename>')
+def load_book(filename):
+    try:
+        book_data = get_epub_content(BOOK_DIR, filename)
+        logging.info(f"Successfully processed book with {book_data['image_count']} images")
+        return jsonify(book_data)
+    except Exception as e:
+        logging.error(f"Error processing epub: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/download/<filename>')
 def download(filename):

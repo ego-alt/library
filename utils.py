@@ -1,8 +1,10 @@
 import base64
+from bs4 import BeautifulSoup
 import ebooklib
+import logging
 from lxml import etree
 import os
-import sys
+from urllib.parse import unquote
 import zipfile
 
 
@@ -32,7 +34,54 @@ def get_epub_cover(epub_path):
         return base64.b64encode(z.read(cover_path)).decode('utf-8')
 
 
-def get_epub_content(epub_path):
-    book = ebooklib.epub.read_epub(epub_path)
-    book_html = [item for item in book.get_items() if item.get_type()==ebooklib.ITEM_DOCUMENT]
-    return [html.get_body_content() for html in book_html]
+def normalize_path(path):
+    """Normalize image paths by removing '../' and './'"""
+    return path.replace('../', '').replace('./', '')
+
+
+def get_epub_content(epub_dir, epub_path):
+    book = ebooklib.epub.read_epub(os.path.join(epub_dir, epub_path))
+    chapters = []
+    images = {}
+    
+    # Extract images
+    for item in book.get_items():
+        if item.get_type() == ebooklib.ITEM_IMAGE:
+            try:
+                image_data = base64.b64encode(item.content).decode('utf-8')
+                normalized_path = normalize_path(item.file_name)
+                images[normalized_path] = f"data:{item.media_type};base64,{image_data}"
+                logging.debug(f"Stored image: {normalized_path}")
+            except Exception as e:
+                logging.error(f"Error processing image {item.file_name}: {str(e)}")
+    
+    # Process chapters
+    for item in book.get_items():
+        if item.get_type() == ebooklib.ITEM_DOCUMENT:
+            content = item.get_content().decode('utf-8')
+            soup = BeautifulSoup(content, 'html.parser')
+            
+            for img in soup.find_all('img'):
+                src = img.get('src')
+                if src:
+                    normalized_src = normalize_path(unquote(src))
+                    if normalized_src in images:
+                        img['src'] = images[normalized_src]
+                        logging.debug(f"Updated image src: {normalized_src}")
+                    else:
+                        logging.warning(f"Image not found: {normalized_src}")
+            
+            chapters.append({
+                'id': item.id,
+                'content': str(soup.body) if soup.body else str(soup)
+            })
+    
+    metadata = book.get_metadata('DC', 'title')
+    creator_metadata = book.get_metadata('DC', 'creator')
+    
+    return {
+        'title': metadata[0][0] if metadata else "Untitled",
+        'author': creator_metadata[0][0] if creator_metadata else "Unknown Author",
+        'chapters': chapters,
+        'image_count': len(images)
+    } 
