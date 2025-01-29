@@ -95,14 +95,53 @@
         .top-controls:hover + .container .reader-container {
             padding-top: 70px;
         }
+
+        .toc-menu {
+            position: fixed;
+            top: 60px;
+            left: -300px;
+            width: 300px;
+            height: calc(100vh - 60px);
+            background: white;
+            box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+            transition: left 0.3s ease;
+            overflow-y: auto;
+            z-index: 98;
+            padding: 20px;
+        }
+
+        .toc-menu.visible {
+            left: 0;
+        }
+
+        .toc-item {
+            padding: 8px 0;
+            cursor: pointer;
+            color: #333;
+            text-decoration: none;
+        }
+
+        .toc-item:hover {
+            color: #007bff;
+        }
+
+        .toc-item.active {
+            color: #007bff;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
     <div class="top-trigger"></div>
     <div class="top-controls">
-        <a href="/" class="btn btn-secondary">
-            <i class="fas fa-arrow-left"></i>
-        </a>
+        <div class="d-flex align-items-center gap-3">
+            <button class="btn btn-secondary" id="menu-toggle">
+                <i class="fas fa-bars"></i>
+            </button>
+            <a href="/" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i>
+            </a>
+        </div>
         <div class="font-size-controls">
             <button class="btn btn-outline-secondary" onclick="adjustFontSize(-1)">
                 <i class="fas fa-magnifying-glass-minus"></i>
@@ -135,6 +174,11 @@
                 </button>
             </div>
         </div>
+    </div>
+
+    <div class="toc-menu" id="toc-menu">
+        <h5 class="mb-3">Table of Contents</h5>
+        <div id="toc-content"></div>
     </div>
 
     <script>
@@ -175,6 +219,16 @@
         function displayBook() {
             document.getElementById('book-title').textContent = currentBook.title;
             document.getElementById('book-author').textContent = `by ${currentBook.author}`;
+            
+            // Display table of contents
+            const tocContent = document.getElementById('toc-content');
+            tocContent.innerHTML = currentBook.chapters.map((chapter, index) => `
+                <div class="toc-item ${index === currentChapter ? 'active' : ''}" 
+                     onclick="jumpToChapter(${index})">
+                    ${chapter.title || `Chapter ${index + 1}`}
+                </div>
+            `).join('');
+            
             displayChapter();
         }
 
@@ -182,7 +236,7 @@
             const content = currentBook.chapters[currentChapter].content;
             document.getElementById('chapter-content').innerHTML = content;
             document.getElementById('chapter-number').textContent = 
-                `Chapter ${currentChapter + 1} of ${currentBook.chapters.length}`;
+                `Section ${currentChapter + 1} of ${currentBook.chapters.length}`;
             
             // Show controls on chapter load
             const controls = document.querySelector('.top-controls');
@@ -223,6 +277,33 @@
                 window.scrollTo(0, 0);
             }
         }
+
+        function jumpToChapter(index) {
+            currentChapter = index;
+            displayChapter();
+            window.scrollTo(0, 0);
+            document.getElementById('toc-menu').classList.remove('visible');
+            
+            // Update active state in TOC
+            document.querySelectorAll('.toc-item').forEach((item, idx) => {
+                item.classList.toggle('active', idx === index);
+            });
+        }
+
+        // Toggle menu visibility
+        document.getElementById('menu-toggle').addEventListener('click', () => {
+            document.getElementById('toc-menu').classList.toggle('visible');
+        });
+
+        // Close menu when clicking outside
+        document.addEventListener('click', (e) => {
+            const menu = document.getElementById('toc-menu');
+            const menuToggle = document.getElementById('menu-toggle');
+            
+            if (!menu.contains(e.target) && !menuToggle.contains(e.target) && menu.classList.contains('visible')) {
+                menu.classList.remove('visible');
+            }
+        });
     </script>
 </body>
 </html>
