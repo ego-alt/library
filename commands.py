@@ -3,7 +3,7 @@ from flask.cli import with_appcontext
 import os
 import ebooklib
 from ebooklib import epub
-from models import db, Book
+from models import db, Book, User
 import logging
 from flask import current_app
 from utils import get_epub_cover, get_epub_cover_path  # Your existing cover extraction utility
@@ -105,6 +105,20 @@ Import completed:
         db.session.rollback()
         logger.error(f"Error committing to database: {str(e)}")
 
+
+@click.command('create-user')
+@click.argument('username')
+@click.argument('password')
+def create_user_command(username, password):
+    """Create a new user."""
+    user = User(username=username)
+    user.set_password(password)
+    db.session.add(user)
+    db.session.commit()
+    click.echo(f'Created user: {username}')
+
+
 def init_commands(app):
     """Register CLI commands."""
-    app.cli.add_command(import_books_command) 
+    app.cli.add_command(import_books_command)
+    app.cli.add_command(create_user_command) 

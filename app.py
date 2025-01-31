@@ -3,10 +3,12 @@ import logging
 import os
 from utils import get_epub_cover, get_epub_content
 from commands import init_commands
-from models import db, Book, Tag  # Add this import
+from models import db, Book, Tag, User, book_tags  # Add this import
+from flask_login import LoginManager, current_user
 
 def create_app():
     app = Flask(__name__)
+    app.config['SECRET_KEY'] = 'your-secret-key-here'  # Change this to a secure secret key
     
     # Database configuration
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///library.db'
@@ -16,9 +18,46 @@ def create_app():
     app.config['BOOK_DIR'] = os.getenv('BOOK_DIR', 'static/')
     # TODO: change to BOOK_DIR = "/mnt/backup/books"
  
+    # Initialize Flask-Login
+    login_manager = LoginManager()
+    login_manager.init_app(app)
+    login_manager.login_view = 'auth.login'
+    
+    @login_manager.user_loader
+    def load_user(user_id):
+        return User.query.get(int(user_id))
+    
+    # Register blueprints
+    from auth import auth as auth_blueprint
+    app.register_blueprint(auth_blueprint)
+    
     def get_covers(offset=0, limit=10, filters=None):
         query = Book.query
-        # filters parameter is kept for future implementation
+        
+        if filters:
+            # Title filter - match any word
+            if filters.get('title'):
+                title_words = filters['title'].split()
+                for word in title_words:
+                    query = query.filter(Book.title.ilike(f'%{word}%'))
+            
+            # Author filter - match any word
+            if filters.get('author'):
+                author_words = filters['author'].split()
+                for word in author_words:
+                    query = query.filter(Book.author.ilike(f'%{word}%'))
+            
+            # Genre filter
+            if filters.get('genre'):
+                genre_words = filters['genre'].split()
+                for word in genre_words:
+                    query = query.filter(Book.genre.ilike(f'%{word}%'))
+            
+            # Tags filter
+            if filters.get('tags'):
+                tag_words = filters['tags'].split()
+                for word in tag_words:
+                    query = query.join(Book.tags).filter(Tag.name.ilike(f'%{word}%'))
         
         books = query.offset(offset).limit(limit).all()
         return [{
@@ -37,7 +76,15 @@ def create_app():
  
     @app.route('/load_more/<int:offset>', methods=['GET'])
     def load_more(offset):
-        images = get_covers(offset, 10)
+        filters = {
+            'title': request.args.get('title'),
+            'author': request.args.get('author'),
+            'genre': request.args.get('genre'),
+            'tags': request.args.get('tags')
+        }
+        # Remove empty filters
+        filters = {k: v for k, v in filters.items() if v}
+        images = get_covers(offset, 10, filters)
         return jsonify(images)
 
     @app.route('/read/<filename>')
@@ -67,6 +114,9 @@ def create_app():
             return jsonify({'error': 'Book not found'}), 404
         
         if request.method == 'POST':
+            if not current_user.is_authenticated:
+                return jsonify({'error': 'Authentication required'}), 401
+            
             data = request.get_json()
             
             # Update book metadata
@@ -74,32 +124,71 @@ def create_app():
             book.author = data.get('author', book.author)
             book.genre = data.get('genre', book.genre)
             
-            # Update tags
-            # Clear existing tags
-            book.tags.clear()
-            # Add new tags
-            for tag_name in data.get('tags', []):
-                tag = Tag.query.filter_by(name=tag_name).first()
-                if not tag:
-                    tag = Tag(name=tag_name)
-                    db.session.add(tag)
-                book.tags.append(tag)
-            
             try:
+                # First, remove all existing tags for this user and book
+                db.session.execute(
+                    book_tags.delete().where(
+                        db.and_(
+                            book_tags.c.book_id == book.id,
+                            book_tags.c.user_id == current_user.id
+                        )
+                    )
+                )
+                
+                # Create/get tags and commit them first
+                tags_to_add = []
+                for tag_name in data.get('tags', []):
+                    tag = Tag.query.filter_by(
+                        name=tag_name,
+                        user_id=current_user.id
+                    ).first()
+                    
+                    if not tag:
+                        tag = Tag(name=tag_name, user_id=current_user.id)
+                        db.session.add(tag)
+                        db.session.flush()  # This assigns the ID without committing
+                    
+                    tags_to_add.append(tag)
+                
+                # Now create the associations
+                for tag in tags_to_add:
+                    db.session.execute(
+                        book_tags.insert().values(
+                            book_id=book.id,
+                            tag_id=tag.id,
+                            user_id=current_user.id
+                        )
+                    )
+                
                 db.session.commit()
                 return jsonify({'message': 'Metadata updated successfully'})
             except Exception as e:
                 db.session.rollback()
                 return jsonify({'error': str(e)}), 500
         
-        # GET request handling (existing code)
-        return jsonify({
+        # GET request handling
+        response = {
             'title': book.title,
             'author': book.author,
             'genre': book.genre,
             'created_at': book.created_at.strftime('%Y-%m-%d %H:%M:%S'),
-            'tags': [tag.name for tag in book.tags]
-        })
+            'tags': []
+        }
+        
+        # Only include tags if user is authenticated
+        if current_user.is_authenticated:
+            # Get tags specific to this user and book
+            user_tags = db.session.query(Tag.name).join(
+                book_tags,
+                db.and_(
+                    book_tags.c.tag_id == Tag.id,
+                    book_tags.c.book_id == book.id,
+                    book_tags.c.user_id == current_user.id
+                )
+            ).all()
+            response['tags'] = [tag[0] for tag in user_tags]
+        
+        return jsonify(response)
  
     # Initialize database
     db.init_app(app)
