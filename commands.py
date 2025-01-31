@@ -1,0 +1,110 @@
+import click
+from flask.cli import with_appcontext
+import os
+import ebooklib
+from ebooklib import epub
+from models import db, Book
+import logging
+from flask import current_app
+from utils import get_epub_cover, get_epub_cover_path  # Your existing cover extraction utility
+import base64
+from PIL import Image
+import io
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+def extract_metadata(epub_book):
+    """Extract metadata from an epub book."""
+    try:
+        # Get title, fallback to filename if not found
+        title = epub_book.get_metadata('DC', 'title')
+        title = title[0][0] if title else "Unknown Title"
+
+        # Get author, fallback to "Unknown Author" if not found
+        author = epub_book.get_metadata('DC', 'creator')
+        author = author[0][0] if author else "Unknown Author"
+
+        return {
+            'title': title,
+            'author': author
+        }
+    except Exception as e:
+        logger.error(f"Error extracting metadata: {str(e)}")
+        return None
+
+
+@click.command('import-books')
+@click.option('--directory', help='Directory containing EPUB files')
+@click.option('--access-level', default='standard', help='Default access level for imported books')
+@with_appcontext
+def import_books_command(directory, access_level):
+    """Import books from the specified directory."""
+    # Use provided directory or fall back to BOOK_DIR from app config
+    book_dir = directory or current_app.config['BOOK_DIR']
+    
+    if not os.path.exists(book_dir):
+        logger.error(f"Directory {book_dir} does not exist")
+        return
+
+    success_count = 0
+    error_count = 0
+    skip_count = 0
+
+    for filename in os.listdir(book_dir):
+        if not filename.endswith('.epub'):
+            continue
+
+        full_path = os.path.join(book_dir, filename)
+        
+        # Check if book already exists
+        existing_book = Book.query.filter_by(filename=filename).first()
+        if existing_book:
+            logger.info(f"Skipping {filename} - already in database")
+            skip_count += 1
+            continue
+
+        try:
+            # Read EPUB file
+            epub_book = epub.read_epub(full_path)
+            metadata = extract_metadata(epub_book)
+
+            if metadata:
+                # Get cover path within the epub
+                cover_path = get_epub_cover_path(full_path)
+
+                # Create new book record
+                book = Book(
+                    title=metadata['title'],
+                    author=metadata['author'],
+                    filename=filename,
+                    cover_path=cover_path,  # Store the path within the epub
+                    access_level=access_level
+                )
+                db.session.add(book)
+                success_count += 1
+                logger.info(f"Successfully imported: {filename}")
+            else:
+                error_count += 1
+                logger.error(f"Could not extract metadata from {filename}")
+
+        except Exception as e:
+            error_count += 1
+            logger.error(f"Error processing {filename}: {str(e)}")
+
+    # Commit all changes
+    try:
+        db.session.commit()
+        logger.info(f"""
+Import completed:
+- Successfully imported: {success_count} books
+- Skipped (already exists): {skip_count} books
+- Errors: {error_count} books
+""")
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error committing to database: {str(e)}")
+
+def init_commands(app):
+    """Register CLI commands."""
+    app.cli.add_command(import_books_command) 

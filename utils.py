@@ -19,20 +19,30 @@ namespaces = {
 }
 
 
-def get_epub_cover(epub_path):
-    with zipfile.ZipFile(epub_path) as z:
-        # We load "META-INF/container.xml" using lxml.etree.fromString():
+def get_epub_cover_path(path: str):
+    with zipfile.ZipFile(path) as z:
+        # Load container.xml to find the root file
         t = etree.fromstring(z.read("META-INF/container.xml"))
-
-        # Load the root path to find where static files are stored
         rootfile_path = t.xpath("/u:container/u:rootfiles/u:rootfile", namespaces=namespaces)[0].get("full-path")
+        
+        # Load the root file to find cover image details
         t = etree.fromstring(z.read(rootfile_path))
-
-        # Find the cover image id and load the image
         cover_id = t.xpath("//opf:metadata/opf:meta[@name='cover']", namespaces=namespaces)[0].get("content")
         cover_href = t.xpath("//opf:manifest/opf:item[@id='" + cover_id + "']", namespaces=namespaces)[0].get("href")
+        
+        # Get the cover image path and load it
         cover_path = os.path.join(os.path.dirname(rootfile_path), cover_href)
-        return base64.b64encode(z.read(cover_path)).decode('utf-8')
+    
+    return cover_path
+
+
+def get_epub_cover(epub_file_path: str, cover_path: str = None) -> str:
+    if cover_path is None:
+        cover_path = get_epub_cover_path(epub_file_path)
+        
+    with zipfile.ZipFile(epub_file_path) as z:
+        with z.open(cover_path) as f:
+            return base64.b64encode(f.read()).decode('utf-8')
 
 
 def normalize_path(path):
