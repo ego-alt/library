@@ -3,7 +3,7 @@ import logging
 import os
 from utils import get_epub_cover, get_epub_content
 from commands import init_commands
-from models import db, Book  # Add this import
+from models import db, Book, Tag  # Add this import
 
 def create_app():
     app = Flask(__name__)
@@ -60,12 +60,39 @@ def create_app():
         """Serve the EPUB file for download."""
         return send_from_directory(app.config['BOOK_DIR'], filename, as_attachment=True)
 
-    @app.route('/book_metadata/<filename>')
+    @app.route('/book_metadata/<filename>', methods=['GET', 'POST'])
     def book_metadata(filename):
         book = Book.query.filter_by(filename=filename).first()
         if not book:
             return jsonify({'error': 'Book not found'}), 404
+        
+        if request.method == 'POST':
+            data = request.get_json()
             
+            # Update book metadata
+            book.title = data.get('title', book.title)
+            book.author = data.get('author', book.author)
+            book.genre = data.get('genre', book.genre)
+            
+            # Update tags
+            # Clear existing tags
+            book.tags.clear()
+            # Add new tags
+            for tag_name in data.get('tags', []):
+                tag = Tag.query.filter_by(name=tag_name).first()
+                if not tag:
+                    tag = Tag(name=tag_name)
+                    db.session.add(tag)
+                book.tags.append(tag)
+            
+            try:
+                db.session.commit()
+                return jsonify({'message': 'Metadata updated successfully'})
+            except Exception as e:
+                db.session.rollback()
+                return jsonify({'error': str(e)}), 500
+        
+        # GET request handling (existing code)
         return jsonify({
             'title': book.title,
             'author': book.author,

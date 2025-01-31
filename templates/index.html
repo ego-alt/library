@@ -81,7 +81,7 @@
         
         .metadata-content {
             background: #FFF1E5;
-            padding: 40px 60px;
+            padding: 40px;
             border-radius: 16px;
             max-width: 1000px;
             width: 90%;
@@ -110,12 +110,15 @@
         }
         
         .metadata-field {
-            margin-bottom: 20px;
+            margin-bottom: 0;
             font-size: 1.1em;
-            padding: 10px 0;
+            padding: 20px 0;
             border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-            display: flex;
+            display: grid;
+            grid-template-columns: 120px 1fr;
+            gap: 6px;
             align-items: center;
+            line-height: 1;
         }
         
         .metadata-field:last-child {
@@ -125,9 +128,7 @@
         .metadata-field strong {
             color: #34495E;
             font-weight: 600;
-            width: 100px;
-            text-align: right;
-            padding-right: 20px;
+            text-align: left;
         }
         
         .close-metadata {
@@ -163,6 +164,7 @@
             transition: all 0.2s ease;
             margin: 0;
             width: 100%;
+            line-height: 1.2;
         }
 
         .metadata-field input:focus, .metadata-field textarea:focus {
@@ -181,7 +183,7 @@
             margin-top: 30px;
             display: flex;
             justify-content: flex-end;
-            padding-left: 120px;
+            padding-left: 0;
         }
 
         .save-button {
@@ -193,6 +195,7 @@
             font-size: 1.1em;
             cursor: pointer;
             transition: background-color 0.2s ease;
+            width: 180px;
         }
 
         .save-button:hover {
@@ -259,27 +262,56 @@
                 let metadataHtml = `
                     <div class="metadata-field">
                         <strong>Title:</strong>
-                        <input type="text" value="${data.title}">
+                        <input type="text" value="${data.title}" id="metadata-title">
                     </div>
                     <div class="metadata-field">
                         <strong>Author:</strong>
-                        <input type="text" value="${data.author}">
+                        <input type="text" value="${data.author}" id="metadata-author">
                     </div>
                     <div class="metadata-field">
                         <strong>Genre:</strong>
-                        <input type="text" value="${data.genre || ''}">
+                        <input type="text" value="${data.genre || ''}" id="metadata-genre">
                     </div>
                     <div class="metadata-field">
                         <strong>Tags:</strong>
-                        <textarea>${tagsHtml}</textarea>
+                        <textarea id="metadata-tags">${tagsHtml}</textarea>
                     </div>
                     <div class="metadata-actions">
-                        <button class="save-button">Save Changes</button>
+                        <button class="save-button" onclick="saveMetadata('${filename}')">Save Changes</button>
                     </div>
                 `;
                 
                 $('#metadataContent').html(metadataHtml);
                 $('#metadataOverlay').css('display', 'flex').fadeIn();
+            });
+        }
+
+        function saveMetadata(filename) {
+            const metadata = {
+                title: $('#metadata-title').val(),
+                author: $('#metadata-author').val(),
+                genre: $('#metadata-genre').val(),
+                tags: $('#metadata-tags').val().split(',').map(tag => tag.trim()).filter(tag => tag)
+            };
+
+            const saveButton = $('.save-button');
+            const originalText = saveButton.text();
+            
+            $.ajax({
+                url: `/book_metadata/${filename}`,
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(metadata),
+                success: function(response) {
+                    saveButton.text('Saved!');
+                    setTimeout(() => {
+                        saveButton.text(originalText);
+                    }, 2000);
+                },
+                error: function(xhr, status, error) {
+                    alert('Error saving metadata: ' + error);
+                    saveButton.text(originalText);
+                }
             });
         }
 
