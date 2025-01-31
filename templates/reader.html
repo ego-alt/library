@@ -193,6 +193,7 @@
         let currentBook = null;
         let currentChapter = 0;
         let currentFontSize = parseInt(localStorage.getItem('readerFontSize')) || 16;
+        let lastSaveTimeout = null;
 
         // Initialize font size from localStorage
         document.documentElement.style.setProperty('--reader-font-size', currentFontSize + 'px');
@@ -227,6 +228,28 @@
             localStorage.setItem('readerFontSize', currentFontSize);
         }
 
+        function saveBookmark() {
+            if (!lastSaveTimeout) {
+                lastSaveTimeout = setTimeout(() => {
+                    const filename = window.location.pathname.split('/').pop();
+                    const position = window.scrollY / document.documentElement.scrollHeight;
+                    
+                    fetch(`/bookmark/${filename}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            chapter_index: currentChapter,
+                            position: position
+                        })
+                    }).catch(error => console.error('Error saving bookmark:', error));
+                    
+                    lastSaveTimeout = null;
+                }, 1000); // Debounce save for 1 second
+            }
+        }
+
         function displayBook() {
             document.getElementById('book-title').textContent = currentBook.title;
             document.getElementById('book-author').textContent = `by ${currentBook.author}`;
@@ -240,7 +263,29 @@
                 </div>
             `).join('');
             
-            displayChapter();
+            // Load bookmark
+            const filename = window.location.pathname.split('/').pop();
+            fetch(`/bookmark/${filename}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.chapter_index !== undefined) {
+                        currentChapter = data.chapter_index;
+                        displayChapter();
+                        // Wait for content to load before scrolling
+                        setTimeout(() => {
+                            window.scrollTo({
+                                top: data.position * document.documentElement.scrollHeight,
+                                behavior: 'instant'
+                            });
+                        }, 100);
+                    } else {
+                        displayChapter();
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading bookmark:', error);
+                    displayChapter();
+                });
         }
 
         function displayChapter() {
@@ -277,7 +322,8 @@
             if (currentChapter < currentBook.chapters.length - 1) {
                 currentChapter++;
                 displayChapter();
-                window.scrollTo(0, 0);
+                window.scrollTo({top: 0, behavior: 'instant'});
+                saveBookmark();
             }
         }
 
@@ -285,20 +331,23 @@
             if (currentChapter > 0) {
                 currentChapter--;
                 displayChapter();
-                window.scrollTo(0, 0);
+                window.scrollTo({top: 0, behavior: 'instant'});
+                saveBookmark();
             }
         }
 
         function jumpToChapter(index) {
             currentChapter = index;
             displayChapter();
-            window.scrollTo(0, 0);
+            window.scrollTo({top: 0, behavior: 'instant'});
             document.getElementById('toc-menu').classList.remove('visible');
             
             // Update active state in TOC
             document.querySelectorAll('.toc-item').forEach((item, idx) => {
                 item.classList.toggle('active', idx === index);
             });
+            
+            saveBookmark();
         }
 
         // Toggle menu visibility
@@ -314,6 +363,11 @@
             if (!menu.contains(e.target) && !menuToggle.contains(e.target) && menu.classList.contains('visible')) {
                 menu.classList.remove('visible');
             }
+        });
+
+        // Add scroll event listener for bookmark saving
+        window.addEventListener('scroll', () => {
+            saveBookmark();
         });
     </script>
 </body>

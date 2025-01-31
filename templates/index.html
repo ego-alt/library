@@ -745,8 +745,8 @@
                     saveButton.text('Saved!');
                     setTimeout(() => {
                         saveButton.text(originalText);
-                        $('#metadataOverlay').hide();
-                    }, 1000);
+                        $('#metadataOverlay').fadeOut(200);
+                    }, 500);
                 },
                 error: function(xhr, status, error) {
                     alert('Error saving metadata: ' + error);
