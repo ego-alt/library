@@ -9,6 +9,10 @@ from urllib.parse import unquote
 import zipfile
 
 
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+
 namespaces = {
    "calibre":"http://calibre.kovidgoyal.net/2009/metadata",
    "dc":"http://purl.org/dc/elements/1.1/",
@@ -46,9 +50,9 @@ def get_epub_cover(epub_file_path: str, cover_path: str = None) -> str:
 
 
 def normalize_path(path):
-    """Normalize image paths by removing '../' and './'"""
-    return path.replace('../', '').replace('./', '')
-
+    """Normalize image paths"""
+    path = path.replace('../', '').replace('./', '')
+    return path.split("images/", 1)[-1]
 
 def get_chapter_title(item, soup):
     """Extract chapter title using multiple fallback methods."""
@@ -119,7 +123,7 @@ def get_epub_content(epub_dir, epub_path):
     
     # Extract images
     for item in book.get_items():
-        if item.get_type() == ebooklib.ITEM_IMAGE:
+        if item.get_type() in [ebooklib.ITEM_COVER, ebooklib.ITEM_IMAGE]:
             try:
                 image_data = base64.b64encode(item.content).decode('utf-8')
                 normalized_path = normalize_path(item.file_name)
