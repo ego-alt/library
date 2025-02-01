@@ -106,6 +106,39 @@ Import completed:
         logger.error(f"Error committing to database: {str(e)}")
 
 
+@click.command('flush-books')
+@click.option('--directory', help='Directory containing EPUB files')
+@with_appcontext
+def remove_deleted_books_command(directory):
+    """Remove books from the database that no longer exist in the specified directory."""
+    # Use provided directory or fall back to BOOK_DIR from app config
+    book_dir = directory or current_app.config['BOOK_DIR']
+    
+    if not os.path.exists(book_dir):
+        logger.error(f"Directory {book_dir} does not exist")
+        return
+
+    # Get all books from the database
+    all_books = Book.query.all()
+    deleted_count = 0
+
+    for book in all_books:
+        full_path = os.path.join(book_dir, book.filename)
+        if not os.path.exists(full_path):
+            # Book file does not exist, remove from database
+            db.session.delete(book)
+            deleted_count += 1
+            logger.info(f"Deleted {book.filename} from database - file not found")
+
+    # Commit all changes
+    try:
+        db.session.commit()
+        logger.info(f"Removed {deleted_count} books from the database that no longer exist in {book_dir}")
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Error committing to database: {str(e)}")
+
+
 @click.command('create-user')
 @click.argument('username')
 @click.argument('password')
@@ -121,4 +154,5 @@ def create_user_command(username, password):
 def init_commands(app):
     """Register CLI commands."""
     app.cli.add_command(import_books_command)
-    app.cli.add_command(create_user_command) 
+    app.cli.add_command(remove_deleted_books_command)
+    app.cli.add_command(create_user_command)
