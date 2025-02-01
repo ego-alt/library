@@ -5,6 +5,7 @@ click==8.1.8
 dill==0.3.9
 EbookLib==0.18
 Flask==3.1.0
+Flask-Login==0.6.3
 Flask-SQLAlchemy==3.1.1
 greenlet==3.1.1
 isort==6.0.0

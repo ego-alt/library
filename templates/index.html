@@ -461,7 +461,10 @@
         </div>
         <div class="filter-group">
             <label for="filterTags">Tags</label>
-            <input type="text" id="filterTags" placeholder="Filter by tags...">
+            <div class="tag-input-container">
+                <div class="tags-container" id="filter-tags-container"></div>
+                <input type="text" id="filterTags" placeholder="Filter by tags...">
+            </div>
         </div>
     </div>
 
@@ -576,8 +579,14 @@
                 title: $('#filterTitle').val(),
                 author: $('#filterAuthor').val(),
                 genre: $('#filterGenre').val(),
-                tags: $('#filterTags').val()
+                tags: [
+                    ...Array.from($('#filter-tags-container .tag')).map(tag => 
+                        tag.innerText.replace(/×/g, '').trim()
+                    ),
+                    $('#filterTags').val().trim() // Include text from the input box
+                ].filter(tag => tag) // Filter out any empty strings
             };
+            console.log(currentFilters);
 
             // Clear existing books
             $('#library').empty();
@@ -616,7 +625,12 @@
 
         // Add event listeners for filter inputs
         const debouncedApplyFilters = debounce(applyFilters, 300);
-        $('#filterTitle, #filterAuthor, #filterGenre, #filterTags').on('input', debouncedApplyFilters);
+        $('#filterTitle, #filterAuthor, #filterGenre').on('input', debouncedApplyFilters);
+        $('#filterTags').on('keydown', function(event) { 
+            if (event.key === 'Enter') { 
+                applyFilters();
+            }
+        });
 
         function showMetadata(filename) {
             $.get(`/book_metadata/${filename}`, function(data) {
@@ -708,17 +722,20 @@
                 }
             });
         }
-
         function addTag(text, container) {
-            // Clean the text by removing any '×' characters that might have accumulated
             const cleanText = text.replace(/×/g, '').trim();
             if (!cleanText) return;
+
+            const isFiltering = container.id === 'filter-tags-container';
+            const removeTagHandler = isFiltering 
+                ? 'this.parentElement.remove(); applyFilters();' 
+                : 'this.parentElement.remove()';
 
             const tag = document.createElement('span');
             tag.className = 'tag';
             tag.innerHTML = `
                 ${cleanText}
-                <span class="remove-tag" onclick="this.parentElement.remove()">×</span>
+                <span class="remove-tag" onclick="${removeTagHandler}">×</span>
             `;
             container.appendChild(tag);
         }
@@ -858,6 +875,9 @@
         function isAuthenticated() {
             return document.body.contains(document.querySelector('button[onclick="handleLogout()"]'));
         }
+
+        // Initialize the filter tags input
+        initializeTagInput('filterTags', 'filter-tags-container');
     </script>
 </body>
 </html>

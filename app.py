@@ -7,6 +7,11 @@ from models import db, Book, Tag, User, book_tags, Bookmark  # Add this import
 from flask_login import LoginManager, current_user
 from datetime import datetime
 
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+
 def create_app():
     app = Flask(__name__)
     app.config['SECRET_KEY'] = 'your-secret-key-here'  # Change this to a secure secret key
@@ -55,15 +60,18 @@ def create_app():
                     query = query.filter(Book.genre.ilike(f'%{word}%'))
             
             # Tags filter - exact matches only for authenticated users
-            if filters.get('tags') and current_user.is_authenticated:
-                tag_words = filters['tags'].split()
-                for tag_name in tag_words:
-                    query = query.join(Book.tags).join(Tag.user).filter(
-                        db.and_(
-                            Tag.name == tag_name,
-                            Tag.user_id == current_user.id
-                        )
-                    )
+            if filters.get('tags'):
+                logging.info(f"Tags filter: {filters['tags']}")
+                if not current_user.is_authenticated:
+                    return []
+
+                tag_words = filters['tags'].split(",")
+                tag_filters = [db.and_(
+                    Tag.name == tag_name,
+                    Tag.user_id == current_user.id
+                ) for tag_name in tag_words]
+
+                query = query.join(Book.tags).join(Tag.user).filter(db.or_(*tag_filters))
         
         books = query.offset(offset).limit(limit).all()
         return [{
