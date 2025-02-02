@@ -4,6 +4,10 @@
 
 This project is an EPUB Library Management System built using Flask, SQLAlchemy, and BeautifulSoup. It allows users to upload, manage, and read EPUB books, extract metadata, and add custom tags. The application provides a web interface for users to interact with their library of books.
 
+![alt text](images/library_home_page.png)
+
+![alt text](images/library_reader.png)
+
 ## Features
 
 - **Book Management**: Users can upload EPUB files, which are processed to extract metadata and cover images.
