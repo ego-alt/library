@@ -331,7 +331,7 @@
             if (currentChapter > 0) {
                 currentChapter--;
                 displayChapter();
-                window.scrollTo({top: 0, behavior: 'instant'});
+                window.scrollTo({top: document.body.scrollHeight, behavior: 'instant'});
                 saveBookmark();
             }
         }

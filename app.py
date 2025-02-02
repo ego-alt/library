@@ -1,24 +1,41 @@
+from auth import auth as auth_blueprint
+from commands import init_commands
+from datetime import datetime
 from flask import Flask, render_template, request, jsonify, send_from_directory
+from flask_caching import Cache
+from flask_compress import Compress
+from flask_login import LoginManager, current_user
+
 import logging
+from models import db, Book, Tag, User, book_tags, Bookmark  # Add this import
 import os
 from utils import get_epub_cover, get_epub_content
-from commands import init_commands
-from models import db, Book, Tag, User, book_tags, Bookmark  # Add this import
-from flask_login import LoginManager, current_user
-from datetime import datetime
 
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
+# Initialise the app cache
+cache = Cache(config={'CACHE_TYPE': 'simple'})
+
+
 def create_app():
     app = Flask(__name__)
-    app.config['SECRET_KEY'] = 'your-secret-key-here'  # Change this to a secure secret key
-    
+    Compress(app)
+    cache.init_app(app)
+
     # Database configuration
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///library.db'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    app.config['COMPRESS_ALGORITHM'] = 'gzip'  # or 'br' for Brotli
+    app.config['COMPRESS_MIMETYPES'] = [
+        'text/html',
+        'text/css',
+        'application/javascript',
+        'application/json',
+        'image/svg+xml'
+    ]
     
     # Book directory configuration
     app.config['BOOK_DIR'] = os.getenv('BOOK_DIR', 'static/')
@@ -33,10 +50,9 @@ def create_app():
     def load_user(user_id):
         return User.query.get(int(user_id))
     
-    # Register blueprints
-    from auth import auth as auth_blueprint
+    # Register blueprints 
     app.register_blueprint(auth_blueprint)
-    
+
     def get_covers(offset=0, limit=10, filters=None):
         query = Book.query
         
@@ -107,6 +123,7 @@ def create_app():
         return render_template('reader.html')
 
     @app.route('/load_book/<filename>')
+    @cache.cached(timeout=3600)
     def load_book(filename):
         try:
             book_data = get_epub_content(app.config['BOOK_DIR'], filename)
@@ -207,7 +224,7 @@ def create_app():
     @app.route('/bookmark/<filename>', methods=['GET', 'POST'])
     def bookmark(filename):
         if not current_user.is_authenticated:
-            return jsonify({'error': 'Authentication required'}), 401
+            return jsonify({'message': 'Authentication required.'}), 200
         
         book = Book.query.filter_by(filename=filename).first()
         if not book:
@@ -251,6 +268,12 @@ def create_app():
             'chapter_index': bookmark.chapter_index,
             'position': bookmark.position
         })
+
+    @app.after_request
+    def add_cache_headers(response):
+        response.cache_control.public = True
+        response.cache_control.max_age = 3600  # Cache for 1 hour
+        return response
 
     # Initialize database
     db.init_app(app)

@@ -157,6 +157,7 @@ def get_epub_content(epub_dir, epub_path):
                     normalized_src = normalize_path(unquote(src))
                     if normalized_src in images:
                         img['src'] = images[normalized_src]
+                        img['loading'] = 'lazy'
                         logging.debug(f"Updated image src: {normalized_src}")
                     else:
                         logging.warning(f"Image not found: {normalized_src}")
