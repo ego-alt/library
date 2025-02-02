@@ -30,12 +30,12 @@ This project is an EPUB Library Management System built using Flask, SQLAlchemy,
 
 3. **Run the Docker container**:
    ```bash
-   sudo docker run -d -p 8002:8002 -v /mnt/backup/books:/mnt/backup/books epub-library
+   docker run -d -p 8002:8002 -v <local_path_to_books>:/mnt/backup/books epub-library
    ```
 
 ## Usage
 
-- **Access the application**: Open your web browser and go to `http://127.0.0.1:5000`.
+- **Access the application**: Open your web browser and go to `http://127.0.0.1:8002`.
 - **User Registration**: Create a new user account to start managing your books.
 - **Upload Books**: Use the provided interface to upload EPUB files.
 - **Read Books**: Click on a book to read it in the built-in reader.
