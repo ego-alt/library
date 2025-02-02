@@ -6,32 +6,13 @@ from ebooklib import epub
 from models import db, Book, User
 import logging
 from flask import current_app
-from utils import get_epub_cover, get_epub_cover_path  # Your existing cover extraction utility
+from utils import get_epub_cover, get_epub_cover_path, extract_metadata
 import base64
 from PIL import Image
 import io
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-def extract_metadata(epub_book):
-    """Extract metadata from an epub book."""
-    try:
-        # Get title, fallback to filename if not found
-        title = epub_book.get_metadata('DC', 'title')
-        title = title[0][0] if title else "Unknown Title"
-
-        # Get author, fallback to "Unknown Author" if not found
-        author = epub_book.get_metadata('DC', 'creator')
-        author = author[0][0] if author else "Unknown Author"
-
-        return {
-            'title': title,
-            'author': author
-        }
-    except Exception as e:
-        logger.error(f"Error extracting metadata: {str(e)}")
-        return None
 
 
 @click.command('import-books')

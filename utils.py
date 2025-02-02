@@ -178,3 +178,23 @@ def get_epub_content(epub_dir, epub_path):
         'chapters': chapters,
         'image_count': len(images)
     } 
+
+
+def extract_metadata(epub_book):
+    """Extract metadata from an epub book."""
+    try:
+        # Get title, fallback to filename if not found
+        title = epub_book.get_metadata('DC', 'title')
+        title = title[0][0] if title else "Unknown Title"
+
+        # Get author, fallback to "Unknown Author" if not found
+        author = epub_book.get_metadata('DC', 'creator')
+        author = author[0][0] if author else "Unknown Author"
+
+        return {
+            'title': title,
+            'author': author
+        }
+    except Exception as e:
+        logger.error(f"Error extracting metadata: {str(e)}")
+        return None

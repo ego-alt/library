@@ -1,5 +1,5 @@
 from auth import auth as auth_blueprint
-from commands import init_commands, extract_metadata
+from commands import init_commands
 from datetime import datetime
 from flask import Flask, render_template, request, jsonify, send_from_directory, current_app
 from flask_caching import Cache
@@ -10,7 +10,7 @@ from ebooklib import epub
 import logging
 from models import db, Book, Tag, User, book_tags, Bookmark  # Add this import
 import os
-from utils import get_epub_cover, get_epub_content, get_epub_cover_path
+from utils import get_epub_cover, get_epub_content, get_epub_cover_path, extract_metadata
 
 
 logger = logging.getLogger(__name__)
@@ -149,14 +149,11 @@ def create_app():
         if request.method == 'POST':
             if not current_user.is_authenticated:
                 return jsonify({'error': 'Authentication required'}), 401
-            
+
             data = request.get_json()
-            
-            # Update book metadata
             book.title = data.get('title', book.title)
             book.author = data.get('author', book.author)
             book.genre = data.get('genre', book.genre)
-            
             try:
                 # First, remove all existing tags for this user and book
                 db.session.execute(
@@ -167,9 +164,7 @@ def create_app():
                         )
                     )
                 )
-                
-                # Create/get tags and commit them first
-                tags_to_add = []
+                # Create/get tags and commit them
                 for tag_name in data.get('tags', []):
                     tag = Tag.query.filter_by(
                         name=tag_name,
@@ -181,10 +176,6 @@ def create_app():
                         db.session.add(tag)
                         db.session.flush()  # This assigns the ID without committing
                     
-                    tags_to_add.append(tag)
-                
-                # Now create the associations
-                for tag in tags_to_add:
                     db.session.execute(
                         book_tags.insert().values(
                             book_id=book.id,
@@ -192,7 +183,6 @@ def create_app():
                             user_id=current_user.id
                         )
                     )
-                
                 db.session.commit()
                 return jsonify({'message': 'Metadata updated successfully'})
             except Exception as e:
@@ -223,7 +213,7 @@ def create_app():
                     book_tags.c.book_id == book.id,
                     book_tags.c.user_id == current_user.id
                 )
-            ).all()
+            ).order_by(Tag.status).all()
             response['tags'] = [tag[0] for tag in user_tags]
         
         return jsonify(response)
@@ -276,6 +266,35 @@ def create_app():
             'position': bookmark.position
         })
 
+    @app.route('/tag_finished/<filename>', methods=['POST'])
+    def tag_finished(filename):
+        """Tag the book as finished."""
+        if not current_user.is_authenticated:
+            return jsonify({'error': 'Authentication required'}), 401
+        
+        book = Book.query.filter_by(filename=filename).first()
+        if not book:
+            return jsonify({'error': 'Book not found'}), 404
+        
+        finish_tag = Tag.query.filter_by(name='Finished', user_id=current_user.id).first()
+        if not finish_tag:
+            finish_tag = Tag(name='Finished', user_id=current_user.id, status=0)
+            db.session.add(finish_tag)
+            db.session.flush()
+
+        if not db.session.query(book_tags).filter_by(
+            book_id=book.id, tag_id=finish_tag.id, user_id=current_user.id
+        ).first():
+            db.session.execute(
+                book_tags.insert().values(
+                    book_id=book.id,
+                    tag_id=finish_tag.id,
+                    user_id=current_user.id
+                )
+            )
+            db.session.commit()
+        return jsonify({'message': 'Book tagged as finished'})
+
     @app.after_request
     def add_cache_headers(response):
         response.cache_control.public = True
@@ -308,13 +327,9 @@ def create_app():
             current_app.logger.error(f"Failed to read EPUB file: {str(e)}")
             return jsonify({'error': 'Failed to read EPUB file: ' + str(e)}), 500
 
-        # Extract metadata using your helper function (assumes extract_metadata is defined in commands.py)
         metadata = extract_metadata(epub_book)
         if not metadata:
             metadata = {'title': '', 'author': ''}
-
-        # Optionally add genre (if your EPUB or helper can extract one)
-        metadata.setdefault('genre', '')
 
         # Get cover image details
         cover_path = get_epub_cover_path(file_path)
@@ -325,7 +340,6 @@ def create_app():
             'filename': file.filename,
             'title': metadata.get('title', ''),
             'author': metadata.get('author', ''),
-            'genre': metadata.get('genre', ''),
             'cover': cover,
             'cover_path': cover_path
         })

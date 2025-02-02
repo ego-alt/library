@@ -437,6 +437,11 @@
         #loginError {
             margin-bottom: 20px;
         }
+
+        .finished-tag {
+            background: #B2E0D9; /* Sage green color */
+            color: black; /* Optional: change text color for better contrast */
+        }
     </style>
 </head>
 <body>
@@ -634,50 +639,67 @@
         });
 
         function generateMetadataHtml(data, isUpload = false) {
+            const isAuth = isAuthenticated();
+
+            // Helper function to create input or span based on authentication
+            const createField = (label, value, id) => `
+                <div class="metadata-field" style="margin-bottom: 10px;">
+                    <strong>${label}:</strong>
+                    ${isAuth 
+                        ? `<input type="text" value="${value}" id="${id}">` 
+                        : `<span class="metadata-value">${value}</span>`}
+                </div>
+            `;
+
+            // Create fields for title, author, and genre
+            const titleField = createField('Title', data.title, isUpload ? 'upload-metadata-title' : 'metadata-title');
+            const authorField = createField('Author', data.author, isUpload ? 'upload-metadata-author' : 'metadata-author');
+            const genreField = createField('Genre', data.genre || '', isUpload ? 'upload-metadata-genre' : 'metadata-genre');
+
+            // Create filename field if uploading
+            const extraField = isUpload 
+                ? createField('Filename', data.filename, 'upload-metadata-filename')
+                : `
+                    <div class="metadata-field" style="margin-bottom: 10px;">
+                        <strong>Custom Tags:</strong>
+                        ${isAuth 
+                            ? `<div class="tag-input-container">
+                                <div class="tags-container" id="tags-container"></div>
+                                <input type="text" id="tags-input" placeholder="Type and press Enter">
+                            </div>` 
+                            : `<span class="metadata-value">${data.tags.join(', ') || ''}</span>`}
+                    </div>
+                `;
+
+            // Cover preview
+            const coverPreview = `
+                <div class="metadata-cover" style="flex-shrink: 0; text-align: left;">
+                    <strong style="display: block; margin-bottom: 10px;">Cover Preview:</strong>
+                    <img src="data:image/jpeg;base64, ${data.cover}" alt="cover thumbnail" style="max-width: 180px; border-radius: 8px;">
+                </div>
+            `;
+
+            // Action buttons
+            const actionButtons = `
+                <div class="metadata-actions" style="justify-content: 'right';">
+                    ${isAuth 
+                        ? `<button class="save-button" onclick="${isUpload ? `saveNewBook('${data.filename}', '${data.cover_path}')` : `saveMetadata('${data.filename}')`}">Save Changes</button>`
+                        : `<p style="color: #666; font-style: italic; padding: 8px 16px; background-color: #FFE6E6; border: 1px solid #FFB3B3; border-radius: 4px;">Log in to edit the metadata</p>`}
+                </div>
+            `;
+
+            // Combine all parts into the final HTML
             return `
                 <div class="metadata-grid" style="display: flex; align-items: flex-start;">
                     <div class="metadata-fields" style="flex: 1; margin-right: 20px;">
-                        <div class="metadata-field" style="margin-bottom: 10px;">
-                            <strong>Title:</strong>
-                            <input type="text" value="${data.title}" id="${isUpload ? 'upload-metadata-title' : 'metadata-title'}">
-                        </div>
-                        <div class="metadata-field" style="margin-bottom: 10px;">
-                            <strong>Author:</strong>
-                            <input type="text" value="${data.author}" id="${isUpload ? 'upload-metadata-author' : 'metadata-author'}">
-                        </div>
-                        <div class="metadata-field" style="margin-bottom: 10px;">
-                            <strong>Genre:</strong>
-                            <input type="text" value="${data.genre || ''}" id="${isUpload ? 'upload-metadata-genre' : 'metadata-genre'}">
-                        </div>
-                        ${isUpload ? `
-                            <div class="metadata-field" style="margin-bottom: 10px;">
-                                <strong>Filename:</strong>
-                                <input type="text" value="${data.filename}" id="upload-metadata-filename">
-                            </div>
-                        ` : `
-                            <div class="metadata-field" style="margin-bottom: 10px;">
-                                <strong>Tags:</strong>
-                                <div class="tag-input-container">
-                                    <div class="tags-container" id="tags-container"></div>
-                                    <input type="text" id="tags-input" placeholder="Type and press Enter">
-                                </div>
-                            </div>
-                        `}
+                        ${titleField}
+                        ${authorField}
+                        ${genreField}
+                        ${extraField}
                     </div>
-                    <div class="metadata-cover" style="flex-shrink: 0; text-align: left;">
-                        <strong style="display: block; margin-bottom: 10px;">Cover Preview:</strong>
-                        <img src="data:image/jpeg;base64, ${data.cover}" alt="cover thumbnail" style="max-width: 180px; border-radius: 8px;">
-                    </div>
+                    ${coverPreview}
                 </div>
-                ${isUpload ? `
-                    <div class="metadata-actions">
-                        <button class="save-button" onclick="saveNewBook('${data.filename}', '${data.cover_path}')">Save Changes</button>
-                    </div>
-                ` : `
-                    <div class="metadata-actions">
-                        <button class="save-button" onclick="saveMetadata('${data.filename}')">Save Changes</button>
-                    </div>
-                `}
+                ${actionButtons}
             `;
         }
 
@@ -699,7 +721,7 @@
         function initializeTagInput(inputId, containerId, initialTags = []) {
             const input = document.getElementById(inputId);
             const container = document.getElementById(containerId);
-            
+
             // Add initial tags
             initialTags.forEach(tag => {
                 if (tag.trim()) addTag(tag.trim(), container);
@@ -731,7 +753,7 @@
                 : 'this.parentElement.remove()';
 
             const tag = document.createElement('span');
-            tag.className = 'tag';
+            tag.className = 'tag' + (cleanText === "Finished" ? ' finished-tag' : '');
             tag.innerHTML = `
                 ${cleanText}
                 <span class="remove-tag" onclick="${removeTagHandler}">×</span>

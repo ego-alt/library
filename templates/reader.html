@@ -194,13 +194,13 @@
         let currentChapter = 0;
         let currentFontSize = parseInt(localStorage.getItem('readerFontSize')) || 16;
         let lastSaveTimeout = null;
+        const filename = window.location.pathname.split('/').pop();
 
         // Initialize font size from localStorage
         document.documentElement.style.setProperty('--reader-font-size', currentFontSize + 'px');
 
         // Load book on page load
-        window.addEventListener('DOMContentLoaded', () => {
-            const filename = window.location.pathname.split('/').pop();
+        window.addEventListener('DOMContentLoaded', () => { 
             document.getElementById('loading-spinner').style.display = 'block';
             // Show controls immediately on load
             document.querySelector('.top-controls').classList.add('visible');
@@ -231,9 +231,7 @@
         function saveBookmark() {
             if (!lastSaveTimeout) {
                 lastSaveTimeout = setTimeout(() => {
-                    const filename = window.location.pathname.split('/').pop();
                     const position = window.scrollY / document.documentElement.scrollHeight;
-                    
                     fetch(`/bookmark/${filename}`, {
                         method: 'POST',
                         headers: {
@@ -264,7 +262,6 @@
             `).join('');
             
             // Load bookmark
-            const filename = window.location.pathname.split('/').pop();
             fetch(`/bookmark/${filename}`)
                 .then(response => response.json())
                 .then(data => {
@@ -324,6 +321,18 @@
                 displayChapter();
                 window.scrollTo({top: 0, behavior: 'instant'});
                 saveBookmark();
+            }
+            
+            if (currentChapter === currentBook.chapters.length - 1) {
+                fetch(`/tag_finished/${filename}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        tags: ['Finished']
+                    })
+                }).catch(error => console.error('Error adding tag:', error));
             }
         }
 
