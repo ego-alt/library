@@ -1,15 +1,16 @@
 from auth import auth as auth_blueprint
-from commands import init_commands
+from commands import init_commands, extract_metadata
 from datetime import datetime
-from flask import Flask, render_template, request, jsonify, send_from_directory
+from flask import Flask, render_template, request, jsonify, send_from_directory, current_app
 from flask_caching import Cache
 from flask_compress import Compress
 from flask_login import LoginManager, current_user
+from ebooklib import epub
 
 import logging
 from models import db, Book, Tag, User, book_tags, Bookmark  # Add this import
 import os
-from utils import get_epub_cover, get_epub_content
+from utils import get_epub_cover, get_epub_content, get_epub_cover_path
 
 
 logger = logging.getLogger(__name__)
@@ -25,6 +26,7 @@ def create_app():
     Compress(app)
     cache.init_app(app)
 
+    app.config['SECRET_KEY'] = 'your-secret-key-here'
     # Database configuration
     app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///library.db'
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -203,7 +205,12 @@ def create_app():
             'author': book.author,
             'genre': book.genre,
             'created_at': book.created_at.strftime('%Y-%m-%d %H:%M:%S'),
-            'tags': []
+            'tags': [],
+            'filename': book.filename,
+            'cover': get_epub_cover(
+                os.path.join(app.config['BOOK_DIR'], book.filename),
+                book.cover_path
+            )
         }
         
         # Only include tags if user is authenticated
@@ -274,6 +281,100 @@ def create_app():
         response.cache_control.public = True
         response.cache_control.max_age = 3600  # Cache for 1 hour
         return response
+
+    @app.route('/upload_book', methods=['POST'])
+    def upload_book():
+        """Endpoint to save the uploaded EPUB and return pre-populated metadata."""
+        if not current_user.is_authenticated:
+            return jsonify({'error': 'Authentication required'}), 401
+
+        # Check for the file in the request
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file part in the request'}), 400
+
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+
+        # Save the file to the BOOK_DIR
+        file_path = os.path.join(current_app.config['BOOK_DIR'], file.filename)
+        file.save(file_path)
+        current_app.logger.info(f"Saved uploaded file to {file_path}")
+
+        # Read the EPUB file to extract metadata
+        try:
+            epub_book = epub.read_epub(file_path)
+        except Exception as e:
+            current_app.logger.error(f"Failed to read EPUB file: {str(e)}")
+            return jsonify({'error': 'Failed to read EPUB file: ' + str(e)}), 500
+
+        # Extract metadata using your helper function (assumes extract_metadata is defined in commands.py)
+        metadata = extract_metadata(epub_book)
+        if not metadata:
+            metadata = {'title': '', 'author': ''}
+
+        # Optionally add genre (if your EPUB or helper can extract one)
+        metadata.setdefault('genre', '')
+
+        # Get cover image details
+        cover_path = get_epub_cover_path(file_path)
+        cover = get_epub_cover(file_path, cover_path)
+
+        # Return the metadata plus file details
+        return jsonify({
+            'filename': file.filename,
+            'title': metadata.get('title', ''),
+            'author': metadata.get('author', ''),
+            'genre': metadata.get('genre', ''),
+            'cover': cover,
+            'cover_path': cover_path
+        })
+
+    @app.route('/upload_book_metadata', methods=['POST'])
+    def upload_book_metadata():
+        """Endpoint to save metadata for a newly uploaded book (creating a new DB record)."""
+        if not current_user.is_authenticated:
+            return jsonify({'error': 'Authentication required'}), 401
+
+        data = request.get_json()
+        original_filename = data.get('original_filename')
+        new_filename = data.get('new_filename')
+        if not new_filename:
+            return jsonify({'error': 'Missing new filename'}), 400
+
+        # Ensure this file is not already in the database
+        existing_book = Book.query.filter_by(filename=new_filename).first()
+        if existing_book:
+            return jsonify({'error': 'Book with this filename already exists'}), 400
+
+        # Define the original and new file paths
+        original_filepath = os.path.join(current_app.config['BOOK_DIR'], original_filename)
+        new_filepath = os.path.join(current_app.config['BOOK_DIR'], new_filename)
+
+        # Rename the file
+        try:
+            os.rename(original_filepath, new_filepath)
+            current_app.logger.info(f"Renamed file from {original_filepath} to {new_filepath}")
+        except Exception as e:
+            current_app.logger.error(f"Failed to rename file: {str(e)}")
+            return jsonify({'error': 'Failed to rename file: ' + str(e)}), 500
+
+        # Create a new Book record with the submitted metadata
+        new_book = Book(
+            title=data.get('title'),
+            author=data.get('author'),
+            genre=data.get('genre'),
+            filename=new_filename,
+            cover_path=data.get('cover_path'),
+            access_level='standard'  # or any default you wish
+        )
+        db.session.add(new_book)
+        try:
+            db.session.commit()
+            return jsonify({'message': 'Book added successfully'})
+        except Exception as e:
+            db.session.rollback()
+            return jsonify({'error': str(e)}), 500
 
     # Initialize database
     db.init_app(app)

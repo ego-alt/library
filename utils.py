@@ -54,6 +54,7 @@ def normalize_path(path):
     path = path.replace('../', '').replace('./', '')
     return path.split("images/", 1)[-1]
 
+
 def get_chapter_title(item, soup):
     """Extract chapter title using multiple fallback methods."""
     # Method 1: Check for heading tags

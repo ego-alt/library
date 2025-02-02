@@ -123,10 +123,6 @@
             gap: 8px;
         }
         
-        .metadata-field.full-width {
-            grid-column: 1 / -1;
-        }
-        
         .metadata-field strong {
             color: #34495E;
             font-weight: 600;
@@ -167,7 +163,6 @@
             display: flex;
             justify-content: flex-end;
             padding-top: 10px;
-            border-top: 1px solid rgba(0, 0, 0, 0.1);
         }
         
         .close-metadata {
@@ -277,7 +272,7 @@
             gap: 0.5rem;
         }
 
-        .filter-button, .login-button {
+        .filter-button, .login-button, .upload-button {
             background: none;
             border: none;
             font-size: 1.2em;
@@ -287,7 +282,7 @@
             transition: color 0.2s;
         }
 
-        .filter-button:hover, .login-button:hover {
+        .filter-button:hover, .login-button:hover, .upload-button:hover {
             color: #2C3E50;
         }
 
@@ -481,6 +476,9 @@
                         <i class="fas fa-door-open"></i>
                     </button>
                 {% endif %}
+                <button class="upload-button" onclick="document.getElementById('fileUploadInput').click();">
+                    <i class="fas fa-upload"></i>
+                </button>
                 <button class="filter-button">
                     <i class="fas fa-filter"></i>
                 </button>
@@ -551,6 +549,9 @@
             </form>
         </div>
     </div>
+
+    <!-- Hidden file input for file uploads -->
+    <input type="file" id="fileUploadInput" style="display: none;" onchange="handleFileUpload(this.files)">
 
     <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
     <script>
@@ -632,69 +633,67 @@
             }
         });
 
-        function showMetadata(filename) {
-            $.get(`/book_metadata/${filename}`, function(data) {
-                let metadataHtml = `
-                    <div class="metadata-grid">
-                        <div class="metadata-field">
+        function generateMetadataHtml(data, isUpload = false) {
+            return `
+                <div class="metadata-grid" style="display: flex; align-items: flex-start;">
+                    <div class="metadata-fields" style="flex: 1; margin-right: 20px;">
+                        <div class="metadata-field" style="margin-bottom: 10px;">
                             <strong>Title:</strong>
-                            ${isAuthenticated() ? `
-                                <input type="text" value="${data.title}" id="metadata-title">
-                            ` : `
-                                <span class="metadata-value">${data.title}</span>
-                            `}
+                            <input type="text" value="${data.title}" id="${isUpload ? 'upload-metadata-title' : 'metadata-title'}">
                         </div>
-                        <div class="metadata-field">
+                        <div class="metadata-field" style="margin-bottom: 10px;">
                             <strong>Author:</strong>
-                            ${isAuthenticated() ? `
-                                <input type="text" value="${data.author}" id="metadata-author">
-                            ` : `
-                                <span class="metadata-value">${data.author}</span>
-                            `}
+                            <input type="text" value="${data.author}" id="${isUpload ? 'upload-metadata-author' : 'metadata-author'}">
                         </div>
-                        <div class="metadata-field">
+                        <div class="metadata-field" style="margin-bottom: 10px;">
                             <strong>Genre:</strong>
-                            ${isAuthenticated() ? `
-                                <input type="text" value="${data.genre || ''}" id="metadata-genre">
-                            ` : `
-                                <span class="metadata-value">${data.genre || ''}</span>
-                            `}
+                            <input type="text" value="${data.genre || ''}" id="${isUpload ? 'upload-metadata-genre' : 'metadata-genre'}">
                         </div>
-                        <div class="metadata-field">
-                            <strong>Added:</strong>
-                            <span class="metadata-value">${new Date(data.created_at).toLocaleDateString()}</span>
-                        </div>
-                        <div class="metadata-field full-width">
-                            <strong>Tags:</strong>
-                            ${isAuthenticated() ? `
+                        ${isUpload ? `
+                            <div class="metadata-field" style="margin-bottom: 10px;">
+                                <strong>Filename:</strong>
+                                <input type="text" value="${data.filename}" id="upload-metadata-filename">
+                            </div>
+                        ` : `
+                            <div class="metadata-field" style="margin-bottom: 10px;">
+                                <strong>Tags:</strong>
                                 <div class="tag-input-container">
                                     <div class="tags-container" id="tags-container"></div>
                                     <input type="text" id="tags-input" placeholder="Type and press Enter">
                                 </div>
-                            ` : `
-                                <span class="metadata-value">
-                                    <div class="tags-container" id="tags-container"></div>
-                                </span>
-                            `}
-                        </div>
+                            </div>
+                        `}
                     </div>
-                    ${isAuthenticated() ? `
-                        <div class="metadata-actions">
-                            <button class="save-button" onclick="saveMetadata('${filename}')">Save Changes</button>
-                        </div>
-                    ` : `
-                        <div class="metadata-actions" style="justify-content: center;">
-                            <p style="color: #666; font-style: italic; padding: 8px 16px; background-color: #FFE6E6; border: 1px solid #FFB3B3; border-radius: 4px;">Log in to edit the metadata</p>
-                        </div>
-                    `}
-                `;
-                
+                    <div class="metadata-cover" style="flex-shrink: 0; text-align: left;">
+                        <strong style="display: block; margin-bottom: 10px;">Cover Preview:</strong>
+                        <img src="data:image/jpeg;base64, ${data.cover}" alt="cover thumbnail" style="max-width: 180px; border-radius: 8px;">
+                    </div>
+                </div>
+                ${isUpload ? `
+                    <div class="metadata-actions">
+                        <button class="save-button" onclick="saveNewBook('${data.filename}', '${data.cover_path}')">Save Changes</button>
+                    </div>
+                ` : `
+                    <div class="metadata-actions">
+                        <button class="save-button" onclick="saveMetadata('${data.filename}')">Save Changes</button>
+                    </div>
+                `}
+            `;
+        }
+
+        function showMetadata(filename) {
+            $.get(`/book_metadata/${filename}`, function(data) {
+                const metadataHtml = generateMetadataHtml(data);
                 $('#metadataContent').html(metadataHtml);
                 $('#metadataOverlay').css('display', 'flex').fadeIn();
-
-                // Initialize tags after HTML is inserted
                 initializeTagInput('tags-input', 'tags-container', data.tags);
             });
+        }
+
+        function showUploadMetadata(data) {
+            const metadataHtml = generateMetadataHtml(data, true);
+            $('#metadataContent').html(metadataHtml);
+            $('#metadataOverlay').css('display', 'flex').fadeIn();
         }
 
         function initializeTagInput(inputId, containerId, initialTags = []) {
@@ -878,6 +877,61 @@
 
         // Initialize the filter tags input
         initializeTagInput('filterTags', 'filter-tags-container');
+
+        async function handleFileUpload(files) {
+            if (files.length) {
+                const file = files[0]; // For simplicity, we handle one file at a time.
+                const formData = new FormData();
+                formData.append('file', file);
+                
+                try {
+                    const response = await fetch('/upload_book', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        alert("Upload failed: " + errorData.error);
+                        return;
+                    }
+                    const data = await response.json();
+                    // Open the metadata overlay with pre-populated fields from the uploaded book.
+                    showUploadMetadata(data);
+                } catch (error) {
+                    console.error("Error during file upload", error);
+                    alert("Error uploading file");
+                }
+            }
+        }
+
+        function saveNewBook(originalFilename, cover_path) {
+            // Collect the metadata from the overlay inputs.
+            const newFilename = $('#upload-metadata-filename').val(); // Get the new filename
+            const metadata = {
+                title: $('#upload-metadata-title').val(),
+                author: $('#upload-metadata-author').val(),
+                genre: $('#upload-metadata-genre').val(),
+                original_filename: originalFilename, // Send the original filename
+                new_filename: newFilename, // Send the new filename
+                cover_path: cover_path
+            };
+
+            $.ajax({
+                url: '/upload_book_metadata', // Adjust this URL if necessary
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(metadata),
+                success: function(response) {
+                    alert("Book added successfully!");
+                    $('#metadataOverlay').fadeOut();
+                    location.reload();
+                },
+                error: function(xhr, status, error) {
+                    console.error("Error saving new book:", error);
+                    alert("Error saving new book: " + error);
+                }
+            });
+        }
     </script>
 </body>
 </html>
