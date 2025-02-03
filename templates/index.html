@@ -438,6 +438,11 @@
             margin-bottom: 20px;
         }
 
+        .started-tag {
+            background: #D9B2A0; /* Amber color */
+            color: black; /* Optional: change text color for better contrast */
+        }
+
         .finished-tag {
             background: #B2E0D9; /* Sage green color */
             color: black; /* Optional: change text color for better contrast */
@@ -753,7 +758,7 @@
                 : 'this.parentElement.remove()';
 
             const tag = document.createElement('span');
-            tag.className = 'tag' + (cleanText === "Finished" ? ' finished-tag' : '');
+            tag.className = 'tag' + (cleanText === "Finished" ? ' finished-tag' : (cleanText === "In Progress" ? ' started-tag' : ''));
             tag.innerHTML = `
                 ${cleanText}
                 <span class="remove-tag" onclick="${removeTagHandler}">×</span>

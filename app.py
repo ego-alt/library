@@ -18,13 +18,24 @@ logger.setLevel(logging.INFO)
 
 
 # Initialise the app cache
-cache = Cache(config={'CACHE_TYPE': 'simple'})
+# cache = Cache(config={'CACHE_TYPE': 'simple'})
+
+
+def get_progress_tag(session, book_id, user_id):
+    """Query to get progress tag for specific book_id and user_id."""
+    return session.query(book_tags).join(
+        Tag, book_tags.c.tag_id == Tag.id
+        ).filter(
+            book_tags.c.book_id == book_id,
+            book_tags.c.user_id == user_id,
+            Tag.category == 0
+        ).first()
 
 
 def create_app():
     app = Flask(__name__)
     Compress(app)
-    cache.init_app(app)
+    # cache.init_app(app)
 
     app.config['SECRET_KEY'] = 'your-secret-key-here'
     # Database configuration
@@ -125,8 +136,23 @@ def create_app():
         return render_template('reader.html')
 
     @app.route('/load_book/<filename>')
-    @cache.cached(timeout=3600)
     def load_book(filename):
+        # Check if a progress tag exists for the current user and book
+        if current_user.is_authenticated:
+            book = Book.query.filter_by(filename=filename).first()
+            progress_tag = get_progress_tag(db.session, book.id, current_user.id)
+            logging.info(f"Progress tag: {progress_tag}")
+            if not progress_tag:
+                logging.info(f"Creating progress tag for book {book.id} and user {current_user.id}")
+                db.session.execute(
+                    book_tags.insert().values(
+                        book_id=book.id,
+                        tag_id=Tag.query.filter_by(name='In Progress', user_id=current_user.id).first().id,
+                        user_id=current_user.id
+                    )
+                )
+                db.session.commit()
+
         try:
             book_data = get_epub_content(app.config['BOOK_DIR'], filename)
             logging.info(f"Successfully processed book with {book_data['image_count']} images")
@@ -217,7 +243,7 @@ def create_app():
                     book_tags.c.book_id == book.id,
                     book_tags.c.user_id == current_user.id
                 )
-            ).order_by(Tag.status).all()
+            ).order_by(Tag.category).all()
             response['tags'] = [tag[0] for tag in user_tags]
         
         return jsonify(response)
@@ -280,27 +306,30 @@ def create_app():
         if not book:
             return jsonify({'error': 'Book not found'}), 404
         
-        # Check if the 'Finished' tag already exists for the user
-        finish_tag = Tag.query.filter_by(name='Finished', user_id=current_user.id).first()
-        if not finish_tag:
-            finish_tag = Tag(name='Finished', user_id=current_user.id, status=0)
-            db.session.add(finish_tag)
-            db.session.commit()  # Commit here to ensure the tag is saved before using it
-
-        # Check if the book is already tagged as finished
-        existing_tag = db.session.query(book_tags).filter_by(
-            book_id=book.id, tag_id=finish_tag.id, user_id=current_user.id
-        ).first()
-        logging.info(f"Existing tag: {existing_tag}")
-        if not existing_tag:
+        # Delete the existing progress tag of the book
+        progress_tag = get_progress_tag(db.session, book.id, current_user.id)
+        logging.info(f"Progress tag: {progress_tag}")
+        if progress_tag:
             db.session.execute(
-                book_tags.insert().values(
-                    book_id=book.id,
-                    tag_id=finish_tag.id,
-                    user_id=current_user.id
+                book_tags.delete().where(
+                    db.and_(
+                        book_tags.c .book_id == book.id,
+                        book_tags.c.tag_id == progress_tag.tag_id,
+                        book_tags.c.user_id == current_user.id
+                    )
                 )
             )
-            db.session.commit()
+
+        finish_tag = Tag.query.filter_by(name='Finished', user_id=current_user.id).first()
+        logging.info(f"Finish tag: {finish_tag}")
+        db.session.execute(
+            book_tags.insert().values(
+                book_id=book.id,
+                tag_id=finish_tag.id,
+                user_id=current_user.id
+            )
+        )
+        db.session.commit()
         
         return jsonify({'message': 'Book tagged as finished'})
 

@@ -61,7 +61,7 @@ class Tag(db.Model):
     name = db.Column(db.String(50), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-    status = db.Column(db.Integer, nullable=False, default=1)  # 0 for finish_tag, 1 for others
+    category = db.Column(db.Integer, nullable=False, default=1)  # 0 for progress tag, 1 for others
     
     # Add user relationship
     user = db.relationship('User', back_populates='tags')
