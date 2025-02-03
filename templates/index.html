@@ -444,7 +444,12 @@
         }
 
         .finished-tag {
-            background: #B2E0D9; /* Sage green color */
+            background: #B2E0D9; /* Sage color */
+            color: black; /* Optional: change text color for better contrast */
+        }
+
+        .unread-tag {
+            background: #A0B2D9; /* Blue color*/
             color: black; /* Optional: change text color for better contrast */
         }
     </style>
@@ -468,7 +473,10 @@
             <label for="filterTags">Tags</label>
             <div class="tag-input-container">
                 <div class="tags-container" id="filter-tags-container"></div>
-                <input type="text" id="filterTags" placeholder="Filter by tags...">
+                <input type="text" id="filterTags" placeholder="Unread, Finished...">
+                <style>
+                    #filterTags::placeholder {font-style: italic;}
+                </style>
             </div>
         </div>
     </div>
@@ -500,7 +508,7 @@
                     <div class="book">
                         <div class="book-buttons">
                             <button class="book-button">
-                                <a href="{{ url_for('download', filename=book.filename) }}" download>
+                                <a href="{{ url_for('index_routes.download', filename=book.filename) }}" download>
                                     <i class="fas fa-download"></i>
                                 </a>
                             </button>
@@ -508,7 +516,7 @@
                                 <i class="fas fa-ellipsis-h"></i>
                             </button>
                         </div>
-                        <a href="{{ url_for('read_book', filename=book.filename) }}">
+                        <a href="{{ url_for('read_routes.read_book', filename=book.filename) }}">
                             <img src="data:image/jpeg;base64, {{book.cover}}" alt="cover">
                         </a>
                     </div>
@@ -758,7 +766,7 @@
                 : 'this.parentElement.remove()';
 
             const tag = document.createElement('span');
-            tag.className = 'tag' + (cleanText === "Finished" ? ' finished-tag' : (cleanText === "In Progress" ? ' started-tag' : ''));
+            tag.className = 'tag' + (cleanText === "Finished" ? ' finished-tag' : (cleanText === "In Progress" ? ' started-tag' : (cleanText === "Unread" ? ' unread-tag' : '')));
             tag.innerHTML = `
                 ${cleanText}
                 <span class="remove-tag" onclick="${removeTagHandler}">×</span>

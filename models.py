@@ -1,9 +1,15 @@
-from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 from flask_login import UserMixin
+from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
+from enum import Enum
 
 db = SQLAlchemy()
+
+class ProgressChoice(str, Enum):
+    UNREAD = 'Unread'
+    IN_PROGRESS = 'In Progress'
+    FINISHED = 'Finished'
 
 # Junction table for book tags
 book_tags = db.Table('book_tags',
@@ -61,7 +67,6 @@ class Tag(db.Model):
     name = db.Column(db.String(50), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-    category = db.Column(db.Integer, nullable=False, default=1)  # 0 for progress tag, 1 for others
     
     # Add user relationship
     user = db.relationship('User', back_populates='tags')
@@ -80,8 +85,10 @@ class Bookmark(db.Model):
     book_id = db.Column(db.Integer, db.ForeignKey('books.id'), nullable=False)
     chapter_index = db.Column(db.Integer, default=0)
     position = db.Column(db.Float, default=0)  # Percentage through chapter
+
     last_read = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-    
+    status = db.Column(db.Enum(ProgressChoice), nullable=False, default=ProgressChoice.UNREAD.value)
+
     # Relationships
     user = db.relationship('User', back_populates='bookmarks')
     book = db.relationship('Book', back_populates='bookmarks')

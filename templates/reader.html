@@ -325,13 +325,7 @@
             
             if (currentChapter === currentBook.chapters.length - 1) {
                 fetch(`/tag_finished/${filename}`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        tags: ['Finished']
-                    })
+                    method: 'POST'
                 }).catch(error => console.error('Error adding tag:', error));
             }
         }

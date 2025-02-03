@@ -3,7 +3,7 @@ from flask.cli import with_appcontext
 import os
 import ebooklib
 from ebooklib import epub
-from models import db, Book, User, Tag
+from models import db, Book, User, Tag, Bookmark
 import logging
 from flask import current_app
 from utils import get_epub_cover, get_epub_cover_path, extract_metadata
@@ -129,13 +129,6 @@ def create_user_command(username, password):
     user.set_password(password)
     db.session.add(user)
     db.session.commit()
-    # Create default tags for the user
-    in_progress_tag = Tag(name="In Progress", user_id=user.id, category=0)
-    finish_tag = Tag(name="Finished", user_id=user.id, category=0)
-    db.session.add(in_progress_tag)
-    db.session.add(finish_tag)
-    db.session.commit()
-    
     click.echo(f'Created user: {username}')
 
 
