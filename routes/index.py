@@ -9,6 +9,7 @@ index_blueprint = Blueprint('index_routes', __name__)
 
 def get_covers(offset=0, limit=10, filters=None):
     query = Book.query
+    conditions = []
 
     if filters:
         # Apply text filters for title, author, and genre
@@ -20,7 +21,7 @@ def get_covers(offset=0, limit=10, filters=None):
         # Apply tag filters if provided
         if (tags := filters.get('tags')):
             if not current_user.is_authenticated:
-                return []
+                return conditions
 
             user_id = current_user.id
             tag_words = [tag.strip() for tag in tags.split(',') if tag.strip()]
@@ -28,7 +29,6 @@ def get_covers(offset=0, limit=10, filters=None):
             progress_tags = [tag for tag in tag_words if tag in (ProgressChoice.IN_PROGRESS, ProgressChoice.FINISHED)]
             other_tags = [tag for tag in tag_words if tag in progress_tags]
 
-            conditions = []
             if unread_tag:
                 conditions.append(
                     db.or_(
@@ -45,11 +45,14 @@ def get_covers(offset=0, limit=10, filters=None):
                     db.and_(Tag.name.in_(other_tags), Tag.user_id == user_id)
                 )
 
-            query = query.outerjoin(Book.bookmarks).outerjoin(Book.tags)
-            if conditions:
-                query = query.filter(db.or_(*conditions))
+    if  current_user.is_authenticated:
+        query = query.outerjoin(Book.bookmarks).outerjoin(Book.tags)
+        if conditions:
+            query = query.filter(db.or_(*conditions))
+        query = query.order_by(Bookmark.last_read.desc(), Book.created_at.desc())
+    else:
+        query = query.order_by(Book.created_at.desc())
 
-    books = query.offset(offset).limit(limit).all()
     return [
         {
             "filename": book.filename,
@@ -58,7 +61,7 @@ def get_covers(offset=0, limit=10, filters=None):
                 book.cover_path
             )
         }
-        for book in books
+        for book in query.offset(offset).limit(limit).all()
     ]
 
 
