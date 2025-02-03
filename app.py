@@ -165,6 +165,7 @@ def create_app():
                     )
                 )
                 # Create/get tags and commit them
+                tags_to_add = []
                 for tag_name in data.get('tags', []):
                     tag = Tag.query.filter_by(
                         name=tag_name,
@@ -176,6 +177,9 @@ def create_app():
                         db.session.add(tag)
                         db.session.flush()  # This assigns the ID without committing
                     
+                    tags_to_add.append(tag)
+                
+                for tag in tags_to_add:
                     db.session.execute(
                         book_tags.insert().values(
                             book_id=book.id,
@@ -276,15 +280,19 @@ def create_app():
         if not book:
             return jsonify({'error': 'Book not found'}), 404
         
+        # Check if the 'Finished' tag already exists for the user
         finish_tag = Tag.query.filter_by(name='Finished', user_id=current_user.id).first()
         if not finish_tag:
             finish_tag = Tag(name='Finished', user_id=current_user.id, status=0)
             db.session.add(finish_tag)
-            db.session.flush()
+            db.session.commit()  # Commit here to ensure the tag is saved before using it
 
-        if not db.session.query(book_tags).filter_by(
+        # Check if the book is already tagged as finished
+        existing_tag = db.session.query(book_tags).filter_by(
             book_id=book.id, tag_id=finish_tag.id, user_id=current_user.id
-        ).first():
+        ).first()
+        logging.info(f"Existing tag: {existing_tag}")
+        if not existing_tag:
             db.session.execute(
                 book_tags.insert().values(
                     book_id=book.id,
@@ -293,6 +301,7 @@ def create_app():
                 )
             )
             db.session.commit()
+        
         return jsonify({'message': 'Book tagged as finished'})
 
     @app.after_request
