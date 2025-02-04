@@ -6,7 +6,7 @@ This project is an EPUB Library Management System built using Flask, SQLAlchemy,
 
 ![alt text](images/home_page.png)
 
-![alt text](images/metadata_overlay.png)
+![alt text](images/metadata_dark.png)
 
 ![alt text](images/epub_reader.png)
 
