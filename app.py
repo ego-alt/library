@@ -37,11 +37,11 @@ def create_app():
     def load_user(user_id):
         return User.query.get(int(user_id))
 
-    @app.after_request
-    def add_cache_headers(response):
-        response.cache_control.public = True
-        response.cache_control.max_age = 3600  # Cache for 1 hour
-        return response
+    # @app.after_request
+    # def add_cache_headers(response):
+    #     response.cache_control.public = True
+    #     response.cache_control.max_age = 3600  # Cache for 1 hour
+    #     return response
 
     # Register blueprints 
     app.register_blueprint(auth_blueprint)

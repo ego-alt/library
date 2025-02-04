@@ -18,5 +18,5 @@ class Config:
     ]
 
     # Book directory
-    BOOK_DIR = os.getenv('BOOK_DIR', 'static/')
+    BOOK_DIR = os.getenv('BOOK_DIR', 'static/epubs/')
     # TODO: change to BOOK_DIR = "/mnt/backup/books"
