@@ -19,7 +19,8 @@
             --overlay-box-shadow: rgba(0, 0, 0, 0.2);
             --controls-background: white;
             --toc-item-color: #333;
-            --toc-item-highlight: #007bff;
+            --toc-item-highlight: #6AACFF;
+            --toc-item-background: #6AACFF4f;
             --text-color-dark: #34495E;
         }
         body {
@@ -30,6 +31,7 @@
             --controls-background: #242424;
             --toc-item-color: #B0B0B0;
             --toc-item-highlight: #3A6D9A;
+            --toc-item-background: #3a6d9a4f;
             --text-color-dark: #B0B0B0;
         }
         p {
@@ -45,19 +47,16 @@
             padding-top: 10px;
             transition: padding-top 0.3s ease;
         }
-        
         #chapter-content {
             margin-bottom: 80px;
             font-size: var(--reader-font-size, 16px);
         }
-        
         #chapter-content img {
             max-width: 100%;
             height: auto;
             display: block;
             margin: 1em auto;
         }
-        
         .controls {
             position: fixed;
             bottom: 0;
@@ -71,29 +70,34 @@
             gap: 15px;
             align-items: center;
         }
-        
         .controls .btn {
             min-width: 75px;
             padding: 4px 9px;
             color: var(--toc-item-highlight);
         }
-
         .btn-outline-primary {
             border-color: var(--toc-item-highlight);
-            color: var(--text-color-dark);
+            color: var(--toc-item-highlight);
         }
-
+        .btn-outline-primary:hover {
+            border-color: var(--toc-item-highlight);
+            background: var(--toc-item-highlight);
+            color: white;
+            box-shadow: none;
+        }
+        .btn-outline-primary:focus, .btn-outline-primary:active {
+            outline: none;
+            box-shadow: none;
+        }
         .btn-primary, .btn-secondary, .btn-outline-secondary {
             padding: 6px 12px;
             font-size: 14px;
         }
-   
         .display-controls {
             display: flex;
             align-items: center;
             gap: 10px;
         }
-        
         .top-controls {
             position: fixed;
             top: -60px;
@@ -108,11 +112,9 @@
             align-items: center;
             transition: top 0.3s ease;
         }
-
         .top-controls.visible {
             top: 0;
         }
-
         .top-trigger {
             position: fixed;
             top: 0;
@@ -121,18 +123,14 @@
             height: 20px;
             z-index: 99;
         }
-
-        .top-trigger:hover + .top-controls,
-        .top-controls:hover {
+        .top-trigger:hover + .top-controls, .top-controls:hover {
             top: 0;
         }
-
         .top-controls.visible + .container .reader-container,
         .top-trigger:hover + .top-controls + .container .reader-container,
         .top-controls:hover + .container .reader-container {
             padding-top: 70px;
         }
-
         .toc-menu {
             position: fixed;
             top: 60px;
@@ -146,27 +144,22 @@
             z-index: 98;
             padding: 20px;
         }
-
         .toc-menu.visible {
             left: 0;
         }
-
         .toc-item {
             padding: 8px 0;
             cursor: pointer;
             color: var(--toc-item-color);
             text-decoration: none;
         }
-
         .toc-item:hover {
             color: var(--toc-item-highlight);
         }
-
         .toc-item.active {
             color: var(--toc-item-highlight);
             font-weight: bold;
         }
-
         .top-controls:not(.visible) + .container + .toc-menu {
             top: 0;
             height: 100vh;
