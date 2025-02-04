@@ -44,8 +44,34 @@
             --text-color-light: #B0B0B0;
             --text-color-gray: #888;
         }
+        .header-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+        }
+        .header-left {
+            display: flex;
+            justify-content: flex-start;
+            position: absolute;
+            left: 0;
+        }
+        .header-right {
+            display: flex;
+            justify-content: flex-end;
+            position: absolute;
+            right: 0;
+        }
+        .header-center {
+            flex-grow: 1;
+            text-align: center;
+        }
+        .header-left button, .header-right button {
+            margin-left: 10px;
+        }
         .header-row h1 {
-            color: var(--text-color-dark); /* Light mode color */
+            color: var(--text-color-dark);
+            margin: 0;
         }
         .library {
             margin-bottom: 30px;
@@ -526,11 +552,13 @@
 
     <div class="container">
         <div class="header-row my-4">
-            <h1 class="text-center m-0">Library</h1>
-            <div class="header-buttons">
+            <div class="header-left">
                 <button class="dark-mode-toggle" onclick="toggleDarkMode()">
                     <i id="dark-mode-icon" class="fas fa-moon"></i>
                 </button>
+            </div>         
+            <h1 class="header-title m-0">Library</h1>
+            <div class="header-right">
                 {% if current_user.is_authenticated %}
                     <button class="login-button" onclick="handleLogout()">
                         <i class="fas fa-door-closed"></i>
