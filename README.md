@@ -10,6 +10,8 @@ This project is an EPUB Library Management System built using Flask, SQLAlchemy,
 
 ![alt text](images/epub_reader.png)
 
+![alt text](images/epub_reader_dark.png)
+
 ## Features
 
 - **Book Management**: Users can upload EPUB files, which are processed to extract metadata and cover images.
