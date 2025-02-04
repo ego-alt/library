@@ -13,42 +13,42 @@ def upload_book():
     if not current_user.is_authenticated:
         return jsonify({'error': 'Authentication required'}), 401
 
-        # Check for the file in the request
-        if 'file' not in request.files:
-            return jsonify({'error': 'No file part in the request'}), 400
+    # Check for the file in the request
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file part in the request'}), 400
 
-        file = request.files['file']
-        if file.filename == '':
-            return jsonify({'error': 'No file selected'}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'No file selected'}), 400
 
-        # Save the file to the BOOK_DIR
-        file_path = os.path.join(current_app.config['BOOK_DIR'], file.filename)
-        file.save(file_path)
-        current_app.logger.info(f"Saved uploaded file to {file_path}")
+    # Save the file to the BOOK_DIR
+    file_path = os.path.join(current_app.config['BOOK_DIR'], file.filename)
+    file.save(file_path)
+    current_app.logger.info(f"Saved uploaded file to {file_path}")
 
-        # Read the EPUB file to extract metadata
-        try:
-            epub_book = epub.read_epub(file_path)
-        except Exception as e:
-            current_app.logger.error(f"Failed to read EPUB file: {str(e)}")
-            return jsonify({'error': 'Failed to read EPUB file: ' + str(e)}), 500
+    # Read the EPUB file to extract metadata
+    try:
+        epub_book = epub.read_epub(file_path)
+    except Exception as e:
+        current_app.logger.error(f"Failed to read EPUB file: {str(e)}")
+        return jsonify({'error': 'Failed to read EPUB file: ' + str(e)}), 500
 
-        metadata = extract_metadata(epub_book)
-        if not metadata:
-            metadata = {'title': '', 'author': ''}
+    metadata = extract_metadata(epub_book)
+    if not metadata:
+        metadata = {'title': '', 'author': ''}
 
-        # Get cover image details
-        cover_path = get_epub_cover_path(file_path)
-        cover = get_epub_cover(file_path, cover_path)
+    # Get cover image details
+    cover_path = get_epub_cover_path(file_path)
+    cover = get_epub_cover(file_path, cover_path)
 
-        # Return the metadata plus file details
-        return jsonify({
-            'filename': file.filename,
-            'title': metadata.get('title', ''),
-            'author': metadata.get('author', ''),
-            'cover': cover,
-            'cover_path': cover_path
-        })
+    # Return the metadata plus file details
+    return jsonify({
+        'filename': file.filename,
+        'title': metadata.get('title', ''),
+        'author': metadata.get('author', ''),
+        'cover': cover,
+        'cover_path': cover_path
+    })
 
 
 @upload_blueprint.route('/upload_book_metadata', methods=['POST'])
