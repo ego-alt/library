@@ -1,3 +1,4 @@
+from ebooklib import epub
 from flask import Blueprint, current_app, jsonify, request
 from flask_login import current_user
 from models import Book, db
