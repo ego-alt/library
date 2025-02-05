@@ -1,19 +1,14 @@
 import logging
 import os
-from datetime import datetime
-
-from ebooklib import epub
-from flask import Flask, render_template, request, jsonify, send_from_directory, current_app
+from flask import Flask, request
 from flask_caching import Cache
 from flask_compress import Compress
-from flask_login import LoginManager, current_user
+from flask_login import LoginManager
 
 from config import Config
 from commands import init_commands
-from models import db, Book, Tag, User, book_tags, Bookmark, ProgressChoice
+from models import db, User
 from routes import auth_blueprint, index_blueprint, metadata_blueprint, read_blueprint, upload_blueprint
-from tag_manager import TagManager
-from utils import get_epub_cover, get_epub_content, get_epub_cover_path, extract_metadata
 
 # Initialize logger
 logger = logging.getLogger(__name__)

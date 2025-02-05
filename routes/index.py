@@ -1,6 +1,6 @@
 from flask import Blueprint, current_app, jsonify, request, render_template
 from flask_login import current_user
-from models import Book, db, Bookmark, ProgressChoice, Tag
+from models import Book, db, Bookmark, BookProgressChoice, Tag
 import os
 from utils import get_epub_cover
 
@@ -25,15 +25,15 @@ def get_covers(offset=0, limit=10, filters=None):
 
             user_id = current_user.id
             tag_words = [tag.strip() for tag in tags.split(',') if tag.strip()]
-            unread_tag = ProgressChoice.UNREAD.value in tag_words
-            progress_tags = [tag for tag in tag_words if tag in (ProgressChoice.IN_PROGRESS, ProgressChoice.FINISHED)]
+            unread_tag = BookProgressChoice.UNREAD.value in tag_words
+            progress_tags = [tag for tag in tag_words if tag in (BookProgressChoice.IN_PROGRESS, BookProgressChoice.FINISHED)]
             other_tags = [tag for tag in tag_words if tag in progress_tags]
 
             if unread_tag:
                 conditions.append(
                     db.or_(
                         Bookmark.id.is_(None),
-                        db.and_(Bookmark.status == ProgressChoice.UNREAD, Bookmark.user_id == user_id)
+                        db.and_(Bookmark.status == BookProgressChoice.UNREAD, Bookmark.user_id == user_id)
                     )
                 )
             if progress_tags:

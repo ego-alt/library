@@ -1,7 +1,7 @@
 from datetime import datetime
 from flask import Blueprint, current_app, jsonify, request, render_template
 from flask_login import current_user
-from models import Book, db, Bookmark, ProgressChoice
+from models import Book, db, Bookmark, BookProgressChoice
 from utils import get_epub_content
 import logging
 
@@ -28,8 +28,8 @@ def load_book(filename):
             db.session.add(bookmark)
             db.session.commit()
         
-        if bookmark.status == ProgressChoice.UNREAD:
-            bookmark.status = ProgressChoice.IN_PROGRESS
+        if bookmark.status == BookProgressChoice.UNREAD:
+            bookmark.status = BookProgressChoice.IN_PROGRESS
             logging.info(f"Setting status to IN_PROGRESS for book {book.id} and user {current_user.id}")
             db.session.commit()
     try:
@@ -91,7 +91,7 @@ def tag_finished(filename):
         return jsonify({'error': 'Book not found'}), 404
 
     bookmark = Bookmark.query.filter_by(user_id=current_user.id, book_id=book.id).first()
-    bookmark.status = ProgressChoice.FINISHED
+    bookmark.status = BookProgressChoice.FINISHED
     logging.info(f"Setting status to FINISHED for book {book.id} and user {current_user.id}")
     db.session.commit() 
     return jsonify({'message': 'Book tagged as finished'})

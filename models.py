@@ -6,7 +6,11 @@ from enum import Enum
 
 db = SQLAlchemy()
 
-class ProgressChoice(str, Enum):
+class UserRoleChoice(str, Enum):
+    ADMIN = 'admin'
+    STANDARD = 'standard'
+
+class BookProgressChoice(str, Enum):
     UNREAD = 'Unread'
     IN_PROGRESS = 'In Progress'
     FINISHED = 'Finished'
@@ -25,7 +29,7 @@ class User(UserMixin, db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=True)
     password_hash = db.Column(db.String(128))
-    role = db.Column(db.String(20), nullable=False, default='standard')  # 'admin', 'standard'
+    role = db.Column(db.Enum(UserRoleChoice), nullable=False, default=UserRoleChoice.STANDARD)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     
     # Add these methods
@@ -87,7 +91,7 @@ class Bookmark(db.Model):
     position = db.Column(db.Float, default=0)  # Percentage through chapter
 
     last_read = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-    status = db.Column(db.Enum(ProgressChoice), nullable=False, default=ProgressChoice.UNREAD.value)
+    status = db.Column(db.Enum(BookProgressChoice), nullable=False, default=BookProgressChoice.UNREAD.value)
 
     # Relationships
     user = db.relationship('User', back_populates='bookmarks')

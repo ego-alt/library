@@ -122,24 +122,29 @@ initializeTagInput('filterTags', 'filter-tags-container');
 
 // <== FUNCTIONS FOR VIEWING AND EDITING METADATA ==>
 function generateMetadataHtml(data, isUpload = false) {
-    const isAuth = isAuthenticated();
+    const isAuth = window.isAuthenticated;
+    console.log("Current User Role:", window.currentUserRole);
+    const isAdmin = (window.currentUserRole || "") === 'admin';
+    console.log("isAdmin:", isAdmin);
 
-    // Helper function to create input or span based on authentication
+    // Helper function to create a field.
+    // Only admin users get an <input> so they can edit the field.
+    // Non-admins (or guests) see a <span> with the value.
     const createField = (label, value, id) => `
         <div class="metadata-field" style="margin-bottom: 10px;">
             <strong>${label}:</strong>
-            ${isAuth 
+            ${isAdmin 
                 ? `<input type="text" value="${value}" id="${id}">` 
-                : `<span class="metadata-value">${value}</span>`}
+                : `<span class="metadata-value" id="${id}">${value}</span>`}
         </div>
     `;
 
-    // Create fields for title, author, and genre
+    // Create fields for title, author, and genre.
     const titleField = createField('Title', data.title, isUpload ? 'upload-metadata-title' : 'metadata-title');
     const authorField = createField('Author', data.author, isUpload ? 'upload-metadata-author' : 'metadata-author');
     const genreField = createField('Genre', data.genre || '', isUpload ? 'upload-metadata-genre' : 'metadata-genre');
 
-    // Create filename field if uploading
+    // For uploading a new book, include a filename field.
     const extraField = isUpload 
         ? createField('Filename', data.filename, 'upload-metadata-filename')
         : `
@@ -153,30 +158,30 @@ function generateMetadataHtml(data, isUpload = false) {
                     : `<span class="metadata-value">${data.tags.join(', ') || ''}</span>`}
             </div>
         `;
-
+    
     // Cover preview with an edit button if the user is authenticated
     const coverPreview = `
         <div class="metadata-cover" style="text-align: left;">
             <strong style="display: block; margin-bottom: 10px;">Cover Preview:</strong>
             <div style="position: relative; display: inline-block;">
                 <img id="cover-preview-image" src="data:image/jpeg;base64, ${data.cover}" alt="cover thumbnail" style="max-width: 180px; border-radius: 8px;">
-                ${isAuth ? `<button class="book-button" style="position: absolute; top: 5px; right: 5px;" onclick="triggerCoverUpload('${data.filename}')">
+                ${isAdmin ? `<button class="book-button" style="position: absolute; top: 5px; right: 5px;" onclick="triggerCoverUpload('${data.filename}')">
                     <i class="fas fa-edit"></i>
                 </button>` : ''}
             </div>
         </div>
     `;
 
-    // Action buttons
+    // Action buttons for saving changes.
     const actionButtons = `
         <div class="metadata-actions" style="justify-content: 'right';">
             ${isAuth 
                 ? `<button class="save-button" onclick="${isUpload ? `saveNewBook('${data.filename}', '${data.cover_path}')` : `saveMetadata('${data.filename}')`}">Save Changes</button>`
-                : `<p style="color: #666; font-style: italic; padding: 8px 16px; background-color: #FFE6E6; border: 1px solid #FFB3B3; border-radius: 4px;">Log in to edit the metadata</p>`}
+                : ``}
         </div>
     `;
-
-    // Combine all parts into the final HTML
+    
+    // Combine all parts into the final HTML.
     return `
         <div class="metadata-grid" style="display: flex; align-items: flex-start;">
             <div class="metadata-fields" style="flex: 1; margin-right: 20px;">
@@ -207,10 +212,18 @@ function showUploadMetadata(data) {
 }
 
 function saveMetadata(filename) {
+    // Determine if the current user is an admin.
+    let isAdmin = window.currentUserRole && window.currentUserRole.toLowerCase() === 'admin';
+
+    // For each metadata field, check if it is rendered as an input (editable) or as a span.
+    const title = $('#metadata-title').is('input') ? $('#metadata-title').val() : $('#metadata-title').text().trim();
+    const author = $('#metadata-author').is('input') ? $('#metadata-author').val() : $('#metadata-author').text().trim();
+    const genre = $('#metadata-genre').is('input') ? $('#metadata-genre').val() : $('#metadata-genre').text().trim();
+
     const metadata = {
-        title: $('#metadata-title').val(),
-        author: $('#metadata-author').val(),
-        genre: $('#metadata-genre').val(),
+        title,
+        author,
+        genre,
         tags: Array.from($('#tags-container .tag')).map(tag =>
             tag.textContent.replace(/×/g, '').trim()
         )
@@ -400,10 +413,6 @@ async function handleCoverUpload(files) {
 
 
 // <== FUNCTIONS FOR AUTHENTICATING ==>
-function isAuthenticated() {
-    return document.body.contains(document.querySelector('button[onclick="handleLogout()"]'));
-}
-
 function showLoginDialog() {
     $('#loginOverlay').css('display', 'flex').fadeIn();
     $('#username').focus();

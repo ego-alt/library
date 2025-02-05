@@ -1,6 +1,6 @@
 from flask import Blueprint, current_app, jsonify, request
 from flask_login import current_user
-from models import Book, db, Tag, book_tags, ProgressChoice
+from models import Book, db, Tag, book_tags, BookProgressChoice
 from tag_manager import TagManager
 from utils import get_epub_cover, update_epub_cover
 import os
@@ -40,7 +40,7 @@ def book_metadata(filename):
             tags_to_add = []
             for tag_name in data.get('tags', []):
                 # TODO: Generalise this
-                if tag_name in [ProgressChoice.IN_PROGRESS, ProgressChoice.FINISHED]:
+                if tag_name in [BookProgressChoice.IN_PROGRESS, BookProgressChoice.FINISHED]:
                     progress_tag = tag_name
                     continue
 

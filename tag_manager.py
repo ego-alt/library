@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from flask import jsonify
-from models import Bookmark, Tag, ProgressChoice, book_tags, db
+from models import Bookmark, Tag, BookProgressChoice, book_tags, db
 import logging
 
 
@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 ATTRIBUTES = {
-    "status": ProgressChoice.UNREAD.value
+    "status": BookProgressChoice.UNREAD.value
 }
 
 @dataclass

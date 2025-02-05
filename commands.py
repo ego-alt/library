@@ -123,13 +123,20 @@ def remove_deleted_books_command(directory):
 @click.command('create-user')
 @click.argument('username')
 @click.argument('password')
-def create_user_command(username, password):
+@click.option(
+    '--role',
+    default='standard',
+    type=click.Choice(['admin', 'standard'], case_sensitive=False),
+    help='User role (admin or standard) [default: standard]'
+)
+def create_user_command(username, password, role):
     """Create a new user."""
     user = User(username=username)
     user.set_password(password)
+    user.role = role  # Assign the role to the user
     db.session.add(user)
     db.session.commit()
-    click.echo(f'Created user: {username}')
+    click.echo(f'Created user: {username} with role {role}')
 
 
 def init_commands(app):
