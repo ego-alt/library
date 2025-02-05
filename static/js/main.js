@@ -3,6 +3,28 @@ let isLoading = false;
 let allImagesLoaded = false;
 let currentFilters = {};
 
+function getBookTemplate(book) {
+    return `
+        <div class="col-md-3 mb-3">
+            <div class="book">
+                <div class="book-buttons">
+                    <button class="book-button">
+                        <a href="/download/${book.filename}" download>
+                            <i class="fas fa-download"></i>
+                        </a>
+                    </button>
+                    <button class="book-button" onclick="showMetadata('${book.filename}')">
+                        <i class="fas fa-ellipsis-h"></i>
+                    </button>
+                </div>
+                <a href="/read/${book.filename}">
+                    <img src="data:image/jpeg;base64, ${book.cover}" alt="cover">
+                </a>
+            </div>
+        </div>
+    `;
+}
+
 $(window).scroll(function() {
     if (!isLoading && !allImagesLoaded && $(window).scrollTop() + $(window).height() >= $(document).height() - 100) {
         loadMoreImages();
@@ -16,33 +38,6 @@ function debounce(func, wait) {
         clearTimeout(timeout);
         timeout = setTimeout(() => func.apply(this, args), wait);
     };
-}
-
-// Add filter handling
-function applyFilters() {
-    // Reset pagination
-    offset = 0;
-    allImagesLoaded = false;
-    
-    // Collect filter values
-    currentFilters = {
-        title: $('#filterTitle').val(),
-        author: $('#filterAuthor').val(),
-        genre: $('#filterGenre').val(),
-        tags: [
-            ...Array.from($('#filter-tags-container .tag')).map(tag => 
-                tag.innerText.replace(/×/g, '').trim()
-            ),
-            $('#filterTags').val().trim() // Include text from the input box
-        ].filter(tag => tag) // Filter out any empty strings
-    };
-    console.log(currentFilters);
-
-    // Clear existing books
-    $('#library').empty();
-    
-    // Load filtered books
-    loadMoreImages();
 }
 
 // Update loadMoreImages function to use filters
@@ -73,6 +68,35 @@ function loadMoreImages() {
     });
 }
 
+
+// <== FUNCTIONS FOR FILTERING ==>
+// Add filter handling
+function applyFilters() {
+    // Reset pagination
+    offset = 0;
+    allImagesLoaded = false;
+    
+    // Collect filter values
+    currentFilters = {
+        title: $('#filterTitle').val(),
+        author: $('#filterAuthor').val(),
+        genre: $('#filterGenre').val(),
+        tags: [
+            ...Array.from($('#filter-tags-container .tag')).map(tag => 
+                tag.innerText.replace(/×/g, '').trim()
+            ),
+            $('#filterTags').val().trim() // Include text from the input box
+        ].filter(tag => tag) // Filter out any empty strings
+    };
+    console.log(currentFilters);
+
+    // Clear existing books
+    $('#library').empty();
+    
+    // Load filtered books
+    loadMoreImages();
+}
+
 // Add event listeners for filter inputs
 const debouncedApplyFilters = debounce(applyFilters, 300);
 $('#filterTitle, #filterAuthor, #filterGenre').on('input', debouncedApplyFilters);
@@ -82,6 +106,21 @@ $('#filterTags').on('keydown', function(event) {
     }
 });
 
+$('.filter-button').on('click', function() {
+    $('#filterSidebar').toggleClass('active');
+    $('#filterOverlay').fadeToggle();
+});
+
+$('#filterOverlay').on('click', function() {
+    $('#filterSidebar').removeClass('active');
+    $('#filterOverlay').fadeOut();
+});
+
+// Initialize the filter tags input
+initializeTagInput('filterTags', 'filter-tags-container');
+
+
+// <== FUNCTIONS FOR VIEWING AND EDITING METADATA ==>
 function generateMetadataHtml(data, isUpload = false) {
     const isAuth = isAuthenticated();
 
@@ -167,49 +206,6 @@ function showUploadMetadata(data) {
     $('#metadataOverlay').css('display', 'flex').fadeIn();
 }
 
-function initializeTagInput(inputId, containerId, initialTags = []) {
-    const input = document.getElementById(inputId);
-    const container = document.getElementById(containerId);
-
-    // Add initial tags
-    initialTags.forEach(tag => {
-        if (tag.trim()) addTag(tag.trim(), container);
-    });
-    
-    input.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter' || e.key === ',') {
-            e.preventDefault();
-            const value = this.value.trim();
-            if (value) {
-                addTag(value, container);
-                this.value = '';
-            }
-        } else if (e.key === 'Backspace' && !this.value) {
-            const tags = container.getElementsByClassName('tag');
-            if (tags.length) {
-                container.removeChild(tags[tags.length - 1]);
-            }
-        }
-    });
-}
-function addTag(text, container) {
-    const cleanText = text.replace(/×/g, '').trim();
-    if (!cleanText) return;
-
-    const isFiltering = container.id === 'filter-tags-container';
-    const removeTagHandler = isFiltering 
-        ? 'this.parentElement.remove(); applyFilters();' 
-        : 'this.parentElement.remove()';
-
-    const tag = document.createElement('span');
-    tag.className = 'tag' + (cleanText === "Finished" ? ' finished-tag' : (cleanText === "In Progress" ? ' started-tag' : (cleanText === "Unread" ? ' unread-tag' : '')));
-    tag.innerHTML = `
-        ${cleanText}
-        <span class="remove-tag" onclick="${removeTagHandler}">×</span>
-    `;
-    container.appendChild(tag);
-}
-
 function saveMetadata(filename) {
     const metadata = {
         title: $('#metadata-title').val(),
@@ -274,113 +270,59 @@ function saveMetadata(filename) {
     });
 }
 
-function getBookTemplate(book) {
-    return `
-        <div class="col-md-3 mb-3">
-            <div class="book">
-                <div class="book-buttons">
-                    <button class="book-button">
-                        <a href="/download/${book.filename}" download>
-                            <i class="fas fa-download"></i>
-                        </a>
-                    </button>
-                    <button class="book-button" onclick="showMetadata('${book.filename}')">
-                        <i class="fas fa-ellipsis-h"></i>
-                    </button>
-                </div>
-                <a href="/read/${book.filename}">
-                    <img src="data:image/jpeg;base64, ${book.cover}" alt="cover">
-                </a>
-            </div>
-        </div>
-    `;
-}
-
 $('.close-metadata, .metadata-overlay').on('click', function(e) {
     if (e.target === this) {
         $('#metadataOverlay').fadeOut();
     }
 });
 
-$('.filter-button').on('click', function() {
-    $('#filterSidebar').toggleClass('active');
-    $('#filterOverlay').fadeToggle();
-});
 
-$('#filterOverlay').on('click', function() {
-    $('#filterSidebar').removeClass('active');
-    $('#filterOverlay').fadeOut();
-});
+// <== FUNCTIONS FOR TAGGING ==>
+function initializeTagInput(inputId, containerId, initialTags = []) {
+    const input = document.getElementById(inputId);
+    const container = document.getElementById(containerId);
 
-function showLoginDialog() {
-    $('#loginOverlay').css('display', 'flex').fadeIn();
-    $('#username').focus();
-}
-
-function closeLoginDialog() {
-    $('#loginOverlay').fadeOut();
-    $('#loginForm')[0].reset();
-    $('#loginError').hide();
-}
-
-async function handleLogin(event) {
-    event.preventDefault();
+    // Add initial tags
+    initialTags.forEach(tag => {
+        if (tag.trim()) addTag(tag.trim(), container);
+    });
     
-    const formData = new FormData(event.target);
-    
-    try {
-        console.log('Attempting login...');
-        const response = await fetch('/auth/login', {
-            method: 'POST',
-            body: formData
-        });
-        
-        console.log('Response status:', response.status);
-        const data = await response.json();
-        console.log('Response data:', data);
-        
-        if (response.ok) {
-            location.reload();
-        } else {
-            $('#loginError').text(data.error).show();
+    input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' || e.key === ',') {
+            e.preventDefault();
+            const value = this.value.trim();
+            if (value) {
+                addTag(value, container);
+                this.value = '';
+            }
+        } else if (e.key === 'Backspace' && !this.value) {
+            const tags = container.getElementsByClassName('tag');
+            if (tags.length) {
+                container.removeChild(tags[tags.length - 1]);
+            }
         }
-    } catch (error) {
-        console.error('Login error:', error);
-        $('#loginError').text('An error occurred. Please try again.').show();
-    }
+    });
+}
+function addTag(text, container) {
+    const cleanText = text.replace(/×/g, '').trim();
+    if (!cleanText) return;
+
+    const isFiltering = container.id === 'filter-tags-container';
+    const removeTagHandler = isFiltering 
+        ? 'this.parentElement.remove(); applyFilters();' 
+        : 'this.parentElement.remove()';
+
+    const tag = document.createElement('span');
+    tag.className = 'tag' + (cleanText === "Finished" ? ' finished-tag' : (cleanText === "In Progress" ? ' started-tag' : (cleanText === "Unread" ? ' unread-tag' : '')));
+    tag.innerHTML = `
+        ${cleanText}
+        <span class="remove-tag" onclick="${removeTagHandler}">×</span>
+    `;
+    container.appendChild(tag);
 }
 
-// Close dialog when clicking outside or on close button
-$('.close-login, .login-overlay').on('click', function(e) {
-    if (e.target === this) {
-        closeLoginDialog();
-    }
-});
 
-// Prevent closing when clicking inside the login content
-$('.login-content').on('click', function(e) {
-    e.stopPropagation();
-});
-
-async function handleLogout() {
-    try {
-        const response = await fetch('/auth/logout');
-        if (response.ok) {
-            location.reload();
-        }
-    } catch (error) {
-        console.error('Logout error:', error);
-    }
-}
-
-// Add this helper function to check authentication status
-function isAuthenticated() {
-    return document.body.contains(document.querySelector('button[onclick="handleLogout()"]'));
-}
-
-// Initialize the filter tags input
-initializeTagInput('filterTags', 'filter-tags-container');
-
+// <== FUNCTIONS FOR UPLOADING BOOKS AND COVERS ==>
 async function handleFileUpload(files) {
     if (files.length) {
         const file = files[0]; // For simplicity, we handle one file at a time.
@@ -455,3 +397,70 @@ async function handleCoverUpload(files) {
         reader.readAsDataURL(files[0]);
     }
 }
+
+
+// <== FUNCTIONS FOR AUTHENTICATING ==>
+function isAuthenticated() {
+    return document.body.contains(document.querySelector('button[onclick="handleLogout()"]'));
+}
+
+function showLoginDialog() {
+    $('#loginOverlay').css('display', 'flex').fadeIn();
+    $('#username').focus();
+}
+
+function closeLoginDialog() {
+    $('#loginOverlay').fadeOut();
+    $('#loginForm')[0].reset();
+    $('#loginError').hide();
+}
+
+async function handleLogin(event) {
+    event.preventDefault();
+    
+    const formData = new FormData(event.target);
+    
+    try {
+        console.log('Attempting login...');
+        const response = await fetch('/auth/login', {
+            method: 'POST',
+            body: formData
+        });
+        
+        console.log('Response status:', response.status);
+        const data = await response.json();
+        console.log('Response data:', data);
+        
+        if (response.ok) {
+            location.reload();
+        } else {
+            $('#loginError').text(data.error).show();
+        }
+    } catch (error) {
+        console.error('Login error:', error);
+        $('#loginError').text('An error occurred. Please try again.').show();
+    }
+}
+
+async function handleLogout() {
+    try {
+        const response = await fetch('/auth/logout');
+        if (response.ok) {
+            location.reload();
+        }
+    } catch (error) {
+        console.error('Logout error:', error);
+    }
+}
+
+// Close dialog when clicking outside or on close button
+$('.close-login, .login-overlay').on('click', function(e) {
+    if (e.target === this) {
+        closeLoginDialog();
+    }
+});
+
+// Prevent closing when clicking inside the login content
+$('.login-content').on('click', function(e) {
+    e.stopPropagation();
+});
