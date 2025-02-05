@@ -14,10 +14,19 @@ This project is an EPUB Library Management System built using Flask, SQLAlchemy,
 
 ## Features
 
-- **Book Management**: Users can upload EPUB files, which are processed to extract metadata and cover images.
-- **Bookmarking**: The application automatically saves the reading position in each book for user convenience.
-- **Search and Filter**: Users can search for books by title, author, genre, and tags.
-- **Responsive Design**: The web interface is designed to be user-friendly and responsive.
+- **Book Management**
+  - Upload and process EPUBs, with automatic parsing of metadata.
+  - Customize book covers by uploading a new jpg or png.
+  - Download books directly from the library.
+- **EPUB Reader**
+  - Built-in reader with chapter-based navigation.
+  - Toggle dark mode, adjust font size, and leverage a dynamic table of contents.
+  - Mobile-friendly layout with intuitive controls.
+- **Filtering & Search**
+  - Filter books by title, author, genre, or tags.
+  - Track reading progress with automatic tags for Unread, In Progress, and Finished books.
+- **Dark Mode**
+  - Toggle between light and dark themes effortlessly.
 
 ## Installation
 
@@ -34,14 +43,28 @@ This project is an EPUB Library Management System built using Flask, SQLAlchemy,
 
 3. **Run the Docker container**:
    ```bash
-   docker run -d -p 8002:8002 -v <local_path_to_books>:/mnt/backup/books epub-library
+   docker run -d -p 8002:8002 \
+       -v <local_path_to_books>:/mnt/backup/books \
+       -v <local_path_to_instance>:/app/instance \
+       epub-library
+   ```
+
+4. **Alternative (local) setup**
+
+   Ensure you have Python (3.6+) installed and set up a virtual environment:
+   ```bash
+   python -m venv venv
+   source venv/bin/activate   # On Windows use `venv\Scripts\activate`
+   pip install -r requirements.txt
+   flask run --port=8002
    ```
 
 ## Usage
 
 - **Access the application**: Open your web browser and go to `http://127.0.0.1:8002`.
 - **User Registration**: Create a new user account to start managing your books.
-- **Upload Books**: Use the provided interface to upload EPUB files.
+- **Upload Books**: Click the upload icon to add an EPUB file to the library.
+- **Filtering**: Use the sidebar filters to narrow down your book collection by title, author, genre, or tags.
 - **Read Books**: Click on a book to read it in the built-in reader.
 - **Bookmarking**: Save your reading position for easy access later.
 
