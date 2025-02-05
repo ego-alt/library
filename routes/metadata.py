@@ -2,8 +2,9 @@ from flask import Blueprint, current_app, jsonify, request
 from flask_login import current_user
 from models import Book, db, Tag, book_tags, ProgressChoice
 from tag_manager import TagManager
-from utils import get_epub_cover
+from utils import get_epub_cover, update_epub_cover
 import os
+import base64
 
 
 metadata_blueprint = Blueprint('metadata_routes', __name__)
@@ -91,3 +92,36 @@ def book_metadata(filename):
         response['tags'] = tag_manager.get_all_tags(book.id)
     
     return jsonify(response)
+
+
+@metadata_blueprint.route('/update_cover', methods=['POST'])
+def update_cover():
+    """
+    Update the cover image for a book. This route expects a file input named 'cover'
+    and a form field 'filename' for locating the corresponding book.
+    """
+    if not current_user.is_authenticated:
+        return jsonify({'error': 'Authentication required'}), 401
+
+    if 'cover' not in request.files or 'filename' not in request.form:
+        return jsonify({'error': 'Cover file and filename are required'}), 400
+
+    cover_file = request.files['cover']
+    filename = request.form['filename']
+
+    # Query the Book record by filename
+    book = Book.query.filter_by(filename=filename).first()
+    if not book:
+        return jsonify({'error': 'Book not found'}), 404
+
+    epub_file_path = os.path.join(current_app.config['BOOK_DIR'], book.filename)
+
+    try:
+        new_cover_bytes = cover_file.read()
+        # Delegate EPUB cover replacement to our utils helper function
+        update_epub_cover(epub_file_path, new_cover_bytes)
+        new_cover_b64 = base64.b64encode(new_cover_bytes).decode('utf-8')
+        return jsonify({'new_cover': new_cover_b64})
+    except Exception as e:
+        current_app.logger.error(f"Error updating cover: {str(e)}")
+        return jsonify({'error': str(e)}), 500

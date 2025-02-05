@@ -68,7 +68,7 @@ def get_covers(offset=0, limit=10, filters=None):
 @index_blueprint.route('/')
 def index():
     """Render the initial page with the first batch of book covers."""
-    images = get_covers(0, 10)
+    images = get_covers(0, 8)
     return render_template('index.html', images=images)
 
 
@@ -82,7 +82,7 @@ def load_more(offset):
     }
     # Remove empty filters
     filters = {k: v for k, v in filters.items() if v}
-    images = get_covers(offset, 10, filters)
+    images = get_covers(offset, 8, filters)
     return jsonify(images)
 
 

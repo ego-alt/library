@@ -7,6 +7,8 @@ from lxml import etree
 import os
 from urllib.parse import unquote
 import zipfile
+import tempfile
+import shutil
 
 
 logger = logging.getLogger(__name__)
@@ -198,3 +200,26 @@ def extract_metadata(epub_book):
     except Exception as e:
         logger.error(f"Error extracting metadata: {str(e)}")
         return None
+
+
+def update_epub_cover(epub_file_path: str, new_cover_bytes: bytes) -> None:
+    """Replace the cover image in the EPUB file with new cover bytes."""
+    # Get the internal path for the cover image in the EPUB archive
+    cover_path_inside = get_epub_cover_path(epub_file_path)
+    
+    # Create a temporary file that will become the updated EPUB
+    temp_fd, temp_path = tempfile.mkstemp(suffix='.epub')
+    os.close(temp_fd)
+    
+    with zipfile.ZipFile(epub_file_path, 'r') as zin:
+        with zipfile.ZipFile(temp_path, 'w') as zout:
+            for item in zin.infolist():
+                if item.filename == cover_path_inside:
+                    # Replace the cover image with the new image bytes
+                    zout.writestr(item, new_cover_bytes)
+                else:
+                    # Copy all other original files as-is
+                    zout.writestr(item, zin.read(item.filename))
+    
+    # Replace the original EPUB file with the updated version
+    shutil.move(temp_path, epub_file_path)
