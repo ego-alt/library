@@ -656,6 +656,12 @@
         let allImagesLoaded = false;
         let currentFilters = {};
 
+        $(window).scroll(function() {
+            if (!isLoading && !allImagesLoaded && $(window).scrollTop() + $(window).height() >= $(document).height() - 100) {
+                loadMoreImages();
+            }
+        });
+
         // Add debounce function
         function debounce(func, wait) {
             let timeout;
