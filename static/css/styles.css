@@ -505,5 +505,5 @@ body {
     color: black;
 }
 .dark-mode .book img {
-    filter: brightness(0.5);
+    filter: brightness(0.6);
 }
