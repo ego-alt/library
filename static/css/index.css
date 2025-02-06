@@ -231,9 +231,9 @@ body {
     background: var(--text-color-light);
     color: white;
     border: none;
-    padding: 5px 15px;
+    padding: 8px 30px;
     border-radius: 6px;
-    font-size: 0.9em;
+    font-size: 1em;
     cursor: pointer;
     transition: background-color 0.2s ease;
     width: 180px;
