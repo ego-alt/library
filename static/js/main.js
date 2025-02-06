@@ -1,4 +1,4 @@
-let offset = 10;
+let offset = 8;
 let isLoading = false;
 let allImagesLoaded = false;
 let currentFilters = {};
@@ -62,7 +62,7 @@ function loadMoreImages() {
                 $('#library').append(getBookTemplate(book));
             });
         }
-        offset += 10;
+        offset += 8;
         isLoading = false;
         $('#loading').hide();
     });
