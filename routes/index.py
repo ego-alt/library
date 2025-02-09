@@ -1,15 +1,18 @@
 from flask import Blueprint, current_app, jsonify, request, render_template
 from flask_login import current_user
-from models import Book, db, Bookmark, BookProgressChoice, Tag
+from models import db, Book,Bookmark, Tag
+from choices import BookProgressChoice, UserRoleChoice
 import os
 from utils import get_epub_cover
 
 
 index_blueprint = Blueprint('index_routes', __name__)
 
-def get_covers(offset=0, limit=10, filters=None):
+def get_covers(offset=0, limit=8, filters=None):
     query = Book.query
-    conditions = []
+
+    if not current_user.is_authenticated or current_user.role == UserRoleChoice.STANDARD:
+        query = query.filter(Book.access_level == "standard")
 
     if filters:
         # Apply text filters for title, author, and genre
@@ -21,34 +24,35 @@ def get_covers(offset=0, limit=10, filters=None):
         # Apply tag filters if provided
         if (tags := filters.get('tags')):
             if not current_user.is_authenticated:
-                return conditions
+                return []
 
             user_id = current_user.id
-            tag_words = [tag.strip() for tag in tags.split(',') if tag.strip()]
-            unread_tag = BookProgressChoice.UNREAD.value in tag_words
-            progress_tags = [tag for tag in tag_words if tag in (BookProgressChoice.IN_PROGRESS, BookProgressChoice.FINISHED)]
-            other_tags = [tag for tag in tag_words if tag in progress_tags]
+            tags = [tag.strip() for tag in tags.split(',') if tag.strip()]
+            tag_filters = []
 
-            if unread_tag:
-                conditions.append(
+            if BookProgressChoice.UNREAD.value in tags:
+                tag_filters.append(
                     db.or_(
                         Bookmark.id.is_(None),
                         db.and_(Bookmark.status == BookProgressChoice.UNREAD, Bookmark.user_id == user_id)
                     )
                 )
+            
+            progress_tags = {tag for tag in tags if tag in (BookProgressChoice.IN_PROGRESS, BookProgressChoice.FINISHED)}
+            other_tags = {tag for tag in tags if tag not in progress_tags}
             if progress_tags:
-                conditions.append(
+                tag_filters.append(
                     db.and_(Bookmark.status.in_(progress_tags), Bookmark.user_id == user_id)
                 )
             if other_tags:
-                conditions.append(
+                tag_filters.append(
                     db.and_(Tag.name.in_(other_tags), Tag.user_id == user_id)
                 )
+            if tag_filters:
+                query = query.filter(db.or_(*tag_filters))
 
     if  current_user.is_authenticated:
         query = query.outerjoin(Book.bookmarks).outerjoin(Book.tags)
-        if conditions:
-            query = query.filter(db.or_(*conditions))
         query = query.order_by(Bookmark.last_read.desc(), Book.created_at.desc())
     else:
         query = query.order_by(Book.created_at.desc())

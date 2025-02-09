@@ -380,7 +380,7 @@ function saveNewBook(originalFilename, cover_path) {
         contentType: 'application/json',
         data: JSON.stringify(metadata),
         success: function(response) {
-            alert("Book added successfully!");
+            $('.save-button').text("Uploaded!");
             $('#metadataOverlay').fadeOut();
             location.reload();
         },

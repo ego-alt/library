@@ -7,7 +7,7 @@ import logging
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-ATTRIBUTES = {
+DEFAULT_ATTRIBUTES = {
     "status": BookProgressChoice.UNREAD.value
 }
 
@@ -35,7 +35,7 @@ class TagManager:
                 name=getattr(bookmark, attribute),
                 user_id=self.user_id,
             )
-            for attribute, default_value in ATTRIBUTES.items()
+            for attribute, default_value in DEFAULT_ATTRIBUTES.items()
             if getattr(bookmark, attribute) != default_value
         ]
 
@@ -66,7 +66,7 @@ class TagManager:
             return False
 
         if value is None:
-            value = ATTRIBUTES[field]
+            value = DEFAULT_ATTRIBUTES[field]
 
         if bookmark is None:
             bookmark = Bookmark(user_id=self.user_id, book_id=book_id, **{field: value})
@@ -75,5 +75,4 @@ class TagManager:
         else:
             setattr(bookmark, field, value)
 
-        self.db_session.commit()
         return True        

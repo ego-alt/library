@@ -22,6 +22,15 @@ def upload_book():
     if file.filename == '':
         return jsonify({'error': 'No file selected'}), 400
 
+    # Validate file format
+    if not file.filename.endswith('.epub'):
+        return jsonify({'error': 'Invalid file format. Please upload an EPUB file'}), 400
+
+    # Check file size (e.g., limit to 10 MB)
+    max_file_size = 10 * 1024 * 1024  # 10 MB
+    if file.content_length > max_file_size:
+        return jsonify({'error': 'File size exceeds the maximum limit of 10 MB.'}), 400
+
     # Save the file to the BOOK_DIR
     file_path = os.path.join(current_app.config['BOOK_DIR'], file.filename)
     file.save(file_path)
@@ -30,6 +39,14 @@ def upload_book():
     # Read the EPUB file to extract metadata
     try:
         epub_book = epub.read_epub(file_path)
+        table_of_contents = epub_book.get_items_of_type(epub.EpubNav)
+        import logging
+        logging.info(f"Table of contents: {table_of_contents}")
+        if not table_of_contents:
+            # TODO: Check what the table of contents looks like
+            os.remove(file_path)
+            return jsonify({'error': 'Uploaded EPUB does not contain a table of contents. Quality is questionable.'}), 400
+
     except Exception as e:
         current_app.logger.error(f"Failed to read EPUB file: {str(e)}")
         return jsonify({'error': 'Failed to read EPUB file: ' + str(e)}), 500

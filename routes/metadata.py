@@ -9,6 +9,28 @@ import base64
 
 metadata_blueprint = Blueprint('metadata_routes', __name__)
 
+BOOKMARK_ATTRIBUTES = {
+    "status": [BookProgressChoice.IN_PROGRESS, BookProgressChoice.FINISHED]
+}
+
+
+def bulk_create_tags(book, tags: list[Tag]):
+    for tag in tags:
+        db.session.execute(
+            book_tags.insert().values(
+                book_id=book.id,
+                tag_id=tag.id,
+                user_id=current_user.id
+            )
+        )
+
+
+def bulk_update_bookmark(book, field_to_update):
+    tag_manager = TagManager(db.session, current_user.id)
+    for key, value in field_to_update.items():
+        tag_manager.update_from_virtual_tag(book.id, key, value)
+
+
 @metadata_blueprint.route('/book_metadata/<filename>', methods=['GET', 'POST'])
 def book_metadata(filename):
     """Get or update book metadata."""
@@ -35,13 +57,18 @@ def book_metadata(filename):
                 )
             )
             # Create/get tags and commit them
-            tag_manager = TagManager(db.session, current_user.id)
-            progress_tag = None
+            bookmark_fields_to_update = {key: None for key in BOOKMARK_ATTRIBUTES.keys()}
             tags_to_add = []
+
             for tag_name in data.get('tags', []):
-                # TODO: Generalise this
-                if tag_name in [BookProgressChoice.IN_PROGRESS, BookProgressChoice.FINISHED]:
-                    progress_tag = tag_name
+                next_iter = False
+                for key, value in BOOKMARK_ATTRIBUTES.items():
+                    if tag_name in value:
+                        bookmark_fields_to_update[key] = tag_name
+                        next_iter = True
+                        break
+
+                if next_iter:
                     continue
 
                 tag = Tag.query.filter_by(
@@ -56,15 +83,8 @@ def book_metadata(filename):
                 
                 tags_to_add.append(tag)
             
-            for tag in tags_to_add:
-                db.session.execute(
-                    book_tags.insert().values(
-                        book_id=book.id,
-                        tag_id=tag.id,
-                        user_id=current_user.id
-                    )
-                )
-            tag_manager.update_from_virtual_tag(book.id, "status", progress_tag)
+            bulk_create_tags(book, tags_to_add)
+            bulk_update_bookmark(book, bookmark_fields_to_update)
             db.session.commit()
             return jsonify({'message': 'Metadata updated successfully'})
         except Exception as e:

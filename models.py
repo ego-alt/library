@@ -1,19 +1,10 @@
+from choices import UserRoleChoice, BookProgressChoice
 from datetime import datetime
 from flask_login import UserMixin
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
-from enum import Enum
 
 db = SQLAlchemy()
-
-class UserRoleChoice(str, Enum):
-    ADMIN = 'admin'
-    STANDARD = 'standard'
-
-class BookProgressChoice(str, Enum):
-    UNREAD = 'Unread'
-    IN_PROGRESS = 'In Progress'
-    FINISHED = 'Finished'
 
 # Junction table for book tags
 book_tags = db.Table('book_tags',
