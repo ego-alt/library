@@ -15,15 +15,17 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-@click.command('import-books')
-@click.option('--directory', help='Directory containing EPUB files')
-@click.option('--access-level', default='standard', help='Default access level for imported books')
+@click.command("import-books")
+@click.option("--directory", help="Directory containing EPUB files")
+@click.option(
+    "--access-level", default="standard", help="Default access level for imported books"
+)
 @with_appcontext
 def import_books_command(directory, access_level):
     """Import books from the specified directory."""
     # Use provided directory or fall back to BOOK_DIR from app config
-    book_dir = directory or current_app.config['BOOK_DIR']
-    
+    book_dir = directory or current_app.config["BOOK_DIR"]
+
     if not os.path.exists(book_dir):
         logger.error(f"Directory {book_dir} does not exist")
         return
@@ -33,11 +35,11 @@ def import_books_command(directory, access_level):
     skip_count = 0
 
     for filename in os.listdir(book_dir):
-        if not filename.endswith('.epub'):
+        if not filename.endswith(".epub"):
             continue
 
         full_path = os.path.join(book_dir, filename)
-        
+
         # Check if book already exists
         existing_book = Book.query.filter_by(filename=filename).first()
         if existing_book:
@@ -56,11 +58,11 @@ def import_books_command(directory, access_level):
 
                 # Create new book record
                 book = Book(
-                    title=metadata['title'],
-                    author=metadata['author'],
+                    title=metadata["title"],
+                    author=metadata["author"],
                     filename=filename,
                     cover_path=cover_path,  # Store the path within the epub
-                    access_level=access_level
+                    access_level=access_level,
                 )
                 db.session.add(book)
                 success_count += 1
@@ -87,14 +89,14 @@ Import completed:
         logger.error(f"Error committing to database: {str(e)}")
 
 
-@click.command('flush-books')
-@click.option('--directory', help='Directory containing EPUB files')
+@click.command("flush-books")
+@click.option("--directory", help="Directory containing EPUB files")
 @with_appcontext
 def remove_deleted_books_command(directory):
     """Remove books from the database that no longer exist in the specified directory."""
     # Use provided directory or fall back to BOOK_DIR from app config
-    book_dir = directory or current_app.config['BOOK_DIR']
-    
+    book_dir = directory or current_app.config["BOOK_DIR"]
+
     if not os.path.exists(book_dir):
         logger.error(f"Directory {book_dir} does not exist")
         return
@@ -114,20 +116,22 @@ def remove_deleted_books_command(directory):
     # Commit all changes
     try:
         db.session.commit()
-        logger.info(f"Removed {deleted_count} books from the database that no longer exist in {book_dir}")
+        logger.info(
+            f"Removed {deleted_count} books from the database that no longer exist in {book_dir}"
+        )
     except Exception as e:
         db.session.rollback()
         logger.error(f"Error committing to database: {str(e)}")
 
 
-@click.command('create-user')
-@click.argument('username')
-@click.argument('password')
+@click.command("create-user")
+@click.argument("username")
+@click.argument("password")
 @click.option(
-    '--role',
-    default='standard',
-    type=click.Choice(['admin', 'standard'], case_sensitive=False),
-    help='User role (admin or standard) [default: standard]'
+    "--role",
+    default="standard",
+    type=click.Choice(["admin", "standard"], case_sensitive=False),
+    help="User role (admin or standard) [default: standard]",
 )
 def create_user_command(username, password, role):
     """Create a new user."""
@@ -136,7 +140,7 @@ def create_user_command(username, password, role):
     user.role = role  # Assign the role to the user
     db.session.add(user)
     db.session.commit()
-    click.echo(f'Created user: {username} with role {role}')
+    click.echo(f"Created user: {username} with role {role}")
 
 
 def init_commands(app):
