@@ -2,4 +2,13 @@
 line-length = 88
 
 [tool.ruff.lint]
-select = ["E", "F", "W"]  # Specify which error codes to check
+select = [
+    "E",
+    "F",
+    "W",
+    "I",
+    "N",
+    "UP",
+    "B",
+    "TID"
+]  # Specify which error codes to check

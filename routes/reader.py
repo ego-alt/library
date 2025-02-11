@@ -1,10 +1,18 @@
 from datetime import datetime
-from flask import Blueprint, current_app, jsonify, request, render_template
+from flask import (
+    Blueprint,
+    current_app,
+    jsonify,
+    request,
+    render_template,
+    Response,
+    stream_with_context,
+)
 from flask_login import current_user
 from models import Book, db, Bookmark, BookProgressChoice
 from utils import get_epub_content
 import logging
-
+import json
 
 read_blueprint = Blueprint("read_routes", __name__)
 
@@ -17,7 +25,7 @@ def read_book(filename):
 
 @read_blueprint.route("/load_book/<filename>")
 def load_book(filename):
-    """Load the book and return the book data."""
+    """Load the book and return the book data as a stream."""
     if current_user.is_authenticated:
         book = Book.query.filter_by(filename=filename).first()
         bookmark = Bookmark.query.filter_by(
@@ -34,15 +42,55 @@ def load_book(filename):
                 f"Setting status to IN_PROGRESS for book {book.id} and user {current_user.id}"
             )
             db.session.commit()
+
     try:
-        book_data = get_epub_content(current_app.config["BOOK_DIR"], filename)
-        logging.info(
-            f"Successfully processed book with {book_data['image_count']} images"
+        return Response(
+            stream_with_context(
+                stream_book_content(current_app.config["BOOK_DIR"], filename)
+            ),
+            content_type="application/x-ndjson",
         )
-        return jsonify(book_data)
     except Exception as e:
         logging.error(f"Error processing epub: {str(e)}")
         return jsonify({"error": str(e)}), 500
+
+
+def stream_book_content(epub_dir, epub_path):
+    """Stream book content as newline-delimited JSON."""
+    try:
+        book_data = get_epub_content(epub_dir, epub_path)
+
+        # Send initial metadata
+        yield (
+            json.dumps(
+                {
+                    "type": "metadata",
+                    "title": book_data["title"],
+                    "author": book_data["author"],
+                    "image_count": book_data["image_count"],
+                    "table_of_contents": [
+                        chapter["title"] for chapter in book_data["chapters"]
+                    ],
+                }
+            )
+            + "\n"
+        )
+
+        for index, chapter in enumerate(book_data["chapters"]):
+            yield (
+                json.dumps(
+                    {
+                        "type": "chapter",
+                        "index": index,
+                        "title": chapter.get("title", f"Chapter {index + 1}"),
+                        "content": chapter["content"],
+                    }
+                )
+                + "\n"
+            )
+
+    except Exception as e:
+        yield json.dumps({"type": "error", "message": str(e)}) + "\n"
 
 
 @read_blueprint.route("/bookmark/<filename>", methods=["GET", "POST"])

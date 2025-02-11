@@ -68,7 +68,7 @@ def get_chapter_title(item, soup):
     # Method 1: Check for heading tags
     title_tag = soup.find(["h1", "h2", "h3", "h4", "h5", "h6", "title"])
     if title_tag:
-        title = title_tag.get_text().strip()
+        title = title_tag.get_text(strip=True)
         if title:
             return title
 
@@ -78,7 +78,7 @@ def get_chapter_title(item, soup):
     )
     if chapter_elements:
         for elem in chapter_elements:
-            title = elem.get_text().strip()
+            title = elem.get_text(strip=True)
             if title:
                 return title
 
@@ -93,39 +93,28 @@ def get_chapter_title(item, soup):
         "section-title",
     ]
     for identifier in common_title_identifiers:
-        # Check classes
-        title_elem = soup.find(class_=identifier)
+        title_elem = soup.find(class_=identifier) or soup.find(id=identifier)
         if title_elem:
-            title = title_elem.get_text().strip()
-            if title:
-                return title
-
-        # Check IDs
-        title_elem = soup.find(id=identifier)
-        if title_elem:
-            title = title_elem.get_text().strip()
+            title = title_elem.get_text(strip=True)
             if title:
                 return title
 
     # Method 4: Check item properties in the spine
     if hasattr(item, "get_name"):
         filename = item.get_name()
-        # Remove file extension and common prefixes
         basename = os.path.splitext(os.path.basename(filename))[0]
-        # Clean up the filename
-        clean_name = basename.replace("_", " ").replace("-", " ")
-        # Remove common prefixes like 'chapter', 'section', etc.
+        clean_name = basename.replace("_", " ").replace("-", " ").lower()
         for prefix in ["chapter", "ch", "section", "part"]:
-            if clean_name.lower().startswith(prefix):
+            if clean_name.startswith(prefix):
                 clean_name = clean_name[len(prefix) :].strip()
+                break
         if clean_name:
             return clean_name.title()
 
-    # Method 5: Look for the first substantial paragraph
+    # Method 5: Look for the first substantial paragraph (under 100 characters)
     first_para = soup.find("p")
     if first_para:
-        text = first_para.get_text().strip()
-        # Only use if it's short enough to be a title (less than 100 chars)
+        text = first_para.get_text(strip=True)
         if text and len(text) < 100:
             return text
 
@@ -149,12 +138,7 @@ def get_epub_content(epub_dir, epub_path):
                 logging.error(f"Error processing image {item.file_name}: {str(e)}")
 
     # Get spine order
-    spine_items = []
-    for item in book.spine:
-        if isinstance(item, tuple):
-            spine_items.append(item[0])  # Handle tuples in spine
-        else:
-            spine_items.append(item)  # Handle direct items
+    spine_items = [item[0] if isinstance(item, tuple) else item for item in book.spine]
 
     # Process chapters in spine order
     for item_id in spine_items:
@@ -171,11 +155,9 @@ def get_epub_content(epub_dir, epub_path):
                 src = img.get("src")
                 if src:
                     normalized_src = normalize_path(unquote(src))
-                    if normalized_src in images:
-                        img["src"] = images[normalized_src]
-                        img["loading"] = "lazy"
-                        logging.debug(f"Updated image src: {normalized_src}")
-                    else:
+                    img["src"] = images.get(normalized_src, img["src"])
+                    img["loading"] = "lazy"
+                    if normalized_src not in images:
                         logging.warning(f"Image not found: {normalized_src}")
 
             chapters.append(

@@ -1,5 +1,9 @@
 let currentBook = null;
-let currentChapter = 0;
+let currentChapter = null;
+
+let allChapters = [];
+let currentChapterNum = 0;
+let currentPagePosition = 0;
 let currentFontSize = parseInt(localStorage.getItem('readerFontSize')) || 16;
 let lastSaveTimeout = null;
 const filename = window.location.pathname.split('/').pop();
@@ -14,90 +18,87 @@ window.addEventListener('DOMContentLoaded', () => {
     document.querySelector('.top-controls').classList.add('visible');
     
     fetch(`/load_book/${filename}`)
-        .then(response => response.json())
-        .then(data => {
-            currentBook = data;
-            currentChapter = 0;
-            document.getElementById('loading-spinner').style.display = 'none';
-            document.getElementById('reader-content').style.display = 'block';
-            displayBook();
+        .then(response => {
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder("utf-8");
+            let buffer = '';
+
+            function processChunk(chunk) {
+                buffer += chunk;
+                const lines = buffer.split('\n');
+                buffer = lines.pop(); // Keep the last incomplete line
+
+                for (const line of lines) {
+                    if (!line.trim()) continue;
+
+                    const data = JSON.parse(line);
+                    switch (data.type) {
+                        case 'metadata':
+                            currentBook = data;
+                            displayBookMetadata();
+                            fetchReadingPosition();
+                            break;
+                        case 'chapter':
+                            currentChapter = data;
+                            console.log(currentChapter);
+                            chapterNum = currentChapter.index;
+                            allChapters[chapterNum] = currentChapter;
+                            if (chapterNum == currentChapterNum) {
+                                document.getElementById('loading-spinner').style.display = 'none';
+                                document.getElementById('reader-content').style.display = 'block';
+                                displayChapter();
+
+                                // Wait for next paint to ensure content is rendered
+                                requestAnimationFrame(() => {
+                                    window.scrollTo({
+                                        top: currentPagePosition * document.documentElement.scrollHeight,
+                                        behavior: 'instant'
+                                    });
+                                });
+                            }
+                    }    
+                }
+            }
+            function readStream() {
+                reader.read().then(({done, value}) => {
+                    if (done) {
+                        if (buffer) {
+                            processChunk('');
+                        }
+                        return;
+                    }
+                    processChunk(decoder.decode(value, {stream: true}));
+                    readStream();
+                }).catch(error => {
+                    console.error('Error reading stream:', error);
+                    document.getElementById('loading-spinner').style.display = 'none';
+                    document.getElementById('chapter-content').innerHTML = 
+                        '<div class="alert alert-danger">Error loading book. Please try again.</div>';
+                });
+            }
+            readStream();
         })
-        .catch(error => {
-            console.error('Error:', error);
-            document.getElementById('loading-spinner').style.display = 'none';
-            document.getElementById('chapter-content').innerHTML = 
-                '<div class="alert alert-danger">Error loading book. Please try again.</div>';
-        });
 });
 
-function adjustFontSize(delta) {
-    currentFontSize = Math.max(12, Math.min(24, currentFontSize + delta));
-    document.documentElement.style.setProperty('--reader-font-size', currentFontSize + 'px');
-    localStorage.setItem('readerFontSize', currentFontSize);
-}
-
-function saveBookmark() {
-    if (!lastSaveTimeout) {
-        lastSaveTimeout = setTimeout(() => {
-            const position = window.scrollY / document.documentElement.scrollHeight;
-            fetch(`/bookmark/${filename}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    chapter_index: currentChapter,
-                    position: position
-                })
-            }).catch(error => console.error('Error saving bookmark:', error));
-            
-            lastSaveTimeout = null;
-        }, 1000); // Debounce save for 1 second
-    }
-}
-
-function displayBook() {
+function displayBookMetadata() {
     document.getElementById('book-title').textContent = currentBook.title;
     document.getElementById('book-author').textContent = `by ${currentBook.author}`;
     
     // Display table of contents
     const tocContent = document.getElementById('toc-content');
-    tocContent.innerHTML = currentBook.chapters.map((chapter, index) => `
-        <div class="toc-item ${index === currentChapter ? 'active' : ''}" 
+    tocContent.innerHTML = currentBook.table_of_contents.map((chapter_title, index) => `
+        <div class="toc-item ${index === currentChapterNum ? 'active' : ''}" 
              onclick="jumpToChapter(${index})">
-            ${chapter.title || `Chapter ${index + 1}`}
+            ${chapter_title || `Chapter ${index + 1}`}
         </div>
     `).join('');
-    
-    // Load bookmark
-    fetch(`/bookmark/${filename}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.chapter_index !== undefined) {
-                currentChapter = data.chapter_index;
-                displayChapter();
-                // Wait for content to load before scrolling
-                setTimeout(() => {
-                    window.scrollTo({
-                        top: data.position * document.documentElement.scrollHeight,
-                        behavior: 'instant'
-                    });
-                }, 100);
-            } else {
-                displayChapter();
-            }
-        })
-        .catch(error => {
-            console.error('Error loading bookmark:', error);
-            displayChapter();
-        });
 }
 
 function displayChapter() {
-    const content = currentBook.chapters[currentChapter].content;
+    const content = allChapters[currentChapterNum].content;
     document.getElementById('chapter-content').innerHTML = content;
     document.getElementById('chapter-number').textContent = 
-        `Section ${currentChapter + 1} of ${currentBook.chapters.length}`;
+        `Section ${currentChapterNum + 1} of ${currentBook.table_of_contents.length}`;
     
     // Show controls on chapter load
     const controls = document.querySelector('.top-controls');
@@ -124,14 +125,14 @@ function displayChapter() {
 }
 
 function nextChapter() {
-    if (currentChapter < currentBook.chapters.length - 1) {
-        currentChapter++;
+    if (currentChapterNum < currentBook.table_of_contents.length - 1) {
+        currentChapterNum++;
         displayChapter();
         window.scrollTo({top: 0, behavior: 'instant'});
         saveBookmark();
     }
     
-    if (currentChapter === currentBook.chapters.length - 1) {
+    if (currentChapterNum === currentBook.table_of_contents.length - 1) {
         fetch(`/tag_finished/${filename}`, {
             method: 'POST'
         }).catch(error => console.error('Error adding tag:', error));
@@ -139,8 +140,8 @@ function nextChapter() {
 }
 
 function prevChapter() {
-    if (currentChapter > 0) {
-        currentChapter--;
+    if (currentChapterNum > 0) {
+        currentChapterNum--;
         displayChapter();
         window.scrollTo({top: document.body.scrollHeight, behavior: 'instant'});
         saveBookmark();
@@ -148,7 +149,7 @@ function prevChapter() {
 }
 
 function jumpToChapter(index) {
-    currentChapter = index;
+    currentChapterNum = index;
     displayChapter();
     window.scrollTo({top: 0, behavior: 'instant'});
     document.getElementById('toc-menu').classList.remove('visible');
@@ -159,6 +160,43 @@ function jumpToChapter(index) {
     });
     
     saveBookmark();
+}
+
+function fetchReadingPosition() {
+    // Load bookmark
+    fetch(`/bookmark/${filename}`)
+        .then(response => response.json())
+        .then(data => {
+            currentChapterNum = data.chapter_index;
+            currentPagePosition = data.position;
+        })
+    }
+
+
+function saveBookmark() {
+    if (!lastSaveTimeout) {
+        lastSaveTimeout = setTimeout(() => {
+            const position = window.scrollY / document.documentElement.scrollHeight;
+            fetch(`/bookmark/${filename}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    chapter_index: currentChapterNum,
+                    position: position
+                })
+            }).catch(error => console.error('Error saving bookmark:', error));
+            
+            lastSaveTimeout = null;
+        }, 1000); // Debounce save for 1 second
+    }
+}
+
+function adjustFontSize(delta) {
+    currentFontSize = Math.max(12, Math.min(24, currentFontSize + delta));
+    document.documentElement.style.setProperty('--reader-font-size', currentFontSize + 'px');
+    localStorage.setItem('readerFontSize', currentFontSize);
 }
 
 // Toggle menu visibility

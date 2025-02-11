@@ -78,7 +78,8 @@ class Tag(db.Model):
 
     # Make name unique per user
     __table_args__ = (
-        db.UniqueConstraint("name", "user_id", name="unique_tag_per_user"),
+        db.UniqueConstraint("user_id", "name", name="unique_tag_per_user"),
+        db.Index("idx_user_tag", "user_id", "name"),
     )
 
 
@@ -105,4 +106,5 @@ class Bookmark(db.Model):
     # Ensure each user can only have one bookmark per book
     __table_args__ = (
         db.UniqueConstraint("user_id", "book_id", name="unique_user_book_bookmark"),
+        db.Index("idx_user_book", "user_id", "book_id"),
     )
