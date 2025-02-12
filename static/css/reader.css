@@ -16,7 +16,8 @@ body {
     --toc-item-color: #B0B0B0;
     --toc-item-highlight: #3A6D9A;
     --toc-item-background: #3a6d9a4f;
-    --text-color-dark: #B0B0B0;
+    --text-color-dark: #888;
+    --heading-color: #E0E0E0;
 }
 p {
     color: var(--text-color-dark);
@@ -162,4 +163,17 @@ a {
     width: 0;
     background-color: #6c757d;
     transition: width 0.3s ease;
+}
+
+.toc-item.unprocessed {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.toc-item.unprocessed:hover {
+    background-color: transparent;
+}
+
+.toc-menu h5 {
+    color: var(--text-color-dark);
 }
