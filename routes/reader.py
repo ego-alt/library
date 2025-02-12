@@ -18,7 +18,7 @@ read_blueprint = Blueprint("read_routes", __name__)
 
 
 def rotate_list(l: list, n: int) -> list:
-    if n==0:
+    if n == 0:
         return l
 
     return l[-n:] + l[:-n]
@@ -99,12 +99,13 @@ def stream_book_content(
         )
 
         chapters = rotate_list(book_data["chapters"], n=-start_chapter)
-        for index, chapter in enumerate(chapters):
+        for i, chapter in enumerate(chapters):
+            index = (i + start_chapter) % len(toc)
             yield (
                 json.dumps(
                     {
                         "type": "chapter",
-                        "index": (index + start_chapter) % len(toc),
+                        "index": index,
                         "title": chapter.get("title", f"Chapter {index + 1}"),
                         "content": chapter["content"],
                     }

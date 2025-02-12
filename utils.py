@@ -68,7 +68,7 @@ def get_chapter_title(item, soup):
     # Method 1: Check for heading tags
     title_tag = soup.find(["h1", "h2", "h3", "h4", "h5", "h6", "title"])
     if title_tag:
-        title = title_tag.get_text(strip=True)
+        title = title_tag.get_text().strip()
         if title:
             return title
 
@@ -78,7 +78,7 @@ def get_chapter_title(item, soup):
     )
     if chapter_elements:
         for elem in chapter_elements:
-            title = elem.get_text(strip=True)
+            title = elem.get_text().strip()
             if title:
                 return title
 
@@ -95,7 +95,7 @@ def get_chapter_title(item, soup):
     for identifier in common_title_identifiers:
         title_elem = soup.find(class_=identifier) or soup.find(id=identifier)
         if title_elem:
-            title = title_elem.get_text(strip=True)
+            title = title_elem.get_text().strip()
             if title:
                 return title
 
@@ -103,18 +103,18 @@ def get_chapter_title(item, soup):
     if hasattr(item, "get_name"):
         filename = item.get_name()
         basename = os.path.splitext(os.path.basename(filename))[0]
-        clean_name = basename.replace("_", " ").replace("-", " ").lower()
+        clean_name = basename.replace("_", " ").replace("-", " ")
         for prefix in ["chapter", "ch", "section", "part"]:
-            if clean_name.startswith(prefix):
+            if clean_name.lower().startswith(prefix):
                 clean_name = clean_name[len(prefix) :].strip()
-                break
+
         if clean_name:
             return clean_name.title()
 
     # Method 5: Look for the first substantial paragraph (under 100 characters)
     first_para = soup.find("p")
     if first_para:
-        text = first_para.get_text(strip=True)
+        text = first_para.get_text().strip()
         if text and len(text) < 100:
             return text
 
