@@ -28,7 +28,6 @@ namespaces = {
 def rotate_list(l: list, n: int) -> list:
     if n == 0:
         return l
-
     return l[-n:] + l[:-n]
 
 
@@ -72,8 +71,9 @@ def normalize_path(path):
 
 def get_chapter_title(item, soup):
     """Extract chapter title using multiple fallback methods."""
+
     # Method 1: Check for heading tags
-    title_tag = soup.find(["h1", "h2", "h3", "h4", "h5", "h6", "title"])
+    title_tag = soup.find(["h1", "h2", "h3", "h4", "h5", "h6"])
     if title_tag:
         title = title_tag.get_text().strip()
         if title:
@@ -122,60 +122,10 @@ def get_chapter_title(item, soup):
     first_para = soup.find("p")
     if first_para:
         text = first_para.get_text().strip()
-        if text and len(text) < 100:
+        if text and len(text) < 25:
             return text
 
     return None
-
-
-def get_epub_content(epub_dir, epub_path):
-    book = ebooklib.epub.read_epub(os.path.join(epub_dir, epub_path), {"ignore_ncx": True})
-    chapters = []
-    images = {}
-
-    # Extract images
-    for item in book.get_items():
-        if item.get_type() in [ebooklib.ITEM_COVER, ebooklib.ITEM_IMAGE]:
-            try:
-                image_data = base64.b64encode(item.content).decode("utf-8")
-                normalized_path = normalize_path(item.file_name)
-                images[normalized_path] = f"data:{item.media_type};base64,{image_data}"
-                logging.debug(f"Stored image: {normalized_path}")
-            except Exception as e:
-                logging.error(f"Error processing image {item.file_name}: {str(e)}")
-
-    # Get spine order
-    spine_items = [item[0] if isinstance(item, tuple) else item for item in book.spine]
-
-    # Process chapters in spine order
-    for item_id in spine_items:
-        item = book.get_item_with_id(item_id)
-        if item and item.get_type() == ebooklib.ITEM_DOCUMENT:
-            content = item.get_content().decode("utf-8")
-            soup = BeautifulSoup(content, "html.parser")
-
-            # Extract chapter title using the new function
-            title = get_chapter_title(item, soup)
-
-            # Process images
-            for img in soup.find_all("img"):
-                src = img.get("src")
-                if src:
-                    normalized_src = normalize_path(unquote(src))
-                    img["src"] = images.get(normalized_src, img["src"])
-                    img["loading"] = "lazy"
-                    if normalized_src not in images:
-                        logging.warning(f"Image not found: {normalized_src}")
-
-            chapters.append(
-                {
-                    "id": item.id,
-                    "title": title,
-                    "content": str(soup.body) if soup.body else str(soup),
-                }
-            )
-
-    return {"chapters": chapters, "image_count": len(images)}
 
 
 def extract_metadata(epub_book):
@@ -216,3 +166,83 @@ def update_epub_cover(epub_file_path: str, new_cover_bytes: bytes) -> None:
 
     # Replace the original EPUB file with the updated version
     shutil.move(temp_path, epub_file_path)
+
+
+def get_epub_structure(epub_path: str) -> dict:
+    """Extract epub structure without loading full content."""
+    with zipfile.ZipFile(epub_path) as z:
+        # Get container.xml to find the rootfile
+        container = etree.fromstring(z.read("META-INF/container.xml"))
+        rootfile_path = container.xpath(
+            "/u:container/u:rootfiles/u:rootfile", namespaces=namespaces
+        )[0].get("full-path")
+
+        # Parse the rootfile (content.opf usually)
+        root = etree.fromstring(z.read(rootfile_path))
+
+        # Get spine order
+        spine = root.xpath("//opf:spine/opf:itemref/@idref", namespaces=namespaces)
+
+        # Get manifest items (mapping of id -> href)
+        manifest = {
+            item.get("id"): {
+                "href": item.get("href"),
+                "media-type": item.get("media-type"),
+            }
+            for item in root.xpath("//opf:manifest/opf:item", namespaces=namespaces)
+        }
+
+        # Get image items with their paths and media types
+        images = {
+            normalize_path(manifest[id]["href"]): {
+                "path": os.path.join(
+                    os.path.dirname(rootfile_path), manifest[id]["href"]
+                ),
+                "media-type": manifest[id]["media-type"],
+            }
+            for id, item in manifest.items()
+            if item["media-type"].startswith("image/")
+        }
+
+        # Get spine items in order WITHOUT loading content
+        chapters = [
+            {
+                "id": itemref,
+                "path": os.path.join(
+                    os.path.dirname(rootfile_path), manifest[itemref]["href"]
+                ),
+                "index": idx,  # Add index for default title
+            }
+            for idx, itemref in enumerate(spine)
+            if manifest[itemref]["media-type"] == "application/xhtml+xml"
+        ]
+
+        return {"chapters": chapters, "images": images, "image_count": len(images)}
+
+
+def process_chapter_content(epub_path: str, chapter_path: str, images: dict) -> dict:
+    """Process a single chapter's content."""
+    with zipfile.ZipFile(epub_path) as z:
+        content = z.read(chapter_path).decode("utf-8")
+        soup = BeautifulSoup(content, "html.parser")
+
+        # Extract chapter title using multiple fallback methods
+        title = get_chapter_title(
+            None, soup
+        )  # Passing None as we don't have ebooklib item
+
+        # Process images in the chapter
+        for img in soup.find_all("img"):
+            src = img.get("src")
+            if src:
+                normalized_src = normalize_path(unquote(src))
+                if normalized_src in images:
+                    # Create a data URL for the image
+                    image_data = z.read(images[normalized_src]["path"])
+                    img["src"] = (
+                        f"data:{images[normalized_src]['media-type']};base64,"
+                        f"{base64.b64encode(image_data).decode('utf-8')}"
+                    )
+                img["loading"] = "lazy"
+
+        return {"title": title, "content": str(soup.body) if soup.body else str(soup)}

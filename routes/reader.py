@@ -11,10 +11,11 @@ from flask import (
 from flask_caching import Cache
 from flask_login import current_user
 from models import Book, db, Bookmark, BookProgressChoice
-from utils import get_epub_content, rotate_list
+from utils import rotate_list, get_epub_structure, process_chapter_content
 import logging
 import json
 import time
+import os
 
 
 read_blueprint = Blueprint("read_routes", __name__)
@@ -32,7 +33,7 @@ def load_book(filename):
     book = Book.query.filter_by(filename=filename).first()
     bookmark = None
 
-    if current_user.is_authenticated: 
+    if current_user.is_authenticated:
         bookmark = Bookmark.query.filter_by(
             user_id=current_user.id, book_id=book.id
         ).first()
@@ -77,29 +78,19 @@ def stream_book_content(
 ):
     """Stream book content as newline-delimited JSON."""
     try:
-        cache_key = f'book_content_{epub_path}'
-        cache = current_app.extensions['cache']
+        full_path = os.path.join(epub_dir, epub_path)
+        structure = get_epub_structure(full_path)
 
-        start = time.perf_counter()
-        book_data = cache.get(cache_key)
-        
-        if book_data is None:
-            book_data = get_epub_content(epub_dir, epub_path)
-            cache[cache_key] = book_data
-            
-        end = time.perf_counter()
-        logging.info(f"Time taken to process epub content: {end - start:.3f} seconds")
-        toc = [chapter["title"] for chapter in book_data["chapters"]]
-
-        # Send initial metadata
         yield (
             json.dumps(
                 {
                     "type": "metadata",
                     "title": book_title,
                     "author": book_author,
-                    "image_count": book_data["image_count"],
-                    "table_of_contents": toc,
+                    "image_count": structure["image_count"],
+                    "table_of_contents": [
+                        f"Chapter {ch['index'] + 1}" for ch in structure["chapters"]
+                    ],
                     "start_chapter": start_chapter,
                     "chapter_pos": chapter_pos,
                 }
@@ -107,20 +98,30 @@ def stream_book_content(
             + "\n"
         )
 
-        chapters = rotate_list(book_data["chapters"], n=-start_chapter)
+        # Rotate chapters list based on start_chapter
+        chapters = rotate_list(structure["chapters"], n=-start_chapter)
+
+        # Stream each chapter
         for i, chapter in enumerate(chapters):
-            index = (i + start_chapter) % len(toc)
+            index = (i + start_chapter) % len(structure["chapters"])
+            chapter_content = process_chapter_content(
+                full_path, chapter["path"], structure["images"]
+            )
+
             yield (
                 json.dumps(
                     {
                         "type": "chapter",
                         "index": index,
-                        "title": chapter.get("title", f"Chapter {index + 1}"),
-                        "content": chapter["content"],
+                        "title": chapter_content["title"] or f"Chapter {index + 1}",
+                        "content": chapter_content["content"],
                     }
                 )
                 + "\n"
             )
+
+            # Clear references to help garbage collection
+            chapter_content = None
 
     except Exception as e:
         yield json.dumps({"type": "error", "message": str(e)}) + "\n"

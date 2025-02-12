@@ -42,6 +42,13 @@ window.addEventListener('DOMContentLoaded', () => {
                         case 'chapter':
                             currentChapter = data;
                             chapterNum = currentChapter.index;
+                            // Update TOC with actual chapter title if available
+                            if (currentChapter.title) {
+                                const tocItem = document.getElementById(`toc-item-${chapterNum}`);
+                                if (tocItem) {
+                                    tocItem.textContent = currentChapter.title;
+                                }
+                            }         
                             allChapters[chapterNum] = currentChapter;
                             if (chapterNum == currentChapterNum) {
                                 document.getElementById('loading-spinner').style.display = 'none';
@@ -84,12 +91,13 @@ function displayBookMetadata() {
     document.getElementById('book-title').textContent = currentBook.title;
     document.getElementById('book-author').textContent = `by ${currentBook.author}`;
     
-    // Display table of contents
+    // Display initial table of contents with placeholder titles
     const tocContent = document.getElementById('toc-content');
     tocContent.innerHTML = currentBook.table_of_contents.map((chapter_title, index) => `
         <div class="toc-item ${index === currentChapterNum ? 'active' : ''}" 
-             onclick="jumpToChapter(${index})">
-            ${chapter_title || `Chapter ${index + 1}`}
+             onclick="jumpToChapter(${index})"
+             id="toc-item-${index}">
+            ${chapter_title}
         </div>
     `).join('');
 }
