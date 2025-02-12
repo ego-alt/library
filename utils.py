@@ -168,15 +168,7 @@ def get_epub_content(epub_dir, epub_path):
                 }
             )
 
-    metadata = book.get_metadata("DC", "title")
-    creator_metadata = book.get_metadata("DC", "creator")
-
-    return {
-        "title": metadata[0][0] if metadata else "Untitled",
-        "author": creator_metadata[0][0] if creator_metadata else "Unknown Author",
-        "chapters": chapters,
-        "image_count": len(images),
-    }
+    return {"chapters": chapters, "image_count": len(images)}
 
 
 def extract_metadata(epub_book):

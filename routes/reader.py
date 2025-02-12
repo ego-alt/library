@@ -17,6 +17,13 @@ import json
 read_blueprint = Blueprint("read_routes", __name__)
 
 
+def rotate_list(l: list, n: int) -> list:
+    if n==0:
+        return l
+
+    return l[-n:] + l[:-n]
+
+
 @read_blueprint.route("/read/<filename>")
 def read_book(filename):
     """Render the in-browser epub reader."""
@@ -46,7 +53,14 @@ def load_book(filename):
     try:
         return Response(
             stream_with_context(
-                stream_book_content(current_app.config["BOOK_DIR"], filename)
+                stream_book_content(
+                    epub_dir=current_app.config["BOOK_DIR"],
+                    epub_path=filename,
+                    book_title=book.title,
+                    book_author=book.author,
+                    start_chapter=bookmark.chapter_index,
+                    chapter_pos=bookmark.position,
+                )
             ),
             content_type="application/x-ndjson",
         )
@@ -55,33 +69,42 @@ def load_book(filename):
         return jsonify({"error": str(e)}), 500
 
 
-def stream_book_content(epub_dir, epub_path):
+def stream_book_content(
+    epub_dir: str,
+    epub_path: str,
+    book_title: str,
+    book_author: str,
+    start_chapter: int,
+    chapter_pos: float,
+):
     """Stream book content as newline-delimited JSON."""
     try:
         book_data = get_epub_content(epub_dir, epub_path)
+        toc = [chapter["title"] for chapter in book_data["chapters"]]
 
         # Send initial metadata
         yield (
             json.dumps(
                 {
                     "type": "metadata",
-                    "title": book_data["title"],
-                    "author": book_data["author"],
+                    "title": book_title,
+                    "author": book_author,
                     "image_count": book_data["image_count"],
-                    "table_of_contents": [
-                        chapter["title"] for chapter in book_data["chapters"]
-                    ],
+                    "table_of_contents": toc,
+                    "start_chapter": start_chapter,
+                    "chapter_pos": chapter_pos,
                 }
             )
             + "\n"
         )
 
-        for index, chapter in enumerate(book_data["chapters"]):
+        chapters = rotate_list(book_data["chapters"], n=-start_chapter)
+        for index, chapter in enumerate(chapters):
             yield (
                 json.dumps(
                     {
                         "type": "chapter",
-                        "index": index,
+                        "index": (index + start_chapter) % len(toc),
                         "title": chapter.get("title", f"Chapter {index + 1}"),
                         "content": chapter["content"],
                     }

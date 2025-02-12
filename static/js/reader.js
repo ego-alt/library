@@ -35,8 +35,9 @@ window.addEventListener('DOMContentLoaded', () => {
                     switch (data.type) {
                         case 'metadata':
                             currentBook = data;
+                            currentChapterNum = currentBook.start_chapter;
+                            currentPagePosition = currentBook.chapter_pos;
                             displayBookMetadata();
-                            fetchReadingPosition();
                             break;
                         case 'chapter':
                             currentChapter = data;
@@ -161,17 +162,6 @@ function jumpToChapter(index) {
     
     saveBookmark();
 }
-
-function fetchReadingPosition() {
-    // Load bookmark
-    fetch(`/bookmark/${filename}`)
-        .then(response => response.json())
-        .then(data => {
-            currentChapterNum = data.chapter_index;
-            currentPagePosition = data.position;
-        })
-    }
-
 
 function saveBookmark() {
     if (!lastSaveTimeout) {
