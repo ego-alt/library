@@ -102,11 +102,41 @@ function displayBookMetadata() {
     `).join('');
 }
 
+function updateProgressBar() {
+    const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
+    const position = Math.min(1, window.scrollY / scrollHeight);
+    document.getElementById('chapter-progress').style.width = `${position * 100}%`;
+}
+
+function saveBookmark() {
+    if (!lastSaveTimeout) {
+        lastSaveTimeout = setTimeout(() => {
+            const position = window.scrollY / document.documentElement.scrollHeight;
+            
+            fetch(`/bookmark/${filename}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    chapter_index: currentChapterNum,
+                    position: position
+                })
+            }).catch(error => console.error('Error saving bookmark:', error));
+            
+            lastSaveTimeout = null;
+        }, 1000); // Debounce save for 1 second
+    }
+}
+
 function displayChapter() {
     const content = allChapters[currentChapterNum].content;
     document.getElementById('chapter-content').innerHTML = content;
     document.getElementById('chapter-number').textContent = 
         `Section ${currentChapterNum + 1} of ${currentBook.table_of_contents.length}`;
+    
+    // Initialize progress bar position
+    updateProgressBar();
     
     // Show controls on chapter load
     const controls = document.querySelector('.top-controls');
@@ -137,6 +167,11 @@ function nextChapter() {
         currentChapterNum++;
         displayChapter();
         window.scrollTo({top: 0, behavior: 'instant'});
+        updateProgressBar();
+        // Update active state in TOC
+        document.querySelectorAll('.toc-item').forEach((item, idx) => {
+            item.classList.toggle('active', idx === currentChapterNum);
+        });
         saveBookmark();
     }
     
@@ -152,6 +187,11 @@ function prevChapter() {
         currentChapterNum--;
         displayChapter();
         window.scrollTo({top: document.body.scrollHeight, behavior: 'instant'});
+        updateProgressBar();
+        // Update active state in TOC
+        document.querySelectorAll('.toc-item').forEach((item, idx) => {
+            item.classList.toggle('active', idx === currentChapterNum);
+        });
         saveBookmark();
     }
 }
@@ -160,6 +200,7 @@ function jumpToChapter(index) {
     currentChapterNum = index;
     displayChapter();
     window.scrollTo({top: 0, behavior: 'instant'});
+    updateProgressBar();
     document.getElementById('toc-menu').classList.remove('visible');
     
     // Update active state in TOC
@@ -168,26 +209,6 @@ function jumpToChapter(index) {
     });
     
     saveBookmark();
-}
-
-function saveBookmark() {
-    if (!lastSaveTimeout) {
-        lastSaveTimeout = setTimeout(() => {
-            const position = window.scrollY / document.documentElement.scrollHeight;
-            fetch(`/bookmark/${filename}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    chapter_index: currentChapterNum,
-                    position: position
-                })
-            }).catch(error => console.error('Error saving bookmark:', error));
-            
-            lastSaveTimeout = null;
-        }, 1000); // Debounce save for 1 second
-    }
 }
 
 function adjustFontSize(delta) {
@@ -211,7 +232,8 @@ document.addEventListener('click', (e) => {
     }
 });
 
-// Add scroll event listener for bookmark saving
+// Update scroll event listener to handle both functions
 window.addEventListener('scroll', () => {
+    updateProgressBar();
     saveBookmark();
 });

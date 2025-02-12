@@ -148,3 +148,18 @@ a {
     top: 0;
     height: 100vh;
 }
+.progress-bar-container {
+    position: absolute;
+    top: -2px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background-color: #e9ecef;
+}
+
+.progress-bar {
+    height: 100%;
+    width: 0;
+    background-color: #6c757d;
+    transition: width 0.3s ease;
+}

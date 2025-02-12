@@ -227,22 +227,24 @@ def process_chapter_content(epub_path: str, chapter_path: str, images: dict) -> 
         soup = BeautifulSoup(content, "html.parser")
 
         # Extract chapter title using multiple fallback methods
-        title = get_chapter_title(
-            None, soup
-        )  # Passing None as we don't have ebooklib item
+        title = get_chapter_title(None, soup)
 
-        # Process images in the chapter
-        for img in soup.find_all("img"):
-            src = img.get("src")
-            if src:
-                normalized_src = normalize_path(unquote(src))
-                if normalized_src in images:
-                    # Create a data URL for the image
-                    image_data = z.read(images[normalized_src]["path"])
-                    img["src"] = (
-                        f"data:{images[normalized_src]['media-type']};base64,"
-                        f"{base64.b64encode(image_data).decode('utf-8')}"
-                    )
-                img["loading"] = "lazy"
+        # Process any elements that might contain image references
+        image_attributes = ['src', 'href', 'xlink:href']
+        for element in soup.find_all(['img', 'image', 'link[rel="coverpage"]', 'svg']):
+            for attr in image_attributes:
+                if image_path := element.get(attr):
+                    try:
+                        normalized_path = normalize_path(unquote(image_path))
+                        if normalized_path in images:
+                            image_data = z.read(images[normalized_path]["path"])
+                            element[attr] = (
+                                f"data:{images[normalized_path]['media-type']};base64,"
+                                f"{base64.b64encode(image_data).decode('utf-8')}"
+                            )
+                            if element.name == "img":
+                                element["loading"] = "lazy"
+                    except Exception as e:
+                        logger.warning(f"Failed to process image {image_path}: {e}")
 
         return {"title": title, "content": str(soup.body) if soup.body else str(soup)}
