@@ -25,6 +25,13 @@ namespaces = {
 }
 
 
+def rotate_list(l: list, n: int) -> list:
+    if n == 0:
+        return l
+
+    return l[-n:] + l[:-n]
+
+
 def get_epub_cover_path(path: str):
     with zipfile.ZipFile(path) as z:
         # Load container.xml to find the root file
@@ -122,7 +129,7 @@ def get_chapter_title(item, soup):
 
 
 def get_epub_content(epub_dir, epub_path):
-    book = ebooklib.epub.read_epub(os.path.join(epub_dir, epub_path))
+    book = ebooklib.epub.read_epub(os.path.join(epub_dir, epub_path), {"ignore_ncx": True})
     chapters = []
     images = {}
 

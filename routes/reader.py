@@ -8,20 +8,16 @@ from flask import (
     Response,
     stream_with_context,
 )
+from flask_caching import Cache
 from flask_login import current_user
 from models import Book, db, Bookmark, BookProgressChoice
-from utils import get_epub_content
+from utils import get_epub_content, rotate_list
 import logging
 import json
+import time
+
 
 read_blueprint = Blueprint("read_routes", __name__)
-
-
-def rotate_list(l: list, n: int) -> list:
-    if n == 0:
-        return l
-
-    return l[-n:] + l[:-n]
 
 
 @read_blueprint.route("/read/<filename>")
@@ -79,7 +75,18 @@ def stream_book_content(
 ):
     """Stream book content as newline-delimited JSON."""
     try:
-        book_data = get_epub_content(epub_dir, epub_path)
+        cache_key = f'book_content_{epub_path}'
+        cache = current_app.extensions['cache']
+
+        start = time.perf_counter()
+        book_data = cache.get(cache_key)
+        
+        if book_data is None:
+            book_data = get_epub_content(epub_dir, epub_path)
+            cache[cache_key] = book_data
+            
+        end = time.perf_counter()
+        logging.info(f"Time taken to process epub content: {end - start:.3f} seconds")
         toc = [chapter["title"] for chapter in book_data["chapters"]]
 
         # Send initial metadata

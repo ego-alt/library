@@ -41,7 +41,6 @@ window.addEventListener('DOMContentLoaded', () => {
                             break;
                         case 'chapter':
                             currentChapter = data;
-                            console.log(currentChapter);
                             chapterNum = currentChapter.index;
                             allChapters[chapterNum] = currentChapter;
                             if (chapterNum == currentChapterNum) {
