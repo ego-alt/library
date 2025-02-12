@@ -45,7 +45,7 @@ This project is an EPUB Library Management System built using Flask, SQLAlchemy,
    ```bash
    docker run -d -p 8002:8002 \
        -v <local_path_to_books>:/mnt/backup/books \
-       -v <local_path_to_instance>:/app/instance \
+       -v $(pwd)/instance:/app/instance \
        epub-library
    ```
 
