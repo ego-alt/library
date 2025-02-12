@@ -29,8 +29,10 @@ def read_book(filename):
 @read_blueprint.route("/load_book/<filename>")
 def load_book(filename):
     """Load the book and return the book data as a stream."""
-    if current_user.is_authenticated:
-        book = Book.query.filter_by(filename=filename).first()
+    book = Book.query.filter_by(filename=filename).first()
+    bookmark = None
+
+    if current_user.is_authenticated: 
         bookmark = Bookmark.query.filter_by(
             user_id=current_user.id, book_id=book.id
         ).first()
@@ -54,8 +56,8 @@ def load_book(filename):
                     epub_path=filename,
                     book_title=book.title,
                     book_author=book.author,
-                    start_chapter=bookmark.chapter_index,
-                    chapter_pos=bookmark.position,
+                    start_chapter=bookmark.chapter_index if bookmark else 0,
+                    chapter_pos=bookmark.position if bookmark else 0,
                 )
             ),
             content_type="application/x-ndjson",
