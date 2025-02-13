@@ -42,13 +42,14 @@ window.addEventListener('DOMContentLoaded', () => {
                         case 'chapter':
                             currentChapter = data;
                             chapterNum = currentChapter.index;
-                            // Update TOC with actual chapter title if available
-                            if (currentChapter.title) {
-                                const tocItem = document.getElementById(`toc-item-${chapterNum}`);
-                                if (tocItem) {
+                            // Remove unprocessed state and update title if available
+                            const tocItem = document.getElementById(`toc-item-${chapterNum}`);
+                            if (tocItem) {
+                                tocItem.classList.remove('unprocessed');
+                                if (currentChapter.title) {
                                     tocItem.textContent = currentChapter.title;
                                 }
-                            }         
+                            }
                             allChapters[chapterNum] = currentChapter;
                             if (chapterNum == currentChapterNum) {
                                 document.getElementById('loading-spinner').style.display = 'none';
@@ -91,10 +92,10 @@ function displayBookMetadata() {
     document.getElementById('book-title').textContent = currentBook.title;
     document.getElementById('book-author').textContent = `by ${currentBook.author}`;
     
-    // Display initial table of contents with placeholder titles
+    // Display initial table of contents with placeholder titles and greyed out state
     const tocContent = document.getElementById('toc-content');
     tocContent.innerHTML = currentBook.table_of_contents.map((chapter_title, index) => `
-        <div class="toc-item ${index === currentChapterNum ? 'active' : ''}" 
+        <div class="toc-item ${index === currentChapterNum ? 'active' : ''} unprocessed" 
              onclick="jumpToChapter(${index})"
              id="toc-item-${index}">
             ${chapter_title}
