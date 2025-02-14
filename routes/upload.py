@@ -43,9 +43,6 @@ def upload_book():
     try:
         epub_book = epub.read_epub(file_path)
         table_of_contents = epub_book.get_items_of_type(epub.EpubNav)
-        import logging
-
-        logging.info(f"Table of contents: {table_of_contents}")
         if not table_of_contents:
             # TODO: Check what the table of contents looks like
             os.remove(file_path)
