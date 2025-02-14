@@ -2,7 +2,7 @@
 
 ## Overview
 
-This project is an EPUB Library Management System built using Flask, SQLAlchemy, and BeautifulSoup. It allows users to upload, manage, and read EPUB books, extract metadata, and add custom tags. The application provides a web interface for users to interact with their library of books.
+This project is an Library Management System which allows users to upload, manage, and read EPUBs through the web interface.
 
 ![alt text](images/home_page.png)
 
@@ -18,15 +18,21 @@ This project is an EPUB Library Management System built using Flask, SQLAlchemy,
   - Upload and process EPUBs, with automatic parsing of metadata.
   - Customize book covers by uploading a new jpg or png.
   - Download books directly from the library.
+  - Set access levels according to authentication and user roles.
+  - Batch import functionality for multiple books.
 - **EPUB Reader**
-  - Built-in reader with chapter-based navigation.
-  - Toggle dark mode, adjust font size, and leverage a dynamic table of contents.
+  - Seamless navigation and progress tracking which remembers where you've read up to.
+  - Toggle dark mode and adjust font size to customise your reading experience.
+  - Content streaming ensures lightning-fast delivery, even for massive epubs.
   - Mobile-friendly layout with intuitive controls.
+  - Support for table of contents navigation.
 - **Filtering & Search**
-  - Filter books by title, author, genre, or tags.
-  - Track reading progress with automatic tags for Unread, In Progress, and Finished books.
+  - Filter books by title, author, genre, or custom tags.
+  - Track reading status with automatically generated tags for Unread, In Progress, and Finished books.
+  - Advanced search with support for multiple criteria.
 - **Dark Mode**
   - Toggle between light and dark themes effortlessly.
+  - Persistent theme preference across sessions.
 
 ## Installation
 
@@ -62,11 +68,23 @@ This project is an EPUB Library Management System built using Flask, SQLAlchemy,
 ## Usage
 
 - **Access the application**: Open your web browser and go to `http://127.0.0.1:8002`.
-- **User Registration**: Create a new user account to start managing your books.
-- **Upload Books**: Click the upload icon to add an EPUB file to the library.
-- **Filtering**: Use the sidebar filters to narrow down your book collection by title, author, genre, or tags.
-- **Read Books**: Click on a book to read it in the built-in reader.
-- **Bookmarking**: Save your reading position for easy access later.
+- **Upload Books**: 
+  - Use the upload button in the top navigation bar.
+  - Batch upload: Drag and drop multiple files in the upload area.
+- **Manage Your Collection**: 
+  - Download or view book details via the overlay buttons on each book cover. 
+  - Organize books with custom tags.
+  - Edit metadata including title, author, and cover image.
+- **Filtering**: 
+  - Use the sidebar to search by title, author, or genre. 
+  - Filter by reading status (Unread, In Progress, Finished) or custom tags.
+  - Combine multiple filters for precise results.
+- **Read Books**: 
+  - Click any book cover to read it directly within the browser -- no downloads necessary.
+  - Use arrow keys to navigate between chapters.
+  - Access the table of contents through the sidebar menu.
+- **Bookmarking**: 
+  - Reading position saves automatically while logged in and syncs across devices.
 
 ## Commands
 
@@ -84,5 +102,13 @@ The application includes several CLI commands for managing books:
 
 - **Create User**: Create a new user account.
   ```bash
-  flask create-user <username> <password>
+  flask create-user <username> <password> --role <role>
   ```
+
+## Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/new-feature`)
+3. Commit your changes (`git commit -m 'Add some new feature'`)
+4. Push to the branch (`git push origin feature/new-feature`)
+5. Open a Pull Request
