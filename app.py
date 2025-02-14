@@ -30,6 +30,13 @@ def create_app():
     app.config.from_object(Config)
     cache.init_app(app)
 
+    # Add cache headers for static files
+    @app.after_request
+    def add_cache_headers(response):
+        if '/static/' in request.path:
+            response.cache_control.max_age = 3600
+        return response
+
     # Initialize Flask-Login
     login_manager = LoginManager()
     login_manager.init_app(app)
