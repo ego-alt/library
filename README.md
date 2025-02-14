@@ -2,8 +2,6 @@
 
 ## Overview
 
-This project is an Library Management System which allows users to upload, manage, and read EPUBs through the web interface.
-
 ![alt text](images/home_page.png)
 
 ![alt text](images/metadata_dark.png)
