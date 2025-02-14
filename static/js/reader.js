@@ -8,6 +8,8 @@ let currentFontSize = parseInt(localStorage.getItem('readerFontSize')) || 16;
 let lastSaveTimeout = null;
 const filename = window.location.pathname.split('/').pop();
 
+let hrefChapterMapping = {};
+
 // Initialize font size from localStorage
 document.documentElement.style.setProperty('--reader-font-size', currentFontSize + 'px');
 
@@ -42,6 +44,8 @@ window.addEventListener('DOMContentLoaded', () => {
                         case 'chapter':
                             currentChapter = data;
                             chapterNum = currentChapter.index;
+                            hrefChapterMapping[currentChapter.href] = chapterNum;
+
                             // Remove unprocessed state and update title if available
                             const tocItem = document.getElementById(`toc-item-${chapterNum}`);
                             if (tocItem) {
@@ -238,3 +242,26 @@ window.addEventListener('scroll', () => {
     updateProgressBar();
     saveBookmark();
 });
+
+// Add this new function to handle chapter links
+function handleChapterLink(element) {
+    const href = element.getAttribute('chapter-link');
+    const sectionId = element.getAttribute('section-link');
+    const targetChapter = hrefChapterMapping[href];
+    
+    jumpToChapter(targetChapter);
+    
+    if (sectionId) {
+        requestAnimationFrame(() => {
+            const targetElement = document.getElementById(sectionId);
+            if (targetElement) {
+                const rect = targetElement.getBoundingClientRect();
+                const absoluteTop = window.pageYOffset + rect.top;
+                // Calculate offset based on current font size
+                const offset = currentFontSize * 2; // roughly one line height
+                
+                window.scrollTo({top: absoluteTop - offset, behavior: 'instant'});
+            }
+        });
+    }
+}

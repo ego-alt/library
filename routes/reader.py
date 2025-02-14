@@ -113,6 +113,7 @@ def stream_book_content(
                     {
                         "type": "chapter",
                         "index": index,
+                        "href": chapter_content["href"],
                         "title": chapter_content["title"] or f"Chapter {index + 1}",
                         "content": chapter_content["content"],
                     }
