@@ -33,7 +33,7 @@ def create_app():
     # Add cache headers for static files
     @app.after_request
     def add_cache_headers(response):
-        if '/static/' in request.path:
+        if "/static/" in request.path:
             response.cache_control.max_age = 3600
         return response
 

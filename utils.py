@@ -232,12 +232,12 @@ def process_chapter_content(epub_path: str, chapter_path: str, images: dict) -> 
         # Process internal links
         chapter_links = set()
         for element in soup.find_all("a"):
-            if (href := element.get('href')):
-                if not href.startswith('#'):
+            if href := element.get("href"):
+                if not href.startswith("#"):
                     href = href.split("#")
                     href_path = href[0]
                     section = href[1] if len(href) > 1 else ""
-                    
+
                     element["chapter-link"] = href_path
                     element["section-link"] = section
                     element["href"] = "javascript:void(0);"
@@ -261,4 +261,8 @@ def process_chapter_content(epub_path: str, chapter_path: str, images: dict) -> 
                     except Exception as e:
                         logger.warning(f"Failed to process image {image_path}: {e}")
 
-        return {"title": title, "href": chapter_path.split("/")[-1], "content": str(soup.body) if soup.body else str(soup)}
+        return {
+            "title": title,
+            "href": chapter_path.split("/")[-1],
+            "content": str(soup.body) if soup.body else str(soup),
+        }
