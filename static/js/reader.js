@@ -120,9 +120,6 @@ overlayStyle.textContent = `
 `;
 document.head.appendChild(overlayStyle);
 
-// Track the currently highlighted element
-let currentHighlight = null;
-
 // Initialize overlay and event listeners when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     // Add overlay HTML with drag handle
@@ -183,7 +180,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 closeOverlay();
             } else if (e.key === 'Enter') {
                 const userInput = e.target.value.trim();
-                const highlightedText = currentHighlight ? currentHighlight.textContent : '';
+                
+                // Get the highlighted text from the temp-highlight span
+                const tempHighlight = document.querySelector('.temp-highlight');
+                const highlightedText = tempHighlight ? tempHighlight.textContent.trim() : '';
                 
                 console.log('Selected text:', highlightedText);
                 console.log('User input:', userInput);
@@ -193,7 +193,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const responseContainer = document.querySelector('.search-response-container');
                 const responseElement = document.querySelector('.search-response');
                 responseContainer.classList.add('active');
-                responseElement.textContent = 'Thinking.' 
+                responseElement.textContent = 'Thinking.'
                 
                 // Create thinking animation
                 let dots = 0;
