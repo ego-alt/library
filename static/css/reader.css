@@ -177,3 +177,11 @@ a {
 .toc-menu h5 {
     color: var(--text-color-dark);
 }
+::selection {
+    background-color: var(--highlight-color);
+    color: inherit;
+}
+.dark-mode ::selection {
+    background-color: var(--highlight-color-dark);
+    color: inherit;
+}

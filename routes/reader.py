@@ -16,9 +16,12 @@ import logging
 import json
 import time
 import os
+from llm_caller import LLMCaller
 
 
 read_blueprint = Blueprint("read_routes", __name__)
+
+llm_caller = LLMCaller()
 
 
 @read_blueprint.route("/read/<filename>")
@@ -186,3 +189,17 @@ def tag_finished(filename):
     )
     db.session.commit()
     return jsonify({"message": "Book tagged as finished"})
+
+
+@read_blueprint.route("/ask_question", methods=["POST"])
+def ask_question():
+    """Handle questions about highlighted text."""
+    data = request.get_json()
+    context = data.get("context", "")
+    question = data.get("question", "")
+    
+    if not context or not question:
+        return jsonify({"error": "Missing context or question"}), 400
+        
+    answer = llm_caller.ask_question(context, question)
+    return jsonify({"answer": answer})

@@ -10,8 +10,293 @@ const filename = window.location.pathname.split('/').pop();
 
 let hrefChapterMapping = {};
 
+// Add this variable at the top with other global variables
+let selectedRange = null;
+
 // Initialize font size from localStorage
 document.documentElement.style.setProperty('--reader-font-size', currentFontSize + 'px');
+
+// Add CSS variables for highlight colors
+document.documentElement.style.setProperty('--highlight-color', 'rgba(225, 204, 171)'); // Light mode
+document.documentElement.style.setProperty('--highlight-color-dark', 'rgba(58, 109, 154, 0.6)'); // Dark mode
+
+// Add CSS for highlighted text
+const style = document.createElement('style');
+style.textContent = `
+    .highlighted-text {
+        background-color: var(--highlight-color);
+    }
+    .dark-mode .highlighted-text {
+        background-color: var(--highlight-color-dark);
+    }
+`;
+document.head.appendChild(style);
+
+// Add CSS for the overlay
+const overlayStyle = document.createElement('style');
+overlayStyle.textContent = `
+    .search-overlay {
+        display: none;
+        position: absolute;
+        z-index: 1000;
+    }
+    .search-overlay.active {
+        display: block;
+    }
+    .search-container {
+        position: relative;
+        width: 300px;
+        box-shadow: 0 2px 8px var(--overlay-box-shadow);
+        background: var(--background-color);
+        border-radius: 4px;
+        overflow: hidden;
+        transition: width 0.3s ease-out;
+    }
+    .drag-handle {
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 20px;
+        height: 20px;
+        cursor: move;
+        z-index: 1001;
+    }
+    .search-container.expanded {
+        width: 600px;
+    }
+    .search-input-container {
+        padding: 8px;
+    }
+    .search-input {
+        width: 100%;
+        padding: 4px 8px;
+        border: 1px solid var(--toc-item-highlight);
+        border-radius: 4px;
+        background: var(--background-color);
+        color: var(--text-color-dark);
+        font-size: 14px;
+    }
+    .search-input:focus {
+        outline: none;
+    }
+    .dark-mode .search-input {
+        border-color: var(--text-color-dark);
+    }
+    .search-response-container {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.3s ease-out;
+        border-top: 1px solid var(--input-field-border);
+    }
+    .search-response-container.active {
+        max-height: 300px;
+        overflow-y: auto;
+    }
+    .search-response {
+        padding: 4px 16px 12px;
+        color: var(--text-color-dark);
+        font-size: 14px;
+        line-height: 1.5;
+    }
+    .temp-highlight {
+        background-color: rgba(225, 204, 171);
+        display: inline;
+        box-decoration-break: clone;
+        -webkit-box-decoration-break: clone;
+        padding: 0.16em 0;
+        margin: -0.16em 0;
+        padding-right: 0.25em;
+        margin-right: -0.25em;
+    }
+    .dark-mode .temp-highlight {
+        background-color: rgba(58, 109, 154, 0.6);
+    }
+    .thinking-animation {
+        color: var(--text-color-dark);
+        font-size: 14px;
+        padding: 4px 16px 12px;
+        opacity: 0.7;
+    }
+`;
+document.head.appendChild(overlayStyle);
+
+// Track the currently highlighted element
+let currentHighlight = null;
+
+// Initialize overlay and event listeners when DOM is loaded
+document.addEventListener('DOMContentLoaded', () => {
+    // Add overlay HTML with drag handle
+    const overlay = document.createElement('div');
+    overlay.className = 'search-overlay';
+    overlay.innerHTML = `
+        <div class="search-container">
+            <div class="drag-handle"></div>
+            <div class="search-input-container">
+                <input type="text" class="search-input" placeholder="Ask a quick question...">
+            </div>
+            <div class="search-response-container">
+                <div class="search-response"></div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+
+    // Add drag functionality
+    const dragHandle = overlay.querySelector('.drag-handle');
+    let isDragging = false;
+    let currentX;
+    let currentY;
+    let initialX;
+    let initialY;
+
+    dragHandle.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        initialX = e.clientX - overlay.offsetLeft;
+        initialY = e.clientY - overlay.offsetTop;
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (isDragging) {
+            e.preventDefault();
+            currentX = e.clientX - initialX;
+            currentY = e.clientY - initialY;
+            
+            // Keep overlay within viewport bounds
+            const bounds = overlay.getBoundingClientRect();
+            currentX = Math.max(0, Math.min(currentX, window.innerWidth - bounds.width));
+            currentY = Math.max(0, Math.min(currentY, window.innerHeight - bounds.height));
+            
+            overlay.style.left = currentX + 'px';
+            overlay.style.top = currentY + 'px';
+        }
+    });
+
+    document.addEventListener('mouseup', () => {
+        isDragging = false;
+    });
+
+    // Handle overlay input
+    document.querySelector('.search-input').addEventListener('keydown', async (e) => {
+        if (e.key === 'Enter' || e.key === 'Escape') {
+            if (e.key === 'Escape') {
+                console.log('Closing overlay');
+                closeOverlay();
+            } else if (e.key === 'Enter') {
+                const userInput = e.target.value.trim();
+                const highlightedText = currentHighlight ? currentHighlight.textContent : '';
+                
+                console.log('Selected text:', highlightedText);
+                console.log('User input:', userInput);
+                
+                // Start loading animation immediately
+                const container = document.querySelector('.search-container');
+                const responseContainer = document.querySelector('.search-response-container');
+                const responseElement = document.querySelector('.search-response');
+                responseContainer.classList.add('active');
+                responseElement.textContent = 'Thinking.' 
+                
+                // Create thinking animation
+                let dots = 0;
+                responseElement.className = 'thinking-animation';
+                const thinkingAnimation = setInterval(() => {
+                    dots = (dots + 1) % 11;
+                    responseElement.textContent = 'Thinking' + '.'.repeat(dots);
+                }, 200);
+                
+                try {
+                    const response = await fetch('/ask_question', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            context: highlightedText,
+                            question: userInput
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    console.log('Claude Sonnet 3.5 answer:', data.answer);
+                    
+                    // Clear thinking animation
+                    container.classList.add('expanded');
+                    clearInterval(thinkingAnimation);
+                    responseElement.className = 'search-response';
+                    responseElement.textContent = data.answer;
+                } catch (error) {
+                    console.error('Error getting answer:', error);
+                    // Clear thinking animation and show error
+                    clearInterval(thinkingAnimation);
+                    responseElement.className = 'search-response';
+                    responseElement.textContent = 'Sorry, an error occurred while getting the answer.';
+                }
+            }
+        }
+    });
+
+    // Close overlay when clicking outside
+    document.addEventListener('click', (e) => {
+        const overlay = document.querySelector('.search-overlay');
+        if (overlay.classList.contains('active') && 
+            !overlay.contains(e.target) && 
+            e.target.tagName !== 'INPUT') {
+            closeOverlay();
+        }
+    });
+});
+
+// Handle keyboard shortcuts
+document.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        const selection = window.getSelection();
+        const selectedString = selection.toString().trim();
+        
+        if (!selection.rangeCount) return;
+        
+        if (selectedString) {
+            e.preventDefault();
+            
+            try {
+                // Store the selected range
+                selectedRange = selection.getRangeAt(0).cloneRange();
+                
+                // Create a temporary highlight span
+                const tempHighlight = document.createElement('span');
+                tempHighlight.className = 'temp-highlight';
+                selectedRange.surroundContents(tempHighlight);
+                
+                // Clear previous state
+                const overlay = document.querySelector('.search-overlay');
+                const responseContainer = document.querySelector('.search-response-container');
+                const container = document.querySelector('.search-container');
+                const input = overlay.querySelector('.search-input');
+                
+                overlay.classList.remove('active');
+                responseContainer.classList.remove('active');
+                container.classList.remove('expanded');
+                input.value = '';
+                
+                // Position overlay relative to selection
+                const rect = tempHighlight.getBoundingClientRect();
+                overlay.style.top = `${window.scrollY + rect.bottom + 10}px`;
+                overlay.style.left = `${rect.left}px`;
+                
+                // Ensure overlay stays within viewport
+                const overlayRect = overlay.getBoundingClientRect();
+                if (overlayRect.right > window.innerWidth) {
+                    overlay.style.left = `${window.innerWidth - overlayRect.width - 20}px`;
+                }
+                
+                requestAnimationFrame(() => {
+                    overlay.classList.add('active');
+                    input.focus();
+                });
+            } catch (error) {
+                console.error('Error handling text selection:', error);
+            }
+        }
+    }
+});
 
 // Load book on page load
 window.addEventListener('DOMContentLoaded', () => { 
@@ -264,4 +549,29 @@ function handleChapterLink(element) {
             }
         });
     }
+}
+
+// Update the closeOverlay function
+function closeOverlay() {
+    const overlay = document.querySelector('.search-overlay');
+    const container = document.querySelector('.search-container');
+    const responseElement = document.querySelector('.search-response');
+    
+    overlay.classList.remove('active');
+    container.classList.remove('expanded');
+    document.querySelector('.search-response-container').classList.remove('active');
+    responseElement.textContent = '';
+    
+    // Remove temporary highlight
+    const tempHighlight = document.querySelector('.temp-highlight');
+    if (tempHighlight) {
+        const parent = tempHighlight.parentNode;
+        while (tempHighlight.firstChild) {
+            parent.insertBefore(tempHighlight.firstChild, tempHighlight);
+        }
+        parent.removeChild(tempHighlight);
+    }
+    
+    // Clear the stored range
+    selectedRange = null;
 }
