@@ -197,9 +197,34 @@ def ask_question():
     data = request.get_json()
     context = data.get("context", "")
     question = data.get("question", "")
+    chapter_sentences = data.get("chapter_sentences")
     
     if not context or not question:
         return jsonify({"error": "Missing context or question"}), 400
         
-    answer = llm_caller.ask_question(context, question)
+    answer = llm_caller.ask_question(context, question, chapter_sentences)
     return jsonify({"answer": answer})
+
+
+@read_blueprint.route("/define_word", methods=["POST"])
+def define_word():
+    """Handle word definition requests."""
+    data = request.get_json()
+    word = data.get("word", "")
+    context = data.get("context", "")
+    
+    if not word or not context:
+        return jsonify({"error": "Missing word or context"}), 400
+        
+    definition = llm_caller.define_word(word, context)
+    return jsonify({"definition": definition})
+
+
+@read_blueprint.route('/translate_text', methods=['POST'])
+def translate_text():
+    data = request.json
+    text = data.get("text", "")
+    context = data.get("context", "")
+    
+    translation = llm_caller.translate_text(text, context)
+    return jsonify({"translation": translation})

@@ -8,10 +8,9 @@ let currentFontSize = parseInt(localStorage.getItem('readerFontSize')) || 16;
 let lastSaveTimeout = null;
 const filename = window.location.pathname.split('/').pop();
 
-let hrefChapterMapping = {};
-
-// Add this variable at the top with other global variables
 let selectedRange = null;
+let hrefChapterMapping = {};
+let chapterSentences = [];
 
 // Initialize font size from localStorage
 document.documentElement.style.setProperty('--reader-font-size', currentFontSize + 'px');
@@ -20,7 +19,6 @@ document.documentElement.style.setProperty('--reader-font-size', currentFontSize
 document.documentElement.style.setProperty('--highlight-color', 'rgba(225, 204, 171)'); // Light mode
 document.documentElement.style.setProperty('--highlight-color-dark', 'rgba(58, 109, 154, 0.6)'); // Dark mode
 
-// Add CSS for highlighted text
 const style = document.createElement('style');
 style.textContent = `
     .highlighted-text {
@@ -204,25 +202,35 @@ document.addEventListener('DOMContentLoaded', () => {
                 }, 200);
                 
                 try {
+                    const sentences = chapterSentences
+                        .slice(0, currentChapterNum + 1)
+                        .filter(Array.isArray)
+                        .flat();
+
+                    const payload = {
+                        context: highlightedText,
+                        question: userInput,
+                        chapter_sentences: sentences
+                    };
+                    console.log('Full payload being sent:', payload);
                     const response = await fetch('/ask_question', {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            context: highlightedText,
-                            question: userInput
-                        })
+                        headers: {'Content-Type': 'application/json',},
+                        body: JSON.stringify(payload)
                     });
                     
                     const data = await response.json();
                     console.log('Claude Sonnet 3.5 answer:', data.answer);
                     
                     // Clear thinking animation
-                    container.classList.add('expanded');
                     clearInterval(thinkingAnimation);
                     responseElement.className = 'search-response';
                     responseElement.textContent = data.answer;
+                    
+                    // Only expand if answer is over 100 characters
+                    if (data.answer.length > 50) {
+                        container.classList.add('expanded');
+                    }
                 } catch (error) {
                     console.error('Error getting answer:', error);
                     // Clear thinking animation and show error
@@ -247,53 +255,57 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Handle keyboard shortcuts
 document.addEventListener('keydown', (e) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+    if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'd' || e.key === 'l')) {
+        e.preventDefault();
+        
         const selection = window.getSelection();
         const selectedString = selection.toString().trim();
         
-        if (!selection.rangeCount) return;
+        if (!selection.rangeCount || !selectedString) return;
         
-        if (selectedString) {
-            e.preventDefault();
+        try {
+            // Store the selected range and create highlight
+            selectedRange = selection.getRangeAt(0).cloneRange();
+            const tempHighlight = document.createElement('span');
+            tempHighlight.className = 'temp-highlight';
+            selectedRange.surroundContents(tempHighlight);
             
-            try {
-                // Store the selected range
-                selectedRange = selection.getRangeAt(0).cloneRange();
-                
-                // Create a temporary highlight span
-                const tempHighlight = document.createElement('span');
-                tempHighlight.className = 'temp-highlight';
-                selectedRange.surroundContents(tempHighlight);
-                
-                // Clear previous state
-                const overlay = document.querySelector('.search-overlay');
-                const responseContainer = document.querySelector('.search-response-container');
-                const container = document.querySelector('.search-container');
-                const input = overlay.querySelector('.search-input');
-                
-                overlay.classList.remove('active');
-                responseContainer.classList.remove('active');
-                container.classList.remove('expanded');
+            // Prepare overlay
+            const overlay = document.querySelector('.search-overlay');
+            const responseContainer = document.querySelector('.search-response-container');
+            const container = document.querySelector('.search-container');
+            const input = overlay.querySelector('.search-input');
+            
+            overlay.classList.remove('active', 'define-mode');
+            responseContainer.classList.remove('active');
+            container.classList.remove('expanded');
+            
+            // Position overlay
+            const rect = tempHighlight.getBoundingClientRect();
+            overlay.style.top = `${window.scrollY + rect.bottom + 10}px`;
+            overlay.style.left = `${rect.left}px`;
+            
+            if (e.key === 'k') {
+                // Question mode
                 input.value = '';
-                
-                // Position overlay relative to selection
-                const rect = tempHighlight.getBoundingClientRect();
-                overlay.style.top = `${window.scrollY + rect.bottom + 10}px`;
-                overlay.style.left = `${rect.left}px`;
-                
-                // Ensure overlay stays within viewport
-                const overlayRect = overlay.getBoundingClientRect();
-                if (overlayRect.right > window.innerWidth) {
-                    overlay.style.left = `${window.innerWidth - overlayRect.width - 20}px`;
-                }
-                
+                input.placeholder = 'Ask a quick question...';
                 requestAnimationFrame(() => {
                     overlay.classList.add('active');
                     input.focus();
                 });
-            } catch (error) {
-                console.error('Error handling text selection:', error);
+            } else if (e.key === 'd') {
+                // Definition mode
+                overlay.classList.add('active', 'define-mode');
+                responseContainer.classList.add('active');
+                handleDefinitionRequest(selectedString, tempHighlight);
+            } else if (e.key === 'l') {
+                // Translation mode
+                overlay.classList.add('active', 'define-mode'); // Reuse define-mode to hide input
+                responseContainer.classList.add('active');
+                handleTranslationRequest(selectedString, tempHighlight);
             }
+        } catch (error) {
+            console.error('Error handling text selection:', error);
         }
     }
 });
@@ -330,6 +342,7 @@ window.addEventListener('DOMContentLoaded', () => {
                             currentChapter = data;
                             chapterNum = currentChapter.index;
                             hrefChapterMapping[currentChapter.href] = chapterNum;
+                            processChapter(currentChapter);
 
                             // Remove unprocessed state and update title if available
                             const tocItem = document.getElementById(`toc-item-${chapterNum}`);
@@ -574,4 +587,76 @@ function closeOverlay() {
     
     // Clear the stored range
     selectedRange = null;
+}
+
+function processChapter(chapter) {
+    console.log(`Processing chapter ${chapter.index}:`, {
+        title: chapter.title,
+        contentLength: chapter.content.length
+    });
+
+    // Use DOMParser for safer HTML parsing
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(chapter.content, 'text/html');
+    const text = doc.body.textContent
+    
+    // More sophisticated sentence splitting
+    const sentenceRegex = /[^.!?]+(?:[.!?](?!['"]?\s|$)[^.!?]*)*[.!?]*/g;
+    const sentences = text.match(sentenceRegex) || [];
+    // Filter out empty or whitespace-only sentences and normalize whitespace
+    const validSentences = sentences
+        .map(s => s.trim().replace(/\s+/g, ' ')) // normalize whitespace
+        .filter(s => s.length > 0);
+        
+    // Store sentences for this chapter at its index
+    chapterSentences[chapter.index] = validSentences;
+}
+
+function handleTextRequest(selectedString, tempHighlight, endpoint, loadingMessage) {
+    const responseElement = document.querySelector('.search-response');
+    const container = document.querySelector('.search-container');
+    
+    // Get surrounding context
+    const contextNode = tempHighlight.parentNode;
+    const fullText = contextNode.textContent;
+    const wordIndex = fullText.indexOf(selectedString);
+    const contextStart = Math.max(0, wordIndex - 100);
+    const contextEnd = Math.min(fullText.length, wordIndex + selectedString.length + 100);
+    const context = fullText.slice(contextStart, contextEnd);
+
+    responseElement.className = 'thinking-animation';
+    responseElement.textContent = loadingMessage;
+    
+    fetch(endpoint, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            [endpoint.includes('translate') ? 'text' : 'word']: selectedString,
+            context: context
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        responseElement.className = 'search-response';
+        const result = data.translation || data.definition;
+        responseElement.textContent = result;
+        
+        // Only expand if result is over 100 characters
+        if (result.length > 50) {
+            container.classList.add('expanded');
+        }
+    })
+    .catch(error => {
+        console.error(`Error processing request:`, error);
+        responseElement.className = 'search-response';
+        responseElement.textContent = 'Sorry, an error occurred while processing your request.';
+    });
+}
+
+function handleDefinitionRequest(selectedString, tempHighlight) {
+    handleTextRequest(selectedString, tempHighlight, '/define_word', 'Looking up definition...');
+}
+
+function handleTranslationRequest(selectedString, tempHighlight) {
+    handleTextRequest(selectedString, tempHighlight, '/translate_text', 'Translating...');
 }

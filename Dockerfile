@@ -16,6 +16,7 @@ COPY . /app/
 # Set production environment variables
 ENV FLASK_ENV=production
 ENV FLASK_APP=app.py
+ENV ANTHROPIC_API_KEY=<set_your_api_key_here>
 
 # Expose the port that the app will run on
 EXPOSE 8002
