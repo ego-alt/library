@@ -45,18 +45,16 @@
    cd library
    ```
 
-2. **Build the Docker image**:
+2. **Configure environment variables**:
+   Create a `.env` file in the project root:
    ```bash
-   docker build -t epub-library .
+   ANTHROPIC_API_KEY=your_api_key_here
+   BOOK_DIR=/path/to/your/books
    ```
 
-3. **Run the Docker container**:
+3. **Build and run with Docker Compose**:
    ```bash
-   docker run -d -p 8002:8002 \
-       -v <local_path_to_books>:/mnt/backup/books \
-       -v $(pwd)/instance:/app/instance \
-       -e ANTHROPIC_API_KEY=<your_api_key_here> \
-       epub-library
+   docker compose up -d
    ```
 
 4. **Alternative (local) setup**:

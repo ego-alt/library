@@ -1,0 +1,11 @@
+version: '3.8'
+services:
+  epub-library:
+    build: .
+    ports:
+      - "8002:8002"
+    volumes:
+      - ${BOOK_DIR}:/mnt/backup/books
+      - ./instance:/app/instance
+    env_file:
+      - .env 
