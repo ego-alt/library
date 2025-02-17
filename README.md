@@ -1,4 +1,4 @@
-# EPUB Library Management System
+# INQUIRE: AI-Enhanced EPUB Library
 
 ## Overview
 
@@ -31,6 +31,11 @@
 - **Dark Mode**
   - Toggle between light and dark themes effortlessly.
   - Persistent theme preference across sessions.
+- **AI-Powered Reading Assistant**
+  - Ask questions on highlighted text for deeper comprehension.
+  - Get instant word definitions tailored to the current passage.
+  - Translate selected text to English with context-aware accuracy.
+  - Keyboard shortcuts for quick access on desktop (`Ctrl/Cmd + K`for questions, `D` for definitions, `L` for translations).
 
 ## Installation
 
@@ -45,7 +50,12 @@
    docker build -t epub-library .
    ```
 
-3. **Run the Docker container**:
+3. **Export your Anthropic API key if you want to use AI-powered features:**
+  ```bash
+   export ANTHROPIC_API_KEY=<set_your_api_key_here>
+  ```
+
+4. **Run the Docker container**:
    ```bash
    docker run -d -p 8002:8002 \
        -v <local_path_to_books>:/mnt/backup/books \
