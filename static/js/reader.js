@@ -540,22 +540,14 @@ function initializeOverlay(tempHighlight, mode = 'question') {
     const spaceBelow = viewportHeight - highlightRect.bottom;
     const overlayWidth = parseInt(getComputedStyle(container).width);
     
-    // Calculate center position
-    const highlightCenter = highlightRect.left + (highlightRect.width / 2);
-    const overlayHalfWidth = overlayWidth / 2;
-    
-    // Position the overlay - try center first, fallback to left or right align if it would overflow
+    // Position the overlay - try left first, then right, fallback to center if neither fits
     let left;
-    if (highlightCenter - overlayHalfWidth >= readerRect.left && 
-        highlightCenter + overlayHalfWidth <= readerRect.right) {
-        // Center align if it fits
-        left = highlightCenter - overlayHalfWidth;
-    } else if (highlightRect.left + overlayWidth > readerRect.right) {
-        // Right align if too wide
+    if (highlightRect.left + overlayWidth <= readerRect.right) {
+        left = highlightRect.left;
+    } else if (highlightRect.right - overlayWidth >= readerRect.left) {
         left = highlightRect.right - overlayWidth;
     } else {
-        // Left align as fallback
-        left = highlightRect.left;
+        left = highlightRect.left + (highlightRect.width / 2) - overlayWidth / 2;
     }
     overlay.style.left = `${left}px`;
     
