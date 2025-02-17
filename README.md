@@ -50,20 +50,16 @@
    docker build -t epub-library .
    ```
 
-3. **Export your Anthropic API key if you want to use AI-powered features**:
-   ```bash
-   export ANTHROPIC_API_KEY=<set_your_api_key_here>
-   ```
-
-4. **Run the Docker container**:
+3. **Run the Docker container**:
    ```bash
    docker run -d -p 8002:8002 \
        -v <local_path_to_books>:/mnt/backup/books \
        -v $(pwd)/instance:/app/instance \
+       -e ANTHROPIC_API_KEY=<your_api_key_here> \
        epub-library
    ```
 
-5. **Alternative (local) setup**:
+4. **Alternative (local) setup**:
    Ensure you have Python (3.6+) installed and set up a virtual environment:
    ```bash
    python -m venv venv
