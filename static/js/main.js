@@ -145,9 +145,8 @@ function generateMetadataHtml(data, isUpload = false) {
     const genreField = createField('Genre', data.genre || '', isUpload ? 'upload-metadata-genre' : 'metadata-genre');
 
     // For uploading a new book, include a filename field.
-    const constructedFilename = `${data.title.replace(/\s+/g, '_')}__${data.author.replace(/\s+/g, '_')}.epub`;
     const extraField = isUpload 
-        ? createField('Filename', constructedFilename, 'upload-metadata-filename')
+        ? createField('Filename', data.filename, 'upload-metadata-filename')
         : `
             <div class="metadata-field" style="margin-bottom: 10px;">
                 <strong>Custom Tags:</strong>
