@@ -13,11 +13,11 @@ upload_blueprint = Blueprint("upload_routes", __name__)
 
 def generate_filename(title, author):
     # Remove punctuation from the title and author
-    spaces_regex = r'\s+'
+    spaces_regex = r"\s+"
     punctuation_regex = r'[.,\'"\']'
 
-    title = re.sub(spaces_regex, '_', re.sub(punctuation_regex, '', title))
-    author = re.sub(spaces_regex, '_', re.sub(punctuation_regex, '', author))
+    title = re.sub(spaces_regex, "_", re.sub(punctuation_regex, "", title))
+    author = re.sub(spaces_regex, "_", re.sub(punctuation_regex, "", author))
     # Concatenate the title and author for the filename, separated by a double underscore
     return f"{title}__{author}.epub"
 
@@ -55,13 +55,15 @@ def upload_book():
         if not table_of_contents:
             os.remove(temp_file_path)
             return jsonify(
-                {"error": "Uploaded EPUB does not contain a table of contents. Quality is questionable."}
+                {
+                    "error": "Uploaded EPUB does not contain a table of contents. Quality is questionable."
+                }
             ), 400
 
         metadata = extract_metadata(epub_book)
         title, author = metadata.get("title", ""), metadata.get("author", "")
         filename = generate_filename(title, author)
-        
+
         # Rename the file to standardized name
         final_file_path = os.path.join(current_app.config["BOOK_DIR"], filename)
         os.rename(temp_file_path, final_file_path)
@@ -104,7 +106,9 @@ def upload_book_metadata():
     if original_filename != new_filename:
         # Rename the file
         try:
-            original_filepath = os.path.join(current_app.config["BOOK_DIR"], original_filename)
+            original_filepath = os.path.join(
+                current_app.config["BOOK_DIR"], original_filename
+            )
             new_filepath = os.path.join(current_app.config["BOOK_DIR"], new_filename)
             os.rename(original_filepath, new_filepath)
             current_app.logger.info(

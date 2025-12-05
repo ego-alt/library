@@ -1,4 +1,11 @@
-from flask import Blueprint, current_app, jsonify, request, render_template
+from flask import (
+    Blueprint,
+    current_app,
+    jsonify,
+    request,
+    render_template,
+    send_from_directory,
+)
 from flask_login import current_user
 from models import db, Book, Bookmark, Tag
 from choices import BookProgressChoice, UserRoleChoice
@@ -24,9 +31,7 @@ def get_covers(offset=0, limit=BOOKS_PER_LOAD, filters=None):
     if current_user.is_authenticated:
         query = query.outerjoin(
             Book.bookmarks.and_(Bookmark.user_id == current_user.id)
-        ).outerjoin(
-            Book.tags.and_(Tag.user_id == current_user.id)
-        )
+        ).outerjoin(Book.tags.and_(Tag.user_id == current_user.id))
 
     if filters:
         # Apply text filters for title, author, and genre
