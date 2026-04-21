@@ -58,12 +58,10 @@
    ```
 
 4. **Alternative (local) setup**:
-   Ensure you have Python (3.6+) installed and set up a virtual environment:
+   Ensure you have Python (3.10+) and `uv` installed:
    ```bash
-   python -m venv venv
-   source venv/bin/activate   # On Windows use `venv\Scripts\activate`
-   pip install -r requirements.txt
-   flask run --port=8002
+   uv sync
+   uv run flask run --port=8002
    ```
 
 ## Usage
@@ -93,17 +91,17 @@ The application includes several CLI commands for managing books:
 
 - **Import Books**: Import EPUB files from a specified directory.
   ```bash
-  flask import-books --directory /path/to/epub/files
+  uv run flask import-books --directory /path/to/epub/files
   ```
 
 - **Flush Books**: Remove books from the database that no longer exist in the specified directory.
   ```bash
-  flask flush-books --directory /path/to/epub/files
+  uv run flask flush-books --directory /path/to/epub/files
   ```
 
 - **Create User**: Create a new user account.
   ```bash
-  flask create-user <username> <password> --role <role>
+  uv run flask create-user <username> <password> --role <role>
   ```
 
 ## Contributing
