@@ -22,4 +22,4 @@ class Config:
     ]
 
     # Book directory
-    BOOK_DIR = os.getenv("BOOK_DIR", "/mnt/backup/books/")
+    BOOK_DIR = os.getenv("BOOK_DIR", os.path.join(BASE_DIR, "books"))
