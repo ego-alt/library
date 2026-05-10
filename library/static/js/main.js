@@ -100,6 +100,24 @@ function appendSkeletons(count) {
 }
 
 
+// <== GLOBAL CLICK DELEGATION ==>
+// Single dispatcher for data-action buttons. Replaces inline onclick handlers
+// so user-supplied data (filenames, tags) never gets interpolated into HTML
+// or JS strings.
+document.addEventListener('click', (e) => {
+    const trigger = e.target.closest('[data-action]');
+    if (!trigger) return;
+    const filename = trigger.dataset.filename;
+    switch (trigger.dataset.action) {
+        case 'show-metadata':  showMetadata(filename); break;
+        case 'change-cover':   triggerCoverUpload(filename); break;
+        case 'delete-book':    confirmDeleteBook(filename); break;
+        case 'save-metadata':  saveMetadata(filename); break;
+        case 'save-new-book':  saveNewBook(filename, trigger.dataset.coverPath || ''); break;
+    }
+});
+
+
 // <== TOAST NOTIFICATIONS ==>
 // Non-blocking replacement for alert() — slides in bottom-right and auto-dismisses.
 function showToast(message, type = 'info') {
@@ -268,7 +286,7 @@ function generateMetadataHtml(data, isUpload = false) {
     // --- Cover with hover overlay for admins ---
     const coverChange = isAdmin
         ? `<button type="button" class="meta-cover__change"
-                   onclick="triggerCoverUpload('${escapeHtml(data.filename)}')">
+                   data-action="change-cover" data-filename="${escapeHtml(data.filename)}">
               <i class="fas fa-camera"></i><span>Change cover</span>
            </button>`
         : '';
@@ -322,18 +340,23 @@ function generateMetadataHtml(data, isUpload = false) {
 
     const deleteButton = (isAdmin && !isUpload)
         ? `<button type="button" class="delete-book-button"
-                   onclick="confirmDeleteBook('${escapeHtml(data.filename)}')">
+                   data-action="delete-book" data-filename="${escapeHtml(data.filename)}">
               <i class="fas fa-trash"></i><span>Delete</span>
            </button>`
         : '';
     const saveLabel = isUpload ? 'Add to library' : 'Save changes';
     const saveButton = isAuth
-        ? `<button type="button" class="save-button"
-                   onclick="${isUpload
-                       ? `saveNewBook('${escapeHtml(data.filename)}', '${escapeHtml(data.cover_path || '')}')`
-                       : `saveMetadata('${escapeHtml(data.filename)}')`}">
-              ${saveLabel}
-           </button>`
+        ? (isUpload
+            ? `<button type="button" class="save-button"
+                       data-action="save-new-book"
+                       data-filename="${escapeHtml(data.filename)}"
+                       data-cover-path="${escapeHtml(data.cover_path || '')}">
+                  ${saveLabel}
+               </button>`
+            : `<button type="button" class="save-button"
+                       data-action="save-metadata" data-filename="${escapeHtml(data.filename)}">
+                  ${saveLabel}
+               </button>`)
         : '';
 
     return `
@@ -666,16 +689,26 @@ function addTag(text, container) {
     if (!cleanText) return;
 
     const isFiltering = container.id === 'filter-tags-container';
-    const removeTagHandler = isFiltering 
-        ? 'this.parentElement.remove(); applyFilters();' 
-        : 'this.parentElement.remove()';
+    const statusClass = {
+        'Finished': 'finished-tag',
+        'In Progress': 'started-tag',
+        'Unread': 'unread-tag',
+    }[cleanText];
 
+    // Build via DOM nodes so user-supplied tag text is never interpreted as HTML.
     const tag = document.createElement('span');
-    tag.className = 'tag' + (cleanText === "Finished" ? ' finished-tag' : (cleanText === "In Progress" ? ' started-tag' : (cleanText === "Unread" ? ' unread-tag' : '')));
-    tag.innerHTML = `
-        ${cleanText}
-        <span class="remove-tag" onclick="${removeTagHandler}">×</span>
-    `;
+    tag.className = 'tag' + (statusClass ? ' ' + statusClass : '');
+    tag.appendChild(document.createTextNode(cleanText + ' '));
+
+    const removeBtn = document.createElement('span');
+    removeBtn.className = 'remove-tag';
+    removeBtn.textContent = '×';
+    removeBtn.addEventListener('click', () => {
+        tag.remove();
+        if (isFiltering) applyFilters();
+    });
+    tag.appendChild(removeBtn);
+
     container.appendChild(tag);
 }
 
