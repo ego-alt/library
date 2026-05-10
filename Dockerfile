@@ -23,4 +23,4 @@ EXPOSE 8002
 
 # Run the Flask application using Gunicorn with the correct module reference.
 # This tells Gunicorn to call the create_app() factory in app.py.
-CMD ["uv", "run", "gunicorn", "app:create_app()", "--bind", "0.0.0.0:8002", "--workers", "3", "--timeout", "120", "--worker-class", "sync"]
+CMD ["uv", "run", "gunicorn", "app:create_app()", "--bind", "0.0.0.0:8002", "--workers", "3", "--threads", "8", "--timeout", "120", "--worker-class", "gthread"]

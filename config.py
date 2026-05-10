@@ -18,6 +18,7 @@ class Config:
         "text/css",
         "application/javascript",
         "application/json",
+        "application/x-ndjson",
         "image/svg+xml",
     ]
 
