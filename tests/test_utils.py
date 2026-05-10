@@ -176,7 +176,7 @@ def test_extract_metadata_pulls_title_and_author(epub_path):
     from ebooklib import epub as _epub
 
     path = epub_path(build_epub3(title="Demo", author="Tester"))
-    meta = extract_metadata(_epub.read_epub(path))
+    meta = extract_metadata(_epub.read_epub(path, options={"ignore_ncx": True}))
     assert meta == {"title": "Demo", "author": "Tester"}
 
 

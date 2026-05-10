@@ -68,3 +68,8 @@ select = ["E", "F", "W", "I", "N", "UP", "B", "TID"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+filterwarnings = [
+    # Internal to ebooklib's container.xml parsing; nothing we can do from
+    # our code. Drop this once ebooklib publishes a fix.
+    "ignore:This search incorrectly ignores the root element:FutureWarning:ebooklib.epub",
+]

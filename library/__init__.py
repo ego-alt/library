@@ -22,7 +22,7 @@ from .routes import (
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-cache = Cache(config={"CACHE_TYPE": "simple"})
+cache = Cache(config={"CACHE_TYPE": "flask_caching.backends.simplecache.SimpleCache"})
 
 
 def create_app(config_overrides: dict | None = None):
@@ -53,7 +53,7 @@ def create_app(config_overrides: dict | None = None):
 
     @login_manager.user_loader
     def load_user(user_id):
-        return User.query.get(int(user_id))
+        return db.session.get(User, int(user_id))
 
     app.register_blueprint(auth_blueprint)
     app.register_blueprint(index_blueprint)

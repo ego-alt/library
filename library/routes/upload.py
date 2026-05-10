@@ -62,7 +62,7 @@ def upload_book():
 
     # Read the EPUB file to extract metadata
     try:
-        epub_book = epub.read_epub(temp_file_path)
+        epub_book = epub.read_epub(temp_file_path, options={"ignore_ncx": True})
         table_of_contents = epub_book.get_items_of_type(epub.EpubNav)
         if not table_of_contents:
             os.remove(temp_file_path)

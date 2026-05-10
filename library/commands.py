@@ -46,7 +46,7 @@ def import_books_command(directory, access_level):
 
         try:
             # Read EPUB file
-            epub_book = epub.read_epub(full_path)
+            epub_book = epub.read_epub(full_path, options={"ignore_ncx": True})
             metadata = extract_metadata(epub_book)
 
             if metadata:
