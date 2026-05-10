@@ -64,18 +64,14 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelector('.search-input').addEventListener('keydown', async (e) => {
         if (e.key === 'Enter' || e.key === 'Escape') {
             if (e.key === 'Escape') {
-                console.log('Closing overlay');
                 closeOverlay();
             } else if (e.key === 'Enter') {
                 const userInput = e.target.value.trim();
-                
+
                 // Get the highlighted text from the temp-highlight span
                 const tempHighlight = document.querySelector('.temp-highlight');
                 const highlightedText = tempHighlight ? tempHighlight.textContent.trim() : '';
-                
-                console.log('Selected text:', highlightedText);
-                console.log('User input:', userInput);
-                
+
                 // Start loading animation immediately
                 const container = document.querySelector('.search-container');
                 const responseContainer = document.querySelector('.search-response-container');
@@ -134,10 +130,9 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Store the selected range and create highlight
             selectedRange = selection.getRangeAt(0).cloneRange();
-            const tempHighlight = document.createElement('span');
-            tempHighlight.className = 'temp-highlight';
-            selectedRange.surroundContents(tempHighlight);
-            
+            const tempHighlight = wrapRangeInHighlight(selectedRange);
+            if (!tempHighlight) return;
+
             if (e.key === 'k') {
                 initializeOverlay(tempHighlight, 'question');
             } else if (e.key === 'd') {
@@ -206,9 +201,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!selection.rangeCount || !selectedString) return;
 
         // Create highlight
-        const tempHighlight = document.createElement('span');
-        tempHighlight.className = 'temp-highlight';
-        selectedRange.surroundContents(tempHighlight);
+        const tempHighlight = wrapRangeInHighlight(selectedRange);
+        if (!tempHighlight) return;
 
         // Initialize overlay and handle action
         initializeOverlay(tempHighlight, action);
@@ -459,6 +453,25 @@ function handleChapterLink(element) {
             }
         });
     }
+}
+
+// surroundContents throws if the selection straddles element boundaries.
+// Fall back to extractContents/insertNode, which always works.
+function wrapRangeInHighlight(range) {
+    const span = document.createElement('span');
+    span.className = 'temp-highlight';
+    try {
+        range.surroundContents(span);
+    } catch (_) {
+        try {
+            span.appendChild(range.extractContents());
+            range.insertNode(span);
+        } catch (err) {
+            console.error('Could not wrap selection:', err);
+            return null;
+        }
+    }
+    return span;
 }
 
 // Update the closeOverlay function

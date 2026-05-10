@@ -118,7 +118,17 @@ def load_more(offset):
 
 @index_blueprint.route("/download/<filename>")
 def download(filename):
-    """Serve the EPUB file for download."""
+    """Serve the EPUB file for download, respecting per-book access level."""
+    book = Book.query.filter_by(filename=filename).first()
+    if not book:
+        return jsonify({"error": "Book not found"}), 404
+
+    if book.access_level != "standard" and (
+        not current_user.is_authenticated
+        or current_user.role == UserRoleChoice.STANDARD
+    ):
+        return jsonify({"error": "Forbidden"}), 403
+
     return send_from_directory(
         current_app.config["BOOK_DIR"], filename, as_attachment=True
     )

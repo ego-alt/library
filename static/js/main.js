@@ -82,13 +82,12 @@ function applyFilters() {
         author: $('#filterAuthor').val(),
         genre: $('#filterGenre').val(),
         tags: [
-            ...Array.from($('#filter-tags-container .tag')).map(tag => 
+            ...Array.from($('#filter-tags-container .tag')).map(tag =>
                 tag.innerText.replace(/×/g, '').trim()
             ),
             $('#filterTags').val().trim() // Include text from the input box
         ].filter(tag => tag) // Filter out any empty strings
     };
-    console.log(currentFilters);
 
     // Clear existing books
     $('#library').empty();
@@ -123,9 +122,7 @@ initializeTagInput('filterTags', 'filter-tags-container');
 // <== FUNCTIONS FOR VIEWING AND EDITING METADATA ==>
 function generateMetadataHtml(data, isUpload = false) {
     const isAuth = window.isAuthenticated;
-    console.log("Current User Role:", window.currentUserRole);
     const isAdmin = (window.currentUserRole || "") === 'admin';
-    console.log("isAdmin:", isAdmin);
 
     // Helper function to create a field.
     // Only admin users get an <input> so they can edit the field.
@@ -426,20 +423,16 @@ function closeLoginDialog() {
 
 async function handleLogin(event) {
     event.preventDefault();
-    
+
     const formData = new FormData(event.target);
-    
+
     try {
-        console.log('Attempting login...');
         const response = await fetch('/auth/login', {
             method: 'POST',
             body: formData
         });
-        
-        console.log('Response status:', response.status);
         const data = await response.json();
-        console.log('Response data:', data);
-        
+
         if (response.ok) {
             location.reload();
         } else {
