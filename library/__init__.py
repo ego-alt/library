@@ -9,7 +9,7 @@ from flask_migrate import Migrate
 from werkzeug.exceptions import HTTPException
 
 from .commands import init_commands
-from .config import Config, DATA_DIR
+from .config import DATA_DIR, Config
 from .models import User, db
 from .routes import (
     auth_blueprint,

@@ -1,18 +1,19 @@
 import base64
+import os
+import re
+import uuid
+
 from ebooklib import epub
 from flask import Blueprint, current_app, jsonify, request
+
 from ..models import Book, db
-import re
-from ._helpers import commit_or_rollback, json_login_required
 from ..utils import (
     cover_mimetype,
     extract_metadata,
     get_epub_cover_path,
     read_epub_cover,
 )
-import os
-import uuid
-
+from ._helpers import commit_or_rollback, json_login_required
 
 upload_blueprint = Blueprint("upload_routes", __name__)
 

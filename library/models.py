@@ -1,12 +1,15 @@
-from .choices import UserRoleChoice, BookProgressChoice
 from datetime import datetime, timezone
+
+from flask_login import UserMixin
+from flask_sqlalchemy import SQLAlchemy
+from werkzeug.security import check_password_hash, generate_password_hash
+
+from .choices import BookProgressChoice, UserRoleChoice
 
 
 def _utcnow():
     return datetime.now(timezone.utc)
-from flask_login import UserMixin
-from flask_sqlalchemy import SQLAlchemy
-from werkzeug.security import generate_password_hash, check_password_hash
+
 
 db = SQLAlchemy()
 

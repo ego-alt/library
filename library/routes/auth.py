@@ -1,5 +1,6 @@
-from flask import Blueprint, redirect, url_for, request, jsonify
-from flask_login import login_user, logout_user, login_required
+from flask import Blueprint, jsonify, redirect, request, url_for
+from flask_login import login_required, login_user, logout_user
+
 from ..models import User
 
 auth = Blueprint("auth", __name__, url_prefix="/auth")

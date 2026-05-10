@@ -1,12 +1,12 @@
-from bs4 import BeautifulSoup
 import logging
-from lxml import etree
 import os
-from urllib.parse import unquote
-import zipfile
-import tempfile
 import shutil
+import tempfile
+import zipfile
+from urllib.parse import unquote
 
+from bs4 import BeautifulSoup
+from lxml import etree
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -22,10 +22,10 @@ namespaces = {
 }
 
 
-def rotate_list(l: list, n: int) -> list:
+def rotate_list(items: list, n: int) -> list:
     if n == 0:
-        return l
-    return l[-n:] + l[:-n]
+        return items
+    return items[-n:] + items[:-n]
 
 
 def get_epub_cover_path(path: str):

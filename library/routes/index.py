@@ -1,21 +1,22 @@
+import os
+
 from flask import (
     Blueprint,
     abort,
     current_app,
     jsonify,
     make_response,
-    request,
     render_template,
+    request,
     send_from_directory,
     url_for,
 )
 from flask_login import current_user
-from ..models import db, Book, Bookmark, Tag, book_tags
-from ..choices import BookProgressChoice, UserRoleChoice
-import os
-from ._helpers import commit_or_rollback, get_book_or_404, json_admin_required
-from ..utils import cover_mimetype, read_epub_cover
 
+from ..choices import BookProgressChoice, UserRoleChoice
+from ..models import Book, Bookmark, Tag, book_tags, db
+from ..utils import cover_mimetype, read_epub_cover
+from ._helpers import commit_or_rollback, get_book_or_404, json_admin_required
 
 index_blueprint = Blueprint("index_routes", __name__)
 

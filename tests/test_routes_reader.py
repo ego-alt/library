@@ -1,7 +1,7 @@
 import json
 
 from library.choices import BookProgressChoice
-from library.models import Bookmark, db
+from library.models import Bookmark
 
 
 def _read_ndjson(response):

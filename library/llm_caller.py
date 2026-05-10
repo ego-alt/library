@@ -1,5 +1,6 @@
-import anthropic
 import os
+
+import anthropic
 
 
 class LLMError(Exception):

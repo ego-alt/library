@@ -2,7 +2,6 @@ import os
 
 from library.models import Book, db
 
-
 # --- index / load_more ----------------------------------------------------------
 
 

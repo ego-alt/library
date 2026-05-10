@@ -1,10 +1,9 @@
 import io
 import os
 
-from library.models import Book, db
+from library.models import Book
 from library.routes.upload import generate_filename
 from tests._epub_builder import build_epub3
-
 
 # --- generate_filename ----------------------------------------------------------
 
