@@ -1,4 +1,4 @@
-from choices import UserRoleChoice, BookProgressChoice
+from .choices import UserRoleChoice, BookProgressChoice
 from datetime import datetime, timezone
 
 

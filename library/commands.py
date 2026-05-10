@@ -2,11 +2,11 @@ import click
 from flask.cli import with_appcontext
 import os
 from ebooklib import epub
-from choices import UserRoleChoice
-from models import db, Book, User
+from .choices import UserRoleChoice
+from .models import db, Book, User
 import logging
 from flask import current_app
-from utils import get_epub_cover_path, extract_metadata
+from .utils import get_epub_cover_path, extract_metadata
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

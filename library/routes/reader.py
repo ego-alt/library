@@ -1,4 +1,4 @@
-from models import _utcnow
+from ..models import _utcnow
 from flask import (
     Blueprint,
     abort,
@@ -12,15 +12,15 @@ from flask import (
     url_for,
 )
 from flask_login import current_user
-from models import Book, db, Bookmark, BookProgressChoice
-from utils import rotate_list, get_epub_structure, process_chapter_content
+from ..models import Book, db, Bookmark, BookProgressChoice
+from ..utils import rotate_list, get_epub_structure, process_chapter_content
 import logging
 import json
 import mimetypes
 import os
 import zipfile
-from llm_caller import LLMCaller, LLMError
-from routes._helpers import (
+from ..llm_caller import LLMCaller, LLMError
+from ._helpers import (
     commit_or_rollback,
     get_book_or_404,
     json_login_required,

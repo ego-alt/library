@@ -1,12 +1,12 @@
 from flask import Blueprint, current_app, jsonify, request, url_for
 from flask_login import current_user
-from models import Bookmark, Tag, book_tags, db, BookProgressChoice
-from routes._helpers import (
+from ..models import Bookmark, Tag, book_tags, db, BookProgressChoice
+from ._helpers import (
     commit_or_rollback,
     get_book_or_404,
     json_login_required,
 )
-from utils import update_epub_cover
+from ..utils import update_epub_cover
 import os
 
 

@@ -4,7 +4,7 @@ from functools import wraps
 from flask import abort, jsonify
 from flask_login import current_user
 
-from models import Book, db
+from ..models import Book, db
 
 
 def json_login_required(view):

@@ -1,10 +1,10 @@
 import base64
 from ebooklib import epub
 from flask import Blueprint, current_app, jsonify, request
-from models import Book, db
+from ..models import Book, db
 import re
-from routes._helpers import commit_or_rollback, json_login_required
-from utils import (
+from ._helpers import commit_or_rollback, json_login_required
+from ..utils import (
     cover_mimetype,
     extract_metadata,
     get_epub_cover_path,

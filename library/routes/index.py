@@ -10,11 +10,11 @@ from flask import (
     url_for,
 )
 from flask_login import current_user
-from models import db, Book, Bookmark, Tag
-from choices import BookProgressChoice, UserRoleChoice
+from ..models import db, Book, Bookmark, Tag
+from ..choices import BookProgressChoice, UserRoleChoice
 import os
-from routes._helpers import get_book_or_404
-from utils import cover_mimetype, read_epub_cover
+from ._helpers import get_book_or_404
+from ..utils import cover_mimetype, read_epub_cover
 
 
 index_blueprint = Blueprint("index_routes", __name__)
