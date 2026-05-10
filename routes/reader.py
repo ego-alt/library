@@ -14,12 +14,20 @@ from utils import rotate_list, get_epub_structure, process_chapter_content
 import logging
 import json
 import os
-from llm_caller import LLMCaller
+from llm_caller import LLMCaller, LLMError
 
 
 read_blueprint = Blueprint("read_routes", __name__)
 
 llm_caller = LLMCaller()
+
+
+def _llm_response(payload_key: str, fn, *args):
+    try:
+        return jsonify({payload_key: fn(*args)})
+    except LLMError as e:
+        current_app.logger.error(f"LLM call failed: {e}")
+        return jsonify({"error": str(e)}), 502
 
 
 @read_blueprint.route("/read/<filename>")
@@ -208,8 +216,7 @@ def ask_question():
     if not context or not question:
         return jsonify({"error": "Missing context or question"}), 400
 
-    answer = llm_caller.ask_question(context, question)
-    return jsonify({"answer": answer})
+    return _llm_response("answer", llm_caller.ask_question, context, question)
 
 
 @read_blueprint.route("/define_word", methods=["POST"])
@@ -222,8 +229,7 @@ def define_word():
     if not word or not context:
         return jsonify({"error": "Missing word or context"}), 400
 
-    definition = llm_caller.define_word(word, context)
-    return jsonify({"definition": definition})
+    return _llm_response("definition", llm_caller.define_word, word, context)
 
 
 @read_blueprint.route("/translate_text", methods=["POST"])
@@ -232,5 +238,4 @@ def translate_text():
     text = data.get("text", "")
     context = data.get("context", "")
 
-    translation = llm_caller.translate_text(text, context)
-    return jsonify({"translation": translation})
+    return _llm_response("translation", llm_caller.translate_text, text, context)

@@ -1,6 +1,9 @@
-from flask import current_app
 import anthropic
 import os
+
+
+class LLMError(Exception):
+    """Raised when a Claude API call fails."""
 
 
 class LLMCaller:
@@ -8,8 +11,16 @@ class LLMCaller:
     DEFAULT_TEMPERATURE = 0.7
 
     def __init__(self):
-        api_key = os.getenv("ANTHROPIC_API_KEY")
-        self.client = anthropic.Anthropic(api_key=api_key)
+        self._client = None
+
+    @property
+    def client(self) -> anthropic.Anthropic:
+        if self._client is None:
+            api_key = os.getenv("ANTHROPIC_API_KEY")
+            if not api_key:
+                raise LLMError("ANTHROPIC_API_KEY is not set")
+            self._client = anthropic.Anthropic(api_key=api_key)
+        return self._client
 
     def _call_api(
         self,
@@ -26,10 +37,9 @@ class LLMCaller:
                 system=system,
                 messages=[{"role": "user", "content": user_content}],
             )
-            return message.content[0].text
-        except Exception as e:
-            current_app.logger.error(f"Error calling Claude API: {str(e)}")
-            return f"Sorry, I encountered an error: {str(e)}"
+        except anthropic.AnthropicError as e:
+            raise LLMError(str(e)) from e
+        return message.content[0].text
 
     def ask_question(self, context: str, question: str) -> str:
         system = (
