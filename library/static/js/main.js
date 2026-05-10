@@ -2,6 +2,9 @@ let offset = 8;
 let isLoading = false;
 let allImagesLoaded = false;
 let currentFilters = {};
+// View state — 'all' (every book, newest first) or 'mine' (only started, by last_read).
+// Server renders the initial batch using window.initialView; localStorage may override it.
+let currentView = window.initialView || 'all';
 
 function getBookTemplate(book) {
     return `
@@ -46,13 +49,13 @@ function loadMoreImages() {
     $('#loading').show();
 
     const queryParams = new URLSearchParams(currentFilters);
-    
+    queryParams.set('view', currentView);
+
     $.get(`/load_more/${offset}?${queryParams.toString()}`, function(data) {
         if (data.length === 0) {
             allImagesLoaded = true;
-            // Show empty state if no books are displayed
             if (offset === 0) {
-                $('#emptyState').show();
+                renderEmptyState();
                 $('#library').hide();
             }
         } else {
@@ -67,6 +70,60 @@ function loadMoreImages() {
         $('#loading').hide();
     });
 }
+
+function renderEmptyState() {
+    const $empty = $('#emptyState');
+    const hasFilters = Object.keys(currentFilters).some(k => currentFilters[k] && currentFilters[k].length);
+    if (currentView === 'mine' && !hasFilters) {
+        $empty.find('h3').text("Your library is empty");
+        $empty.find('p').text("Open a book to start reading and it'll show up here.");
+    } else {
+        $empty.find('h3').text("No books match your filters");
+        $empty.find('p').text("Try adjusting your search criteria");
+    }
+    $empty.show();
+}
+
+
+// <== VIEW TOGGLE (All books vs My books) ==>
+function toggleView() {
+    currentView = currentView === 'mine' ? 'all' : 'mine';
+    localStorage.setItem('libraryView', currentView);
+    updateViewToggleUI();
+    reloadLibrary();
+}
+
+function updateViewToggleUI() {
+    const btn = document.getElementById('viewToggle');
+    if (!btn) return;
+    const icon = btn.querySelector('i');
+    const isMine = currentView === 'mine';
+    btn.classList.toggle('active', isMine);
+    btn.setAttribute('aria-pressed', isMine ? 'true' : 'false');
+    btn.title = isMine
+        ? "Showing your library — click to browse all books"
+        : "Show only books you've started reading";
+    if (icon) icon.className = isMine ? 'fas fa-bookmark' : 'far fa-bookmark';
+}
+
+function reloadLibrary() {
+    offset = 0;
+    allImagesLoaded = false;
+    $('#emptyState').hide();
+    $('#library').empty().show();
+    loadMoreImages();
+}
+
+// On page load: respect a stored view preference if it differs from what the
+// server rendered. Causes a brief flash on first load when 'mine' is stored.
+$(function() {
+    const stored = localStorage.getItem('libraryView');
+    if (window.isAuthenticated && stored && stored !== currentView) {
+        currentView = stored;
+        reloadLibrary();
+    }
+    updateViewToggleUI();
+});
 
 
 // <== FUNCTIONS FOR FILTERING ==>

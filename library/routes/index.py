@@ -23,7 +23,21 @@ index_blueprint = Blueprint("index_routes", __name__)
 BOOKS_PER_LOAD = 8
 
 
-def get_covers(offset=0, limit=BOOKS_PER_LOAD, filters=None):
+VIEW_ALL = "all"
+VIEW_MINE = "mine"
+
+
+def get_covers(offset=0, limit=BOOKS_PER_LOAD, filters=None, view=VIEW_ALL):
+    """Return the next batch of book covers.
+
+    view='all'  → every accessible book, newest first by created_at.
+    view='mine' → only books the user has started (IN_PROGRESS or FINISHED),
+                  ordered by last_read so the most recently opened is first.
+                  Falls back to 'all' for anonymous users.
+    """
+    if view == VIEW_MINE and not current_user.is_authenticated:
+        view = VIEW_ALL
+
     query = Book.query
 
     if (
@@ -32,11 +46,18 @@ def get_covers(offset=0, limit=BOOKS_PER_LOAD, filters=None):
     ):
         query = query.filter(Book.access_level == "standard")
 
-    # Add joins early if user is authenticated
+    # Joins for authenticated users let us read bookmark and tag context.
     if current_user.is_authenticated:
         query = query.outerjoin(
             Book.bookmarks.and_(Bookmark.user_id == current_user.id)
         ).outerjoin(Book.tags.and_(Tag.user_id == current_user.id))
+
+    # "My books": restrict to bookmarks with a started reading status.
+    if view == VIEW_MINE:
+        query = query.filter(Bookmark.status.in_([
+            BookProgressChoice.IN_PROGRESS,
+            BookProgressChoice.FINISHED,
+        ]))
 
     if filters:
         # Apply text filters for title, author, and genre
@@ -83,7 +104,9 @@ def get_covers(offset=0, limit=BOOKS_PER_LOAD, filters=None):
             if tag_filters:
                 query = query.filter(db.or_(*tag_filters))
 
-    if current_user.is_authenticated:
+    # Sort: 'mine' uses last_read; 'all' uses created_at so freshly added books
+    # are visible at the top regardless of how much you've already read.
+    if view == VIEW_MINE:
         query = query.order_by(Bookmark.last_read.desc(), Book.created_at.desc())
     else:
         query = query.order_by(Book.created_at.desc())
@@ -97,11 +120,17 @@ def get_covers(offset=0, limit=BOOKS_PER_LOAD, filters=None):
     ]
 
 
+def _requested_view():
+    view = request.args.get("view", VIEW_ALL)
+    return view if view in (VIEW_ALL, VIEW_MINE) else VIEW_ALL
+
+
 @index_blueprint.route("/")
 def index():
     """Render the initial page with the first batch of book covers."""
-    images = get_covers(0, BOOKS_PER_LOAD)
-    return render_template("index.html", images=images)
+    view = _requested_view()
+    images = get_covers(0, BOOKS_PER_LOAD, view=view)
+    return render_template("index.html", images=images, current_view=view)
 
 
 @index_blueprint.route("/load_more/<int:offset>", methods=["GET"])
@@ -114,7 +143,7 @@ def load_more(offset):
     }
     # Remove empty filters
     filters = {k: v for k, v in filters.items() if v}
-    images = get_covers(offset, BOOKS_PER_LOAD, filters)
+    images = get_covers(offset, BOOKS_PER_LOAD, filters, view=_requested_view())
     return jsonify(images)
 
 

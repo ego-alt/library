@@ -9,6 +9,7 @@
     --text-color-dark: #34495E;
     --text-color-light: #2C3E50;
     --text-color-gray: #666;
+    --accent-color: #6AACFF;
     --tag-started: #D9B2A0; /* Amber color */
     --tag-finished: #B2E0D9; /* Sage color */
     --tag-unread: #A0B2D9; /* Blue color */
@@ -27,6 +28,7 @@ body {
     --text-color-dark: #E0E0E0;
     --text-color-light: #B0B0B0;
     --text-color-gray: #888;
+    --accent-color: #3A6D9A;
 }
 .header-row {
     display: flex;
@@ -466,7 +468,7 @@ body {
     display: flex;
     gap: 0.5rem;
 }
-.filter-button, .login-button, .upload-button, .dark-mode-toggle {
+.filter-button, .login-button, .upload-button, .dark-mode-toggle, .view-toggle {
     background: none;
     border: none;
     font-size: 1.2em;
@@ -475,8 +477,15 @@ body {
     cursor: pointer;
     transition: color 0.2s;
 }
-.filter-button:hover, .login-button:hover, .upload-button:hover, .dark-mode-toggle:hover {
+.filter-button:hover, .login-button:hover, .upload-button:hover, .dark-mode-toggle:hover, .view-toggle:hover {
     color: var(--text-color-light);
+}
+.view-toggle.active {
+    color: var(--accent-color);
+}
+.view-toggle.active:hover {
+    color: var(--accent-color);
+    opacity: 0.8;
 }
 .filter-sidebar {
     position: fixed;
