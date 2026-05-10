@@ -96,7 +96,7 @@ class Bookmark(db.Model):
     status = db.Column(
         db.Enum(BookProgressChoice),
         nullable=False,
-        default=BookProgressChoice.UNREAD.value,
+        default=BookProgressChoice.UNREAD,
     )
 
     # Relationships

@@ -34,6 +34,8 @@ def read_book(filename):
 def load_book(filename):
     """Load the book and return the book data as a stream."""
     book = Book.query.filter_by(filename=filename).first()
+    if not book:
+        return jsonify({"error": "Book not found"}), 404
     bookmark = None
 
     if current_user.is_authenticated:
@@ -146,6 +148,9 @@ def bookmark(filename):
         bookmark = Bookmark.query.filter_by(
             user_id=current_user.id, book_id=book.id
         ).first()
+        if not bookmark:
+            bookmark = Bookmark(user_id=current_user.id, book_id=book.id)
+            db.session.add(bookmark)
         bookmark.chapter_index = data.get("chapter_index", 0)
         bookmark.position = data.get("position", 0)
         bookmark.last_read = datetime.utcnow()
@@ -183,6 +188,9 @@ def tag_finished(filename):
     bookmark = Bookmark.query.filter_by(
         user_id=current_user.id, book_id=book.id
     ).first()
+    if not bookmark:
+        bookmark = Bookmark(user_id=current_user.id, book_id=book.id)
+        db.session.add(bookmark)
     bookmark.status = BookProgressChoice.FINISHED
     logging.info(
         f"Setting status to FINISHED for book {book.id} and user {current_user.id}"

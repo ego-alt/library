@@ -14,7 +14,7 @@ upload_blueprint = Blueprint("upload_routes", __name__)
 def generate_filename(title, author):
     # Remove punctuation from the title and author
     spaces_regex = r"\s+"
-    punctuation_regex = r'[.,\'"\']'
+    punctuation_regex = r"[.,'\"]"
 
     title = re.sub(spaces_regex, "_", re.sub(punctuation_regex, "", title))
     author = re.sub(spaces_regex, "_", re.sub(punctuation_regex, "", author))

@@ -10,7 +10,7 @@ import base64
 metadata_blueprint = Blueprint("metadata_routes", __name__)
 
 BOOKMARK_ATTRIBUTES = {
-    "status": [BookProgressChoice.IN_PROGRESS, BookProgressChoice.FINISHED]
+    "status": [BookProgressChoice.IN_PROGRESS.value, BookProgressChoice.FINISHED.value]
 }
 
 

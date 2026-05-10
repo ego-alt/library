@@ -245,7 +245,7 @@ def process_chapter_content(epub_path: str, chapter_path: str, images: dict) -> 
 
         # Process any elements that might contain image references
         image_attributes = ["src", "href", "xlink:href"]
-        for element in soup.find_all(["img", "image", 'link[rel="coverpage"]', "svg"]):
+        for element in soup.find_all(["img", "image", "svg"]):
             for attr in image_attributes:
                 if image_path := element.get(attr):
                     try:
