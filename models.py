@@ -13,9 +13,24 @@ db = SQLAlchemy()
 # Junction table for book tags
 book_tags = db.Table(
     "book_tags",
-    db.Column("book_id", db.Integer, db.ForeignKey("books.id"), primary_key=True),
-    db.Column("tag_id", db.Integer, db.ForeignKey("tags.id"), primary_key=True),
-    db.Column("user_id", db.Integer, db.ForeignKey("users.id"), primary_key=True),
+    db.Column(
+        "book_id",
+        db.Integer,
+        db.ForeignKey("books.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    db.Column(
+        "tag_id",
+        db.Integer,
+        db.ForeignKey("tags.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    db.Column(
+        "user_id",
+        db.Integer,
+        db.ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
 )
 
 
@@ -24,7 +39,6 @@ class User(UserMixin, db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
-    email = db.Column(db.String(120), unique=True, nullable=True)
     password_hash = db.Column(db.String(128))
     role = db.Column(
         db.Enum(UserRoleChoice), nullable=False, default=UserRoleChoice.STANDARD
