@@ -149,7 +149,13 @@ def load_more(offset):
 
 @index_blueprint.route("/cover/<filename>")
 def cover(filename):
-    """Serve a book's cover with long-lived caching keyed on file mtime."""
+    """Serve a book's cover with long-lived caching keyed on file mtime.
+
+    Two layers of caching:
+      1. Server-side: cover bytes memoized in flask-caching keyed on
+         (book_id, mtime). Avoids re-extracting from the zip on every request.
+      2. Client-side: ETag-based 304 response, plus Cache-Control: 1 year.
+    """
     book = get_book_or_404(filename)
     epub_path = os.path.join(current_app.config["BOOK_DIR"], book.filename)
     if not os.path.exists(epub_path):
@@ -160,7 +166,16 @@ def cover(filename):
     if request.if_none_match.contains(etag):
         return "", 304
 
-    cover_bytes = read_epub_cover(epub_path, book.cover_path)
+    # Imported here (not at module top) to break a circular import:
+    # library/__init__.py -> routes -> here -> library.cache.
+    from .. import cache
+
+    cache_key = f"cover:{book.id}:{mtime}"
+    cover_bytes = cache.get(cache_key)
+    if cover_bytes is None:
+        cover_bytes = read_epub_cover(epub_path, book.cover_path)
+        cache.set(cache_key, cover_bytes, timeout=86400)
+
     response = make_response(cover_bytes)
     response.headers["Content-Type"] = cover_mimetype(book.cover_path or "")
     response.headers["Cache-Control"] = "public, max-age=31536000"

@@ -160,6 +160,39 @@ def test_cover_404s_for_unknown_book(client):
     assert r.status_code == 404
 
 
+def test_cover_bytes_are_memoized_across_requests(client, book, mocker):
+    """Repeat fetches without a matching ETag should hit the in-memory cache,
+    not re-extract from the zip."""
+    import library.routes.index as index_module
+    spy = mocker.spy(index_module, "read_epub_cover")
+
+    r1 = client.get(f"/cover/{book.filename}")
+    r2 = client.get(f"/cover/{book.filename}")
+    assert r1.status_code == 200 and r2.status_code == 200
+    assert r1.data == r2.data
+    # Only one zip extraction across two requests.
+    assert spy.call_count == 1
+
+
+def test_cover_cache_invalidates_when_file_mtime_changes(client, book, app, mocker):
+    """If the EPUB on disk is updated (e.g. via /update_cover), a fresh request
+    should re-extract because the mtime changed -> new cache key."""
+    import os
+    import time
+    import library.routes.index as index_module
+    spy = mocker.spy(index_module, "read_epub_cover")
+
+    client.get(f"/cover/{book.filename}")
+
+    # Bump mtime to simulate a cover-update
+    epub_path = os.path.join(app.config["BOOK_DIR"], book.filename)
+    new_mtime = int(time.time()) + 5
+    os.utime(epub_path, (new_mtime, new_mtime))
+
+    client.get(f"/cover/{book.filename}")
+    assert spy.call_count == 2
+
+
 # --- /download ------------------------------------------------------------------
 
 
