@@ -11,15 +11,23 @@ import uuid
 upload_blueprint = Blueprint("upload_routes", __name__)
 
 
-def generate_filename(title, author):
-    # Remove punctuation from the title and author
-    spaces_regex = r"\s+"
-    punctuation_regex = r"[.,'\"]"
+def _slugify(value: str) -> str:
+    value = re.sub(r"[.,'\"]", "", value)
+    value = re.sub(r"\s+", "_", value)
+    # Strip anything that's not a safe filename char.
+    value = re.sub(r"[^A-Za-z0-9_\-]", "", value)
+    return value or "untitled"
 
-    title = re.sub(spaces_regex, "_", re.sub(punctuation_regex, "", title))
-    author = re.sub(spaces_regex, "_", re.sub(punctuation_regex, "", author))
-    # Concatenate the title and author for the filename, separated by a double underscore
-    return f"{title}__{author}.epub"
+
+def generate_filename(title: str, author: str, book_dir: str) -> str:
+    """Build a unique <title>__<author>.epub filename, avoiding collisions on disk."""
+    base = f"{_slugify(title)}__{_slugify(author)}"
+    candidate = f"{base}.epub"
+    i = 2
+    while os.path.exists(os.path.join(book_dir, candidate)):
+        candidate = f"{base}_{i}.epub"
+        i += 1
+    return candidate
 
 
 @upload_blueprint.route("/upload_book", methods=["POST"])
@@ -60,7 +68,7 @@ def upload_book():
 
         metadata = extract_metadata(epub_book)
         title, author = metadata.get("title", ""), metadata.get("author", "")
-        filename = generate_filename(title, author)
+        filename = generate_filename(title, author, current_app.config["BOOK_DIR"])
 
         # Rename the file to standardized name
         final_file_path = os.path.join(current_app.config["BOOK_DIR"], filename)
