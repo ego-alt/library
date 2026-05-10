@@ -204,6 +204,7 @@ body {
 .metadata-actions {
     display: flex;
     justify-content: flex-end;
+    gap: 10px;
     padding-top: 0;
 }
 .close-metadata {
@@ -240,6 +241,24 @@ body {
 }
 .save-button:hover {
     background: var(--text-color-dark);
+}
+.delete-book-button {
+    background: #b03a2e;
+    color: white;
+    border: none;
+    padding: 8px 30px;
+    border-radius: 6px;
+    font-size: 1em;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+    width: 180px;
+}
+.delete-book-button:hover {
+    background: #922b21;
+}
+.delete-book-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
 }
 .tag-input-container {
     background: var(--input-field-background);

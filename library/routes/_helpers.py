@@ -4,6 +4,7 @@ from functools import wraps
 from flask import abort, jsonify
 from flask_login import current_user
 
+from ..choices import UserRoleChoice
 from ..models import Book, db
 
 
@@ -14,6 +15,20 @@ def json_login_required(view):
     def wrapper(*args, **kwargs):
         if not current_user.is_authenticated:
             return jsonify({"error": "Authentication required"}), 401
+        return view(*args, **kwargs)
+
+    return wrapper
+
+
+def json_admin_required(view):
+    """Require an authenticated admin; respond with JSON 401/403 otherwise."""
+
+    @wraps(view)
+    def wrapper(*args, **kwargs):
+        if not current_user.is_authenticated:
+            return jsonify({"error": "Authentication required"}), 401
+        if current_user.role != UserRoleChoice.ADMIN:
+            return jsonify({"error": "Admin role required"}), 403
         return view(*args, **kwargs)
 
     return wrapper

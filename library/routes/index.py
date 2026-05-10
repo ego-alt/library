@@ -10,10 +10,10 @@ from flask import (
     url_for,
 )
 from flask_login import current_user
-from ..models import db, Book, Bookmark, Tag
+from ..models import db, Book, Bookmark, Tag, book_tags
 from ..choices import BookProgressChoice, UserRoleChoice
 import os
-from ._helpers import get_book_or_404
+from ._helpers import commit_or_rollback, get_book_or_404, json_admin_required
 from ..utils import cover_mimetype, read_epub_cover
 
 
@@ -152,3 +152,27 @@ def download(filename):
     return send_from_directory(
         current_app.config["BOOK_DIR"], filename, as_attachment=True
     )
+
+
+@index_blueprint.route("/book/<filename>", methods=["DELETE"])
+@json_admin_required
+def delete_book(filename):
+    """Permanently remove a book — DB row, join-table rows, and the EPUB file."""
+    book = get_book_or_404(filename)
+    epub_path = os.path.join(current_app.config["BOOK_DIR"], book.filename)
+
+    with commit_or_rollback():
+        # Defensively clear book_tags rows: existing DBs don't have ON DELETE
+        # CASCADE on the join table, so the orphan rows would be left behind.
+        db.session.execute(
+            book_tags.delete().where(book_tags.c.book_id == book.id)
+        )
+        db.session.delete(book)
+
+    if os.path.exists(epub_path):
+        try:
+            os.remove(epub_path)
+        except OSError as e:
+            current_app.logger.warning(f"Removed DB row but failed to unlink {epub_path}: {e}")
+
+    return jsonify({"message": "Book deleted"})

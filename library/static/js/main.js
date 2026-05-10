@@ -169,12 +169,17 @@ function generateMetadataHtml(data, isUpload = false) {
         </div>
     `;
 
-    // Action buttons for saving changes.
+    // Action buttons. Admins on an existing book also get a destructive Delete.
+    const deleteButton = (isAdmin && !isUpload)
+        ? `<button class="delete-book-button" onclick="confirmDeleteBook('${data.filename}')">Delete Book</button>`
+        : ``;
+    const saveButton = isAuth
+        ? `<button class="save-button" onclick="${isUpload ? `saveNewBook('${data.filename}', '${data.cover_path}')` : `saveMetadata('${data.filename}')`}">Save Changes</button>`
+        : ``;
     const actionButtons = `
-        <div class="metadata-actions" style="justify-content: 'right';">
-            ${isAuth 
-                ? `<button class="save-button" onclick="${isUpload ? `saveNewBook('${data.filename}', '${data.cover_path}')` : `saveMetadata('${data.filename}')`}">Save Changes</button>`
-                : ``}
+        <div class="metadata-actions">
+            ${deleteButton}
+            ${saveButton}
         </div>
     `;
     
@@ -284,6 +289,35 @@ $('.close-metadata, .metadata-overlay').on('click', function(e) {
         $('#metadataOverlay').fadeOut();
     }
 });
+
+async function confirmDeleteBook(filename) {
+    if (!confirm(`Permanently delete "${filename}"?\nThis removes the file from disk and cannot be undone.`)) {
+        return;
+    }
+
+    const button = $('.delete-book-button');
+    const originalText = button.text();
+    button.text('Deleting...').prop('disabled', true);
+
+    try {
+        const response = await fetch(`/book/${encodeURIComponent(filename)}`, {
+            method: 'DELETE',
+        });
+        if (!response.ok) {
+            const data = await response.json().catch(() => ({}));
+            throw new Error(data.error || `HTTP ${response.status}`);
+        }
+        // Drop the card from the grid (matched via the read link's filename)
+        const card = document.querySelector(
+            `a[href="/read/${CSS.escape(filename)}"]`
+        )?.closest('.col-md-3');
+        if (card) card.remove();
+        $('#metadataOverlay').fadeOut();
+    } catch (err) {
+        alert(`Failed to delete: ${err.message}`);
+        button.text(originalText).prop('disabled', false);
+    }
+}
 
 
 // <== FUNCTIONS FOR TAGGING ==>
