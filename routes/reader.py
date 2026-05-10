@@ -43,14 +43,15 @@ def load_book(filename):
         if not bookmark:
             bookmark = Bookmark(user_id=current_user.id, book_id=book.id)
             db.session.add(bookmark)
-            db.session.commit()
 
         if bookmark.status == BookProgressChoice.UNREAD:
             bookmark.status = BookProgressChoice.IN_PROGRESS
             logging.info(
                 f"Setting status to IN_PROGRESS for book {book.id} and user {current_user.id}"
             )
-            db.session.commit()
+
+        bookmark.last_read = datetime.utcnow()
+        db.session.commit()
 
     try:
         return Response(
