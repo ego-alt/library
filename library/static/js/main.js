@@ -359,14 +359,17 @@ async function handleFileUpload(files) {
 }
 
 function saveNewBook(originalFilename, cover_path) {
-    // Collect the metadata from the overlay inputs.
-    const newFilename = $('#upload-metadata-filename').val(); // Get the new filename
+    // Match createField(): admins get <input>, others get <span> — use .val() only for inputs.
+    function uploadMetadataField(id) {
+        const $el = $('#' + id);
+        return $el.is('input') ? $el.val() : $el.text().trim();
+    }
     const metadata = {
-        title: $('#upload-metadata-title').val(),
-        author: $('#upload-metadata-author').val(),
-        genre: $('#upload-metadata-genre').val(),
-        original_filename: originalFilename, // Send the original filename
-        new_filename: newFilename, // Send the new filename
+        title: uploadMetadataField('upload-metadata-title'),
+        author: uploadMetadataField('upload-metadata-author'),
+        genre: uploadMetadataField('upload-metadata-genre'),
+        original_filename: originalFilename,
+        new_filename: uploadMetadataField('upload-metadata-filename'),
         cover_path: cover_path
     };
 
@@ -381,8 +384,9 @@ function saveNewBook(originalFilename, cover_path) {
             location.reload();
         },
         error: function(xhr, status, error) {
-            console.error("Error saving new book:", error);
-            alert("Error saving new book: " + error);
+            const msg = (xhr.responseJSON && xhr.responseJSON.error) ? xhr.responseJSON.error : error;
+            console.error("Error saving new book:", msg);
+            alert("Error saving new book: " + msg);
         }
     });
 }

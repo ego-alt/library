@@ -1,4 +1,5 @@
 import logging
+import os
 
 from flask import Flask, jsonify, request
 from flask_caching import Cache
@@ -8,7 +9,7 @@ from flask_migrate import Migrate
 from werkzeug.exceptions import HTTPException
 
 from .commands import init_commands
-from .config import Config
+from .config import Config, DATA_DIR
 from .models import User, db
 from .routes import (
     auth_blueprint,
@@ -28,6 +29,8 @@ def create_app():
     app = Flask(__name__)
     Compress(app)
     app.config.from_object(Config)
+    os.makedirs(DATA_DIR, exist_ok=True)
+    os.makedirs(app.config["BOOK_DIR"], exist_ok=True)
     cache.init_app(app)
 
     @app.after_request
