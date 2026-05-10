@@ -112,9 +112,8 @@ def stream_book_content(
                     "title": book_title,
                     "author": book_author,
                     "image_count": structure["image_count"],
-                    "table_of_contents": [
-                        f"Chapter {ch['index'] + 1}" for ch in structure["chapters"]
-                    ],
+                    "toc": structure["toc"],
+                    "spine_length": structure["spine_length"],
                     "start_chapter": start_chapter,
                     "chapter_pos": chapter_pos,
                 }

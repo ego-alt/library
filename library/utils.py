@@ -180,56 +180,200 @@ def update_epub_cover(epub_file_path: str, new_cover_bytes: bytes) -> None:
     shutil.move(temp_path, epub_file_path)
 
 
+_NCX_NS = {"ncx": "http://www.daisy.org/z3986/2005/ncx/"}
+
+
+def _split_toc_href(href: str, doc_dir: str) -> tuple[str, str]:
+    """Resolve a TOC href into (full path inside zip, fragment id)."""
+    if not href:
+        return "", ""
+    path_part, _, section = href.partition("#")
+    if not path_part:
+        return "", section
+    full = os.path.normpath(os.path.join(doc_dir, unquote(path_part)))
+    return full, section
+
+
+def _walk_nav_ol(ol, nav_dir: str) -> list[dict]:
+    entries = []
+    for li in ol.find_all("li", recursive=False):
+        anchor = li.find(["a", "span"], recursive=False)
+        if anchor is None:
+            continue
+        title = anchor.get_text(strip=True)
+        href = anchor.get("href", "") if anchor.name == "a" else ""
+        path, section = _split_toc_href(href, nav_dir)
+        nested = li.find("ol", recursive=False)
+        entries.append(
+            {
+                "title": title,
+                "href": path,
+                "section_id": section,
+                "children": _walk_nav_ol(nested, nav_dir) if nested else [],
+            }
+        )
+    return entries
+
+
+def _parse_nav_html(content: bytes, nav_dir: str) -> list[dict]:
+    soup = BeautifulSoup(content, "html.parser")
+    nav = soup.find("nav", attrs={"epub:type": "toc"}) or soup.find("nav")
+    if not nav:
+        return []
+    ol = nav.find("ol")
+    return _walk_nav_ol(ol, nav_dir) if ol else []
+
+
+def _walk_ncx_points(points, ncx_dir: str) -> list[dict]:
+    entries = []
+    for point in points:
+        label = point.find("ncx:navLabel/ncx:text", namespaces=_NCX_NS)
+        content = point.find("ncx:content", namespaces=_NCX_NS)
+        if label is None or content is None:
+            continue
+        path, section = _split_toc_href(content.get("src", ""), ncx_dir)
+        entries.append(
+            {
+                "title": (label.text or "").strip(),
+                "href": path,
+                "section_id": section,
+                "children": _walk_ncx_points(
+                    point.findall("ncx:navPoint", namespaces=_NCX_NS), ncx_dir
+                ),
+            }
+        )
+    return entries
+
+
+def _read_epub_toc(z, opf_root, rootfile_dir: str, manifest, spine_elem) -> list[dict]:
+    """Return raw TOC entries (with full zip paths). Prefers EPUB3 nav doc, falls back to EPUB2 NCX."""
+    nav_item = next(
+        (m for m in manifest.values() if "nav" in (m.get("properties") or "").split()),
+        None,
+    )
+    if nav_item:
+        nav_path = os.path.normpath(os.path.join(rootfile_dir, nav_item["href"]))
+        try:
+            return _parse_nav_html(z.read(nav_path), os.path.dirname(nav_path))
+        except Exception as e:
+            logger.warning(f"Failed to parse nav doc {nav_path}: {e}")
+
+    ncx_id = spine_elem.get("toc")
+    ncx_item = manifest.get(ncx_id) if ncx_id else None
+    if not ncx_item:
+        ncx_item = next(
+            (m for m in manifest.values()
+             if m.get("media-type") == "application/x-dtbncx+xml"),
+            None,
+        )
+    if ncx_item:
+        ncx_path = os.path.normpath(os.path.join(rootfile_dir, ncx_item["href"]))
+        try:
+            return _parse_ncx_points(
+                etree.fromstring(z.read(ncx_path)).findall(
+                    "ncx:navMap/ncx:navPoint", namespaces=_NCX_NS
+                ),
+                os.path.dirname(ncx_path),
+            )
+        except Exception as e:
+            logger.warning(f"Failed to parse NCX {ncx_path}: {e}")
+
+    return []
+
+
+def _parse_ncx_points(points, ncx_dir: str) -> list[dict]:
+    return _walk_ncx_points(points, ncx_dir)
+
+
+def _resolve_toc_to_spine(entries: list[dict], spine_paths: dict[str, int]) -> list[dict]:
+    """Replace each entry's full-zip-path href with a spine index. Drop entries that don't
+    map to anything in the spine and have no kept descendants."""
+    resolved = []
+    for entry in entries:
+        spine_index = spine_paths.get(entry["href"], -1)
+        children = _resolve_toc_to_spine(entry["children"], spine_paths)
+        if spine_index < 0 and not children:
+            continue
+        title = entry["title"] or (
+            f"Section {spine_index + 1}" if spine_index >= 0 else "Section"
+        )
+        resolved.append(
+            {
+                "title": title,
+                "spine_index": spine_index,
+                "section_id": entry["section_id"],
+                "children": children,
+            }
+        )
+    return resolved
+
+
 def get_epub_structure(epub_path: str) -> dict:
-    """Extract epub structure without loading full content."""
+    """Extract epub structure (spine, images, TOC) without loading full chapter content."""
     with zipfile.ZipFile(epub_path) as z:
-        # Get container.xml to find the rootfile
         container = etree.fromstring(z.read("META-INF/container.xml"))
         rootfile_path = container.xpath(
             "/u:container/u:rootfiles/u:rootfile", namespaces=namespaces
         )[0].get("full-path")
+        rootfile_dir = os.path.dirname(rootfile_path)
 
-        # Parse the rootfile (content.opf usually)
         root = etree.fromstring(z.read(rootfile_path))
-
-        # Get spine order
+        spine_elem = root.xpath("//opf:spine", namespaces=namespaces)[0]
         spine = root.xpath("//opf:spine/opf:itemref/@idref", namespaces=namespaces)
 
-        # Get manifest items (mapping of id -> href)
         manifest = {
             item.get("id"): {
                 "href": item.get("href"),
                 "media-type": item.get("media-type"),
+                "properties": item.get("properties", ""),
             }
             for item in root.xpath("//opf:manifest/opf:item", namespaces=namespaces)
         }
 
-        # Get image items with their paths and media types
         images = {
             normalize_path(manifest[id]["href"]): {
-                "path": os.path.join(
-                    os.path.dirname(rootfile_path), manifest[id]["href"]
-                ),
+                "path": os.path.join(rootfile_dir, manifest[id]["href"]),
                 "media-type": manifest[id]["media-type"],
             }
             for id, item in manifest.items()
             if item["media-type"].startswith("image/")
         }
 
-        # Get spine items in order WITHOUT loading content
-        chapters = [
-            {
-                "id": itemref,
-                "path": os.path.join(
-                    os.path.dirname(rootfile_path), manifest[itemref]["href"]
-                ),
-                "index": idx,  # Add index for default title
-            }
-            for idx, itemref in enumerate(spine)
-            if manifest[itemref]["media-type"] == "application/xhtml+xml"
-        ]
+        chapters = []
+        spine_paths: dict[str, int] = {}
+        for itemref in spine:
+            if manifest[itemref]["media-type"] != "application/xhtml+xml":
+                continue
+            chapter_path = os.path.normpath(
+                os.path.join(rootfile_dir, manifest[itemref]["href"])
+            )
+            spine_paths[chapter_path] = len(chapters)
+            chapters.append(
+                {"id": itemref, "path": chapter_path, "index": len(chapters)}
+            )
 
-        return {"chapters": chapters, "images": images, "image_count": len(images)}
+        toc_raw = _read_epub_toc(z, root, rootfile_dir, manifest, spine_elem)
+        toc = _resolve_toc_to_spine(toc_raw, spine_paths)
+
+        # Fall back to a flat synthetic TOC for books with no nav/NCX
+        if not toc:
+            toc = [
+                {
+                    "title": f"Section {i + 1}",
+                    "spine_index": i,
+                    "section_id": "",
+                    "children": [],
+                }
+                for i in range(len(chapters))
+            ]
+
+        return {
+            "chapters": chapters,
+            "images": images,
+            "image_count": len(images),
+            "toc": toc,
+            "spine_length": len(chapters),
+        }
 
 
 def process_chapter_content(

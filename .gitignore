@@ -12,6 +12,9 @@ venv/
 # Flask
 instance/
 
+# Local books library (kept out of source control)
+books/
+
 # Secrets
 .env
 .env.*

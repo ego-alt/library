@@ -250,14 +250,11 @@ window.addEventListener('DOMContentLoaded', () => {
                             chapterNum = currentChapter.index;
                             hrefChapterMapping[currentChapter.href] = chapterNum;
 
-                            // Remove unprocessed state and update title if available
-                            const tocItem = document.getElementById(`toc-item-${chapterNum}`);
-                            if (tocItem) {
-                                tocItem.classList.remove('unprocessed');
-                                if (currentChapter.title) {
-                                    tocItem.textContent = currentChapter.title;
-                                }
-                            }
+                            // Mark every TOC entry pointing at this spine index as ready to click
+                            document.querySelectorAll(
+                                `#toc-content .toc-item[data-spine-index="${chapterNum}"]`
+                            ).forEach(item => item.classList.remove('unprocessed'));
+
                             allChapters[chapterNum] = currentChapter;
                             if (chapterNum == currentChapterNum) {
                                 document.getElementById('loading-spinner').style.display = 'none';
@@ -299,16 +296,45 @@ window.addEventListener('DOMContentLoaded', () => {
 function displayBookMetadata() {
     document.getElementById('book-title').textContent = currentBook.title;
     document.getElementById('book-author').textContent = `by ${currentBook.author}`;
-    
-    // Display initial table of contents with placeholder titles and greyed out state
+
     const tocContent = document.getElementById('toc-content');
-    tocContent.innerHTML = currentBook.table_of_contents.map((chapter_title, index) => `
-        <div class="toc-item ${index === currentChapterNum ? 'active' : ''} unprocessed" 
-             onclick="jumpToChapter(${index})"
-             id="toc-item-${index}">
-            ${chapter_title}
-        </div>
-    `).join('');
+    tocContent.replaceChildren(buildTocList(currentBook.toc || []));
+    highlightActiveTocItem();
+}
+
+function buildTocList(entries) {
+    const ol = document.createElement('ol');
+    ol.className = 'toc-list';
+    for (const entry of entries) {
+        const li = document.createElement('li');
+        const item = document.createElement('div');
+        item.className = 'toc-item';
+        item.textContent = entry.title;
+        if (entry.spine_index >= 0) {
+            item.dataset.spineIndex = entry.spine_index;
+            if (entry.section_id) item.dataset.sectionId = entry.section_id;
+            // Until the chapter content arrives, the click target is unusable
+            if (!allChapters[entry.spine_index]) item.classList.add('unprocessed');
+            item.addEventListener('click', () => {
+                jumpToChapter(entry.spine_index, entry.section_id);
+            });
+        } else {
+            item.classList.add('toc-section-header');
+        }
+        li.appendChild(item);
+        if (entry.children && entry.children.length) {
+            li.appendChild(buildTocList(entry.children));
+        }
+        ol.appendChild(li);
+    }
+    return ol;
+}
+
+function highlightActiveTocItem() {
+    document.querySelectorAll('#toc-content .toc-item').forEach(item => {
+        const idx = parseInt(item.dataset.spineIndex, 10);
+        item.classList.toggle('active', idx === currentChapterNum);
+    });
 }
 
 function updateProgressBar() {
@@ -341,8 +367,8 @@ function saveBookmark() {
 function displayChapter() {
     const content = allChapters[currentChapterNum].content;
     document.getElementById('chapter-content').innerHTML = content;
-    document.getElementById('chapter-number').textContent = 
-        `Section ${currentChapterNum + 1} of ${currentBook.table_of_contents.length}`;
+    document.getElementById('chapter-number').textContent =
+        `Section ${currentChapterNum + 1} of ${currentBook.spine_length}`;
     
     // Initialize progress bar position
     updateProgressBar();
@@ -372,19 +398,16 @@ function displayChapter() {
 }
 
 function nextChapter() {
-    if (currentChapterNum < currentBook.table_of_contents.length - 1) {
+    if (currentChapterNum < currentBook.spine_length - 1) {
         currentChapterNum++;
         displayChapter();
         window.scrollTo({top: 0, behavior: 'instant'});
         updateProgressBar();
-        // Update active state in TOC
-        document.querySelectorAll('.toc-item').forEach((item, idx) => {
-            item.classList.toggle('active', idx === currentChapterNum);
-        });
+        highlightActiveTocItem();
         saveBookmark();
     }
-    
-    if (currentChapterNum === currentBook.table_of_contents.length - 1) {
+
+    if (currentChapterNum === currentBook.spine_length - 1) {
         fetch(`/tag_finished/${filename}`, {
             method: 'POST'
         }).catch(error => console.error('Error adding tag:', error));
@@ -397,26 +420,36 @@ function prevChapter() {
         displayChapter();
         window.scrollTo({top: document.body.scrollHeight, behavior: 'instant'});
         updateProgressBar();
-        // Update active state in TOC
-        document.querySelectorAll('.toc-item').forEach((item, idx) => {
-            item.classList.toggle('active', idx === currentChapterNum);
-        });
+        highlightActiveTocItem();
         saveBookmark();
     }
 }
 
-function jumpToChapter(index) {
+function jumpToChapter(index, sectionId) {
+    if (index < 0 || !allChapters[index]) return;
     currentChapterNum = index;
     displayChapter();
-    window.scrollTo({top: 0, behavior: 'instant'});
+
+    if (sectionId) {
+        requestAnimationFrame(() => {
+            const target = document.getElementById(sectionId);
+            if (target) {
+                const offset = currentFontSize * 2;
+                window.scrollTo({
+                    top: window.pageYOffset + target.getBoundingClientRect().top - offset,
+                    behavior: 'instant',
+                });
+            } else {
+                window.scrollTo({top: 0, behavior: 'instant'});
+            }
+        });
+    } else {
+        window.scrollTo({top: 0, behavior: 'instant'});
+    }
+
     updateProgressBar();
     document.getElementById('toc-menu').classList.remove('visible');
-    
-    // Update active state in TOC
-    document.querySelectorAll('.toc-item').forEach((item, idx) => {
-        item.classList.toggle('active', idx === index);
-    });
-    
+    highlightActiveTocItem();
     saveBookmark();
 }
 
@@ -432,27 +465,13 @@ window.addEventListener('scroll', () => {
     saveBookmark();
 });
 
-// Add this new function to handle chapter links
+// Resolve in-content chapter links via the same path as TOC clicks.
 function handleChapterLink(element) {
     const href = element.getAttribute('chapter-link');
     const sectionId = element.getAttribute('section-link');
     const targetChapter = hrefChapterMapping[href];
-    
-    jumpToChapter(targetChapter);
-    
-    if (sectionId) {
-        requestAnimationFrame(() => {
-            const targetElement = document.getElementById(sectionId);
-            if (targetElement) {
-                const rect = targetElement.getBoundingClientRect();
-                const absoluteTop = window.pageYOffset + rect.top;
-                // Calculate offset based on current font size
-                const offset = currentFontSize * 2; // roughly one line height
-                
-                window.scrollTo({top: absoluteTop - offset, behavior: 'instant'});
-            }
-        });
-    }
+    if (targetChapter === undefined) return;
+    jumpToChapter(targetChapter, sectionId);
 }
 
 // surroundContents throws if the selection straddles element boundaries.
