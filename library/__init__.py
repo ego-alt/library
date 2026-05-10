@@ -36,7 +36,9 @@ def create_app():
     @app.after_request
     def add_cache_headers(response):
         if "/static/" in request.path:
-            response.cache_control.max_age = 3600
+            # Short cache so JS/CSS edits show up after a normal refresh
+            # rather than a hard refresh.
+            response.cache_control.max_age = 60
         return response
 
     @app.errorhandler(HTTPException)
