@@ -46,12 +46,13 @@ function debounce(func, wait) {
 // Update loadMoreImages function to use filters
 function loadMoreImages() {
     isLoading = true;
-    $('#loading').show();
+    const skeletons = appendSkeletons(SKELETON_COUNT);
 
     const queryParams = new URLSearchParams(currentFilters);
     queryParams.set('view', currentView);
 
     $.get(`/load_more/${offset}?${queryParams.toString()}`, function(data) {
+        skeletons.forEach(el => el.remove());
         if (data.length === 0) {
             allImagesLoaded = true;
             if (offset === 0) {
@@ -67,8 +68,58 @@ function loadMoreImages() {
         }
         offset += 8;
         isLoading = false;
-        $('#loading').hide();
+    }).fail(function() {
+        skeletons.forEach(el => el.remove());
+        isLoading = false;
+        showToast('Could not load more books', 'error');
     });
+}
+
+const SKELETON_COUNT = 8;
+function appendSkeletons(count) {
+    const grid = document.getElementById('library');
+    if (!grid) return [];
+    grid.style.display = '';
+    const created = [];
+    for (let i = 0; i < count; i++) {
+        const el = document.createElement('div');
+        el.className = 'col-md-3 mb-3 book-skeleton-wrapper';
+        el.innerHTML = '<div class="book-skeleton" aria-hidden="true"></div>';
+        grid.appendChild(el);
+        created.push(el);
+    }
+    return created;
+}
+
+
+// <== TOAST NOTIFICATIONS ==>
+// Non-blocking replacement for alert() — slides in bottom-right and auto-dismisses.
+function showToast(message, type = 'info') {
+    const container = document.getElementById('toastContainer');
+    if (!container) {
+        // Fallback if toast container isn't on this page (e.g. reader.html)
+        console.warn('showToast called without #toastContainer:', message);
+        return;
+    }
+    const toast = document.createElement('div');
+    toast.className = `toast toast--${type}`;
+    toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
+    toast.textContent = message;
+    toast.addEventListener('click', () => dismissToast(toast));
+    container.appendChild(toast);
+    // Force a reflow so the entrance transition fires
+    requestAnimationFrame(() => toast.classList.add('toast--shown'));
+    setTimeout(() => dismissToast(toast), type === 'error' ? 6000 : 4000);
+}
+
+function dismissToast(toast) {
+    if (!toast.parentNode) return;
+    toast.classList.remove('toast--shown');
+    toast.addEventListener(
+        'transitionend',
+        () => { if (toast.parentNode) toast.remove(); },
+        { once: true },
+    );
 }
 
 function renderEmptyState() {
@@ -399,12 +450,12 @@ function saveMetadata(filename) {
                 }, 500);
             },
             error: function(xhr, status, error) {
-                alert('Error saving metadata: ' + error);
+                showToast('Error saving metadata: ' + error, 'error');
                 saveButton.text(originalText);
             }
         });
     }).catch(error => {
-        alert('Error updating cover: ' + error);
+        showToast('Error updating cover: ' + error, 'error');
         saveButton.text(originalText);
     });
 }
@@ -439,7 +490,7 @@ async function confirmDeleteBook(filename) {
         if (card) card.remove();
         $('#metadataOverlay').fadeOut();
     } catch (err) {
-        alert(`Failed to delete: ${err.message}`);
+        showToast(`Failed to delete: ${err.message}`, 'error');
         button.text(originalText).prop('disabled', false);
     }
 }
@@ -635,7 +686,7 @@ async function handleFileUpload(files) {
             });
             if (!response.ok) {
                 const errorData = await response.json();
-                alert("Upload failed: " + errorData.error);
+                showToast("Upload failed: " + errorData.error, 'error');
                 return;
             }
             const data = await response.json();
@@ -643,7 +694,7 @@ async function handleFileUpload(files) {
             showUploadMetadata(data);
         } catch (error) {
             console.error("Error during file upload", error);
-            alert("Error uploading file");
+            showToast("Error uploading file", 'error');
         }
     }
 }
@@ -676,7 +727,7 @@ function saveNewBook(originalFilename, cover_path) {
         error: function(xhr, status, error) {
             const msg = (xhr.responseJSON && xhr.responseJSON.error) ? xhr.responseJSON.error : error;
             console.error("Error saving new book:", msg);
-            alert("Error saving new book: " + msg);
+            showToast("Error saving new book: " + msg, 'error');
         }
     });
 }

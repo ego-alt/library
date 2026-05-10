@@ -105,11 +105,10 @@
             <h3 class="text-muted">No books match your filters</h3>
             <p class="text-muted">Try adjusting your search criteria</p>
         </div>
-
-        <div class="loading" id="loading" style="display: none;">
-            <p>Loading more books...</p>
-        </div>
     </div>
+
+    <!-- Toast container; populated by showToast() in main.js -->
+    <div id="toastContainer" class="toast-container" aria-live="polite" aria-atomic="false"></div>
 
     <div class="metadata-overlay" id="metadataOverlay" role="dialog" aria-modal="true" aria-labelledby="metadata-title">
         <div class="metadata-content">

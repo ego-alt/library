@@ -110,9 +110,76 @@ body {
 .book-button:hover {
     background: white;
 }
-.loading {
-    text-align: center;
-    margin: 20px 0;
+/* ============================================================
+   Loading skeleton — shown in the grid while /load_more fetches
+   ============================================================ */
+.book-skeleton {
+    position: relative;
+    width: 100%;
+    padding-top: 133%;  /* match book card 2:3 aspect ratio */
+    border-radius: 8px;
+    background: linear-gradient(
+        90deg,
+        var(--input-field-background) 0%,
+        var(--hover-background) 50%,
+        var(--input-field-background) 100%
+    );
+    background-size: 200% 100%;
+    animation: skeleton-shimmer 1.4s linear infinite;
+    box-shadow: 0 4px 8px var(--overlay-box-shadow);
+}
+@keyframes skeleton-shimmer {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .book-skeleton { animation: none; opacity: 0.6; }
+}
+
+/* ============================================================
+   Toast notifications — non-blocking replacement for alert()
+   ============================================================ */
+.toast-container {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 1100;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    pointer-events: none;
+    max-width: calc(100vw - 40px);
+}
+.toast {
+    background: var(--text-color-light);
+    color: white;
+    padding: 11px 16px;
+    border-radius: 8px;
+    box-shadow: 0 6px 20px var(--overlay-box-shadow);
+    max-width: 360px;
+    font-size: 0.92rem;
+    line-height: 1.35;
+    pointer-events: auto;
+    cursor: pointer;
+    opacity: 0;
+    transform: translateX(20px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.toast--shown {
+    opacity: 1;
+    transform: translateX(0);
+}
+.toast--success { background: #2d8f5b; }
+.toast--error   { background: #b03a2e; }
+.toast--info    { background: var(--text-color-dark); }
+@media (max-width: 600px) {
+    .toast-container {
+        right: 12px;
+        left: 12px;
+        bottom: 12px;
+        align-items: stretch;
+    }
+    .toast { max-width: none; }
 }
 .metadata-overlay {
     display: none;
