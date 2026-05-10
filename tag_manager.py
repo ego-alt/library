@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from flask import jsonify
 from models import Bookmark, Tag, BookProgressChoice, book_tags, db
 import logging
 

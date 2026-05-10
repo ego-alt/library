@@ -1,15 +1,12 @@
 import click
 from flask.cli import with_appcontext
 import os
-import ebooklib
 from ebooklib import epub
-from models import db, Book, User, Tag, Bookmark
+from choices import UserRoleChoice
+from models import db, Book, User
 import logging
 from flask import current_app
-from utils import get_epub_cover, get_epub_cover_path, extract_metadata
-import base64
-from PIL import Image
-import io
+from utils import get_epub_cover_path, extract_metadata
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -137,10 +134,10 @@ def create_user_command(username, password, role):
     """Create a new user."""
     user = User(username=username)
     user.set_password(password)
-    user.role = role  # Assign the role to the user
+    user.role = UserRoleChoice(role.lower())
     db.session.add(user)
     db.session.commit()
-    click.echo(f"Created user: {username} with role {role}")
+    click.echo(f"Created user: {username} with role {user.role.value}")
 
 
 def init_commands(app):

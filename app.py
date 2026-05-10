@@ -1,5 +1,4 @@
 import logging
-import os
 from flask import Flask, request
 from flask_caching import Cache
 from flask_compress import Compress

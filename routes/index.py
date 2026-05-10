@@ -65,7 +65,7 @@ def get_covers(offset=0, limit=BOOKS_PER_LOAD, filters=None):
             progress_tags = []
             other_tags = []
             for tag in tags:
-                if tag in (BookProgressChoice.IN_PROGRESS, BookProgressChoice.FINISHED):
+                if tag in (BookProgressChoice.IN_PROGRESS.value, BookProgressChoice.FINISHED.value):
                     progress_tags.append(tag)
                 elif tag != BookProgressChoice.UNREAD.value:
                     other_tags.append(tag)
