@@ -1,19 +1,24 @@
 from models import _utcnow
 from flask import (
     Blueprint,
+    abort,
     current_app,
     jsonify,
+    make_response,
     request,
     render_template,
     Response,
     stream_with_context,
+    url_for,
 )
 from flask_login import current_user
 from models import Book, db, Bookmark, BookProgressChoice
 from utils import rotate_list, get_epub_structure, process_chapter_content
 import logging
 import json
+import mimetypes
 import os
+import zipfile
 from llm_caller import LLMCaller, LLMError
 from routes._helpers import (
     commit_or_rollback,
@@ -64,6 +69,8 @@ def load_book(filename):
         bookmark.last_read = _utcnow()
         db.session.commit()
 
+    asset_url_prefix = url_for("read_routes.book_asset", filename=filename, asset_path="")
+
     try:
         return Response(
             stream_with_context(
@@ -74,6 +81,7 @@ def load_book(filename):
                     book_author=book.author,
                     start_chapter=bookmark.chapter_index if bookmark else 0,
                     chapter_pos=bookmark.position if bookmark else 0,
+                    asset_url_prefix=asset_url_prefix,
                 )
             ),
             content_type="application/x-ndjson",
@@ -90,6 +98,7 @@ def stream_book_content(
     book_author: str,
     start_chapter: int,
     chapter_pos: float,
+    asset_url_prefix: str,
 ):
     """Stream book content as newline-delimited JSON."""
     try:
@@ -120,7 +129,7 @@ def stream_book_content(
         for i, chapter in enumerate(chapters):
             index = (i + start_chapter) % len(structure["chapters"])
             chapter_content = process_chapter_content(
-                full_path, chapter["path"], structure["images"]
+                full_path, chapter["path"], structure["images"], asset_url_prefix
             )
 
             yield (
@@ -141,6 +150,33 @@ def stream_book_content(
 
     except Exception as e:
         yield json.dumps({"type": "error", "message": str(e)}) + "\n"
+
+
+@read_blueprint.route("/book_asset/<filename>/<path:asset_path>")
+def book_asset(filename, asset_path):
+    """Serve a single file (image, font, etc) from inside an EPUB with long-lived caching."""
+    book = get_book_or_404(filename)
+    epub_path = os.path.join(current_app.config["BOOK_DIR"], book.filename)
+    if not os.path.exists(epub_path):
+        abort(404, description="Book file not found")
+
+    mtime = int(os.path.getmtime(epub_path))
+    etag = f"{book.id}-{mtime}-{asset_path}"
+    if request.if_none_match.contains(etag):
+        return "", 304
+
+    try:
+        with zipfile.ZipFile(epub_path) as z:
+            asset_bytes = z.read(asset_path)
+    except KeyError:
+        abort(404, description="Asset not found")
+
+    response = make_response(asset_bytes)
+    mime_type, _ = mimetypes.guess_type(asset_path)
+    response.headers["Content-Type"] = mime_type or "application/octet-stream"
+    response.headers["Cache-Control"] = "public, max-age=31536000"
+    response.set_etag(etag)
+    return response
 
 
 @read_blueprint.route("/bookmark/<filename>", methods=["GET", "POST"])

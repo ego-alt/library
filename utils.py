@@ -1,7 +1,4 @@
-import base64
 from bs4 import BeautifulSoup
-import ebooklib
-from ebooklib import epub
 import logging
 from lxml import etree
 import os
@@ -235,17 +232,18 @@ def get_epub_structure(epub_path: str) -> dict:
         return {"chapters": chapters, "images": images, "image_count": len(images)}
 
 
-def process_chapter_content(epub_path: str, chapter_path: str, images: dict) -> dict:
-    """Process a single chapter's content."""
+def process_chapter_content(
+    epub_path: str, chapter_path: str, images: dict, asset_url_prefix: str
+) -> dict:
+    """Process a single chapter's content, rewriting image refs to URLs under
+    asset_url_prefix (e.g. '/book_asset/<filename>/')."""
     with zipfile.ZipFile(epub_path) as z:
         content = z.read(chapter_path).decode("utf-8")
         soup = BeautifulSoup(content, "html.parser")
 
-        # Extract chapter title using multiple fallback methods
         title = get_chapter_title(None, soup)
 
         # Process internal links
-        chapter_links = set()
         for element in soup.find_all("a"):
             if href := element.get("href"):
                 if not href.startswith("#"):
@@ -258,7 +256,7 @@ def process_chapter_content(epub_path: str, chapter_path: str, images: dict) -> 
                     element["href"] = "javascript:void(0);"
                     element["onclick"] = "handleChapterLink(this)"
 
-        # Process any elements that might contain image references
+        # Rewrite image refs to point at the asset URL route
         image_attributes = ["src", "href", "xlink:href"]
         for element in soup.find_all(["img", "image", "svg"]):
             for attr in image_attributes:
@@ -266,10 +264,9 @@ def process_chapter_content(epub_path: str, chapter_path: str, images: dict) -> 
                     try:
                         normalized_path = normalize_path(unquote(image_path))
                         if normalized_path in images:
-                            image_data = z.read(images[normalized_path]["path"])
                             element[attr] = (
-                                f"data:{images[normalized_path]['media-type']};base64,"
-                                f"{base64.b64encode(image_data).decode('utf-8')}"
+                                asset_url_prefix
+                                + images[normalized_path]["path"]
                             )
                             if element.name == "img":
                                 element["loading"] = "lazy"
