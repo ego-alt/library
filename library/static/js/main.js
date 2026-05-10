@@ -267,6 +267,7 @@ function saveMetadata(filename) {
             contentType: 'application/json',
             data: JSON.stringify(metadata),
             success: function(response) {
+                invalidateTagsCache();
                 saveButton.text('Saved!');
                 setTimeout(() => {
                     saveButton.text(originalText);
@@ -321,27 +322,158 @@ async function confirmDeleteBook(filename) {
 
 
 // <== FUNCTIONS FOR TAGGING ==>
+
+// Cache the user's tag list once per page load. invalidateTagsCache() forces a refresh.
+async function fetchUserTags() {
+    if (window._userTagsCache) return window._userTagsCache;
+    if (!window.isAuthenticated) {
+        window._userTagsCache = [];
+        return [];
+    }
+    try {
+        const r = await fetch('/tags');
+        window._userTagsCache = r.ok ? await r.json() : [];
+    } catch {
+        window._userTagsCache = [];
+    }
+    return window._userTagsCache;
+}
+
+function invalidateTagsCache() {
+    window._userTagsCache = null;
+}
+
+// Attaches a typeahead dropdown under `input`. Returns { handleKey, refresh }
+// so the surrounding keydown handler can defer to it for Enter / arrows / Esc.
+function attachTagAutocomplete(input, container) {
+    const dropdown = document.createElement('div');
+    dropdown.className = 'tag-suggestions';
+    dropdown.style.display = 'none';
+    input.insertAdjacentElement('afterend', dropdown);
+
+    let visible = [];
+    let highlight = 0;
+
+    const takenLower = () => new Set(
+        Array.from(container.getElementsByClassName('tag'))
+            .map(t => t.textContent.replace(/×/g, '').trim().toLowerCase())
+    );
+
+    function render() {
+        dropdown.innerHTML = '';
+        if (visible.length === 0) {
+            dropdown.style.display = 'none';
+            return;
+        }
+        if (highlight >= visible.length) highlight = visible.length - 1;
+        if (highlight < 0) highlight = 0;
+        visible.forEach((name, i) => {
+            const el = document.createElement('div');
+            el.className = 'tag-suggestion' + (i === highlight ? ' active' : '');
+            el.dataset.index = i;
+            el.textContent = name;
+            dropdown.appendChild(el);
+        });
+        dropdown.style.display = 'block';
+    }
+
+    async function refresh() {
+        const all = await fetchUserTags();
+        const query = input.value.trim().toLowerCase();
+        const taken = takenLower();
+        visible = all
+            .filter(name => !taken.has(name.toLowerCase()))
+            .filter(name => !query || name.toLowerCase().includes(query));
+        render();
+    }
+
+    function pick(idx) {
+        if (idx < 0 || idx >= visible.length) return;
+        addTag(visible[idx], container);
+        input.value = '';
+        // If this is the filter input, rerun the filter immediately
+        if (container.id === 'filter-tags-container') applyFilters();
+        refresh();
+    }
+
+    input.addEventListener('input', refresh);
+    input.addEventListener('focus', refresh);
+
+    dropdown.addEventListener('mousedown', (e) => {
+        // mousedown beats input-blur; lets us pick before the dropdown closes
+        const item = e.target.closest('.tag-suggestion');
+        if (item) {
+            e.preventDefault();
+            pick(parseInt(item.dataset.index, 10));
+        }
+    });
+
+    document.addEventListener('mousedown', (e) => {
+        if (e.target !== input && !dropdown.contains(e.target)) {
+            dropdown.style.display = 'none';
+        }
+    });
+
+    return {
+        refresh,
+        // Returns true if the key was consumed by the autocomplete.
+        handleKey(e) {
+            const open = dropdown.style.display !== 'none';
+            if (!open) return false;
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                highlight = Math.min(visible.length - 1, highlight + 1);
+                render();
+                return true;
+            }
+            if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                highlight = Math.max(0, highlight - 1);
+                render();
+                return true;
+            }
+            if (e.key === 'Escape') {
+                dropdown.style.display = 'none';
+                return true;
+            }
+            if (e.key === 'Enter' && visible.length > 0) {
+                e.preventDefault();
+                pick(highlight);
+                return true;
+            }
+            return false;
+        },
+    };
+}
+
 function initializeTagInput(inputId, containerId, initialTags = []) {
     const input = document.getElementById(inputId);
     const container = document.getElementById(containerId);
+    if (!input || !container) return;
 
-    // Add initial tags
     initialTags.forEach(tag => {
         if (tag.trim()) addTag(tag.trim(), container);
     });
-    
+
+    const ac = attachTagAutocomplete(input, container);
+
     input.addEventListener('keydown', function(e) {
+        // Let the autocomplete consume Enter/arrows/Escape first when it's open
+        if (ac.handleKey(e)) return;
+
         if (e.key === 'Enter' || e.key === ',') {
             e.preventDefault();
             const value = this.value.trim();
             if (value) {
                 addTag(value, container);
                 this.value = '';
+                ac.refresh();
             }
         } else if (e.key === 'Backspace' && !this.value) {
             const tags = container.getElementsByClassName('tag');
             if (tags.length) {
                 container.removeChild(tags[tags.length - 1]);
+                ac.refresh();
             }
         }
     });

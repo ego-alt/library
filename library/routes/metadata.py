@@ -126,6 +126,28 @@ def book_metadata(filename):
     return jsonify(response)
 
 
+@metadata_blueprint.route("/tags")
+@json_login_required
+def list_user_tags():
+    """Suggestions for tag autocomplete: progress-status values first, then the
+    current user's distinct custom tag names alphabetised."""
+    user_tags = [
+        name
+        for (name,) in db.session.query(Tag.name)
+        .filter(Tag.user_id == current_user.id)
+        .distinct()
+        .order_by(Tag.name)
+        .all()
+    ]
+    status_tags = [c.value for c in BookProgressChoice]
+    seen, ordered = set(), []
+    for t in status_tags + user_tags:
+        if t not in seen:
+            seen.add(t)
+            ordered.append(t)
+    return jsonify(ordered)
+
+
 @metadata_blueprint.route("/update_cover", methods=["POST"])
 @json_login_required
 def update_cover():

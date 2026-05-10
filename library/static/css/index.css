@@ -270,6 +270,32 @@ body {
     gap: 4px;
     align-items: center;
     min-height: 38px;
+    position: relative;
+}
+.tag-suggestions {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    margin-top: 2px;
+    background: var(--background-color);
+    border: 1px solid var(--input-field-border);
+    border-radius: 6px;
+    box-shadow: 0 4px 12px var(--overlay-box-shadow);
+    max-height: 180px;
+    overflow-y: auto;
+    z-index: 1100;
+}
+.tag-suggestion {
+    padding: 6px 10px;
+    font-size: 0.95em;
+    color: var(--text-color-light);
+    cursor: pointer;
+}
+.tag-suggestion:hover,
+.tag-suggestion.active {
+    background: var(--hover-background);
+    color: var(--text-color-dark);
 }
 .tag-input-container input {
     border: none !important;
