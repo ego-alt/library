@@ -25,10 +25,12 @@ logger.setLevel(logging.INFO)
 cache = Cache(config={"CACHE_TYPE": "simple"})
 
 
-def create_app():
+def create_app(config_overrides: dict | None = None):
     app = Flask(__name__)
     Compress(app)
     app.config.from_object(Config)
+    if config_overrides:
+        app.config.update(config_overrides)
     os.makedirs(DATA_DIR, exist_ok=True)
     os.makedirs(app.config["BOOK_DIR"], exist_ok=True)
     cache.init_app(app)

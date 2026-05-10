@@ -57,10 +57,17 @@ def load_book(filename):
             user_id=current_user.id, book_id=book.id
         ).first()
         if not bookmark:
-            bookmark = Bookmark(user_id=current_user.id, book_id=book.id)
+            # Brand new bookmark: opening counts as starting to read.
+            # (Setting status explicitly because the column default only
+            # applies at flush time, leaving the attribute None on the
+            # in-memory object — so the UNREAD check below would not fire.)
+            bookmark = Bookmark(
+                user_id=current_user.id,
+                book_id=book.id,
+                status=BookProgressChoice.IN_PROGRESS,
+            )
             db.session.add(bookmark)
-
-        if bookmark.status == BookProgressChoice.UNREAD:
+        elif bookmark.status == BookProgressChoice.UNREAD:
             bookmark.status = BookProgressChoice.IN_PROGRESS
             logging.info(
                 f"Setting status to IN_PROGRESS for book {book.id} and user {current_user.id}"
