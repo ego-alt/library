@@ -3,6 +3,7 @@ from flask import Flask, jsonify, request
 from flask_caching import Cache
 from flask_compress import Compress
 from flask_login import LoginManager
+from flask_migrate import Migrate
 from werkzeug.exceptions import HTTPException
 
 from config import Config
@@ -58,8 +59,9 @@ def create_app():
     app.register_blueprint(read_blueprint)
     app.register_blueprint(upload_blueprint)
 
-    # Initialize database
+    # Initialize database and migrations
     db.init_app(app)
+    Migrate(app, db, render_as_batch=True)
     # Register CLI commands
     init_commands(app)
 
