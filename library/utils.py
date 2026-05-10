@@ -355,7 +355,9 @@ def get_epub_structure(epub_path: str) -> dict:
         toc_raw = _read_epub_toc(z, root, rootfile_dir, manifest, spine_elem)
         toc = _resolve_toc_to_spine(toc_raw, spine_paths)
 
-        # Fall back to a flat synthetic TOC for books with no nav/NCX
+        # Fall back to a flat synthetic TOC for books with no nav/NCX.
+        # Mark entries `synthetic` so the frontend can replace the placeholder
+        # title with the real one once each chapter's content streams in.
         if not toc:
             toc = [
                 {
@@ -363,6 +365,7 @@ def get_epub_structure(epub_path: str) -> dict:
                     "spine_index": i,
                     "section_id": "",
                     "children": [],
+                    "synthetic": True,
                 }
                 for i in range(len(chapters))
             ]

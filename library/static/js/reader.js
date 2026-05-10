@@ -250,10 +250,17 @@ window.addEventListener('DOMContentLoaded', () => {
                             chapterNum = currentChapter.index;
                             hrefChapterMapping[currentChapter.href] = chapterNum;
 
-                            // Mark every TOC entry pointing at this spine index as ready to click
+                            // Ungrey every TOC entry pointing at this spine index, and
+                            // for synthetic entries (no real NCX) replace the placeholder
+                            // title with the one scraped from the chapter HTML.
                             document.querySelectorAll(
                                 `#toc-content .toc-item[data-spine-index="${chapterNum}"]`
-                            ).forEach(item => item.classList.remove('unprocessed'));
+                            ).forEach(item => {
+                                item.classList.remove('unprocessed');
+                                if (item.dataset.synthetic === 'true' && currentChapter.title) {
+                                    item.textContent = currentChapter.title;
+                                }
+                            });
 
                             allChapters[chapterNum] = currentChapter;
                             if (chapterNum == currentChapterNum) {
@@ -313,6 +320,7 @@ function buildTocList(entries) {
         if (entry.spine_index >= 0) {
             item.dataset.spineIndex = entry.spine_index;
             if (entry.section_id) item.dataset.sectionId = entry.section_id;
+            if (entry.synthetic) item.dataset.synthetic = 'true';
             // Until the chapter content arrives, the click target is unusable
             if (!allChapters[entry.spine_index]) item.classList.add('unprocessed');
             item.addEventListener('click', () => {
