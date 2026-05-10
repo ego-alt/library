@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 import shutil
 import tempfile
 import zipfile
@@ -81,60 +82,90 @@ def normalize_path(path):
     return path.split("images/", 1)[-1]
 
 
-def get_chapter_title(item, soup):
-    """Extract chapter title using multiple fallback methods."""
+def _clean_title(text: str) -> str:
+    """Collapse whitespace and trim a candidate title string."""
+    return " ".join((text or "").split())
 
-    # Method 1: Check for heading tags
-    title_tag = soup.find(["h1", "h2", "h3", "h4", "h5", "h6"])
-    if title_tag:
-        title = title_tag.get_text().strip()
-        if title:
+
+def _outside_nav(elem) -> bool:
+    """True if `elem` is not contained inside a <nav> element. Avoids returning
+    'Contents' as a chapter title for the contents page itself."""
+    parent = elem.parent
+    while parent is not None:
+        if getattr(parent, "name", None) == "nav":
+            return False
+        parent = parent.parent
+    return True
+
+
+def get_chapter_title(item, soup):
+    """Best-effort chapter title extraction.
+
+    Tries (in order):
+      1. epub:type=chapter|title|subtitle (strongest semantic signal)
+      2. h1, then h2, then h3 (most-specific heading present)
+      3. Common chapter-title CSS class / id
+      4. <title> in <head> (often generic but better than nothing)
+      5. Filename-derived from the spine item
+      6. First short paragraph (under 60 chars)
+    Returns None if nothing usable is found.
+    """
+
+    # 1. epub:type semantic markers
+    for elem in soup.find_all(attrs={"epub:type": ["chapter", "title", "subtitle"]}):
+        if not _outside_nav(elem):
+            continue
+        if title := _clean_title(elem.get_text()):
             return title
 
-    # Method 2: Check epub:type attribute for common chapter indicators
-    chapter_elements = soup.find_all(
-        attrs={"epub:type": ["chapter", "title", "subtitle"]}
+    # 2. Heading tags by specificity (h1 wins over h2 wins over h3). We skip
+    # h4-h6 because at that depth they're almost always sub-section labels.
+    for tag_name in ("h1", "h2", "h3"):
+        for heading in soup.find_all(tag_name):
+            if not _outside_nav(heading):
+                continue
+            if title := _clean_title(heading.get_text()):
+                return title
+
+    # 3. Common chapter-title class / id names
+    title_pattern = re.compile(
+        r"(?:^|[-_])(chapter[-_]?title|chaptertitle|chapter[-_]?heading"
+        r"|section[-_]?title|heading|^title$)(?:[-_]|$)",
+        re.IGNORECASE,
     )
-    if chapter_elements:
-        for elem in chapter_elements:
-            title = elem.get_text().strip()
-            if title:
-                return title
+    for elem in soup.find_all(class_=title_pattern):
+        if not _outside_nav(elem):
+            continue
+        if title := _clean_title(elem.get_text()):
+            return title
+    for elem in soup.find_all(id=title_pattern):
+        if not _outside_nav(elem):
+            continue
+        if title := _clean_title(elem.get_text()):
+            return title
 
-    # Method 3: Check for common class names or IDs
-    common_title_identifiers = [
-        "chapter-title",
-        "chapterTitle",
-        "chapter_title",
-        "title",
-        "heading",
-        "chapter-heading",
-        "section-title",
-    ]
-    for identifier in common_title_identifiers:
-        title_elem = soup.find(class_=identifier) or soup.find(id=identifier)
-        if title_elem:
-            title = title_elem.get_text().strip()
-            if title:
-                return title
+    # 4. <title> in <head>
+    head_title = soup.find("title")
+    if head_title:
+        if title := _clean_title(head_title.get_text()):
+            return title
 
-    # Method 4: Check item properties in the spine
+    # 5. Filename-derived
     if hasattr(item, "get_name"):
         filename = item.get_name()
         basename = os.path.splitext(os.path.basename(filename))[0]
         clean_name = basename.replace("_", " ").replace("-", " ")
-        for prefix in ["chapter", "ch", "section", "part"]:
+        for prefix in ("chapter", "ch", "section", "part"):
             if clean_name.lower().startswith(prefix):
-                clean_name = clean_name[len(prefix) :].strip()
-
+                clean_name = clean_name[len(prefix):].strip()
         if clean_name:
             return clean_name.title()
 
-    # Method 5: Look for the first substantial paragraph (under 100 characters)
+    # 6. First short paragraph (under 60 chars — chapter epigraphs / openers)
     first_para = soup.find("p")
     if first_para:
-        text = first_para.get_text().strip()
-        if text and len(text) < 25:
+        text = _clean_title(first_para.get_text())
+        if text and len(text) < 60:
             return text
 
     return None
@@ -285,6 +316,94 @@ def _parse_ncx_points(points, ncx_dir: str) -> list[dict]:
     return _walk_ncx_points(points, ncx_dir)
 
 
+_CONTENTS_KEYWORDS = {"contents", "table of contents", "toc"}
+_CONTENTS_SCAN_LIMIT = 15  # contents pages are always front matter
+_CONTENTS_MIN_RESOLVED = 3  # need at least this many spine matches to trust the page
+_CONTENTS_MIN_RATIO = 0.8   # and ≥80% of all <a href> on the page must resolve
+
+
+def _has_contents_marker(soup) -> bool:
+    """True if the document looks like it presents itself as a Contents page.
+
+    Recognises (in order):
+      - <h1>/<h2>/<h3> whose text is just "Contents" / "Table of Contents"
+      - <meta name="chapter-title" content="Contents"> (calibre's hint)
+      - <title> in <head> mentioning Contents
+      - Any short standalone text node ("CONTENTS" alone in a span/p/div)
+    """
+    body = soup.body or soup
+
+    for heading in body.find_all(["h1", "h2", "h3"]):
+        if " ".join(heading.get_text().split()).lower() in _CONTENTS_KEYWORDS:
+            return True
+
+    meta = soup.find("meta", attrs={"name": "chapter-title"})
+    if meta and (meta.get("content") or "").strip().lower() in _CONTENTS_KEYWORDS:
+        return True
+
+    head_title = soup.find("title")
+    if head_title and " ".join(head_title.get_text().split()).lower() in _CONTENTS_KEYWORDS:
+        return True
+
+    # Last resort: any standalone short text node literally saying "Contents".
+    # Limited to short text so we don't trigger on prose mentioning the word.
+    for text_node in body.find_all(string=True, limit=200):
+        s = " ".join(text_node.split()).lower()
+        if s in _CONTENTS_KEYWORDS:
+            return True
+
+    return False
+
+
+def _find_contents_page(z, chapters, spine_paths) -> list[dict]:
+    """Look for an in-content "Contents" page (very common in publisher EPUBs)
+    and extract its <a href> links as TOC entries.
+
+    Two-factor validation: the page must (a) present itself as a Contents page
+    via heading/meta/title and (b) have most of its <a href>s resolve to spine
+    items — filters out chapters that merely mention the word 'Contents'.
+    """
+    for ch in chapters[:_CONTENTS_SCAN_LIMIT]:
+        try:
+            content = z.read(ch["path"]).decode("utf-8", errors="replace")
+        except KeyError:
+            continue
+        soup = BeautifulSoup(content, "html.parser")
+
+        if not _has_contents_marker(soup):
+            continue
+
+        page_dir = os.path.dirname(ch["path"])
+        entries: list[dict] = []
+        total_with_href = 0
+        for anchor in soup.find_all("a"):
+            href = anchor.get("href")
+            if not href or href.startswith("#"):
+                continue
+            total_with_href += 1
+            path, section = _split_toc_href(href, page_dir)
+            text = " ".join((anchor.get_text() or "").split())
+            if path and text:
+                entries.append({
+                    "title": text,
+                    "href": path,
+                    "section_id": section,
+                    "children": [],
+                })
+
+        resolved_count = sum(1 for e in entries if e["href"] in spine_paths)
+        if resolved_count >= _CONTENTS_MIN_RESOLVED and total_with_href and (
+            resolved_count / total_with_href >= _CONTENTS_MIN_RATIO
+        ):
+            logger.info(
+                f"Using in-content Contents page at {ch['path']} "
+                f"({resolved_count}/{total_with_href} links resolved)"
+            )
+            return entries
+
+    return []
+
+
 def _resolve_toc_to_spine(entries: list[dict], spine_paths: dict[str, int]) -> list[dict]:
     """Replace each entry's full-zip-path href with a spine index. Drop entries that don't
     map to anything in the spine and have no kept descendants."""
@@ -352,12 +471,18 @@ def get_epub_structure(epub_path: str) -> dict:
                 {"id": itemref, "path": chapter_path, "index": len(chapters)}
             )
 
+        # 1) Publisher's nav/NCX
         toc_raw = _read_epub_toc(z, root, rootfile_dir, manifest, spine_elem)
         toc = _resolve_toc_to_spine(toc_raw, spine_paths)
 
-        # Fall back to a flat synthetic TOC for books with no nav/NCX.
-        # Mark entries `synthetic` so the frontend can replace the placeholder
-        # title with the real one once each chapter's content streams in.
+        # 2) An in-content Contents page (covers "calibre-y" EPUBs whose NCX is
+        # broken but whose front matter still has a real reader-visible TOC)
+        if not toc:
+            contents_raw = _find_contents_page(z, chapters, spine_paths)
+            toc = _resolve_toc_to_spine(contents_raw, spine_paths)
+
+        # 3) Last resort: flat synthetic list, marked so the frontend can
+        # progressively replace placeholders with extracted titles.
         if not toc:
             toc = [
                 {

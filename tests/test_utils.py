@@ -126,6 +126,151 @@ def test_structure_no_usable_toc_falls_back_to_synthetic(epub_path):
     assert s["toc"][0]["spine_index"] == 0
 
 
+# --- In-content "Contents" page detection -------------------------------------
+
+
+def test_structure_uses_in_content_contents_page_when_ncx_is_broken(epub_path):
+    """When the NCX points at a missing file, fall through to a real
+    'Contents' page in the spine and use its <a href> links."""
+    contents_html = """
+        <h1>Contents</h1>
+        <p><a href="ch1.xhtml">Foreword</a></p>
+        <p><a href="ch2.xhtml">Chapter 1: The Beginning</a></p>
+        <p><a href="ch3.xhtml">Chapter 2: Middles</a></p>
+    """
+    path = epub_path(build_epub2_ncx(
+        chapters=[
+            ("toc.xhtml", contents_html),
+            ("ch1.xhtml", "<h1>Foreword</h1><p>body</p>" * 20),
+            ("ch2.xhtml", "<h1>Chapter 1</h1><p>body</p>" * 20),
+            ("ch3.xhtml", "<h1>Chapter 2</h1><p>body</p>" * 20),
+        ],
+        # NCX points at a non-existent file → resolved TOC is empty → falls through
+        nav_entries=[{"title": "Start", "href": "doesnotexist.xhtml", "children": []}],
+    ))
+
+    s = get_epub_structure(path)
+    titles = [e["title"] for e in s["toc"]]
+    assert titles == ["Foreword", "Chapter 1: The Beginning", "Chapter 2: Middles"]
+    # Spine indices should resolve correctly (toc.xhtml = 0, ch1=1, ch2=2, ch3=3)
+    assert [e["spine_index"] for e in s["toc"]] == [1, 2, 3]
+    # Not synthetic
+    assert all("synthetic" not in e or not e["synthetic"] for e in s["toc"])
+
+
+def test_contents_page_with_too_few_links_does_not_trigger(epub_path):
+    """A contents page with fewer than 3 spine-resolving links should not
+    be trusted — fall through to synthetic."""
+    contents_html = """
+        <h1>Contents</h1>
+        <p><a href="ch1.xhtml">Only One Link</a></p>
+    """
+    path = epub_path(build_epub2_ncx(
+        chapters=[
+            ("toc.xhtml", contents_html),
+            ("ch1.xhtml", "<h1>One</h1><p>body</p>" * 20),
+            ("ch2.xhtml", "<h1>Two</h1><p>body</p>" * 20),
+        ],
+        nav_entries=[{"title": "Missing", "href": "doesnotexist.xhtml", "children": []}],
+    ))
+
+    s = get_epub_structure(path)
+    # Synthetic fallback kicked in
+    assert all(e.get("synthetic") for e in s["toc"])
+
+
+def test_contents_page_recognised_via_inline_span_marker(epub_path):
+    """Real-world EPUBs (e.g. Calibre output) often use a styled <span> rather
+    than an <h1> for the 'CONTENTS' label. The detector must catch that."""
+    contents_html = """
+        <p><span class="sgc2">CONTENTS</span></p>
+        <p><a href="ch1.xhtml">PART ONE</a></p>
+        <p><a href="ch2.xhtml">PART TWO</a></p>
+        <p><a href="ch3.xhtml">PART THREE</a></p>
+    """
+    path = epub_path(build_epub2_ncx(
+        chapters=[
+            ("toc.xhtml", contents_html),
+            ("ch1.xhtml", "<p>body</p>" * 30),
+            ("ch2.xhtml", "<p>body</p>" * 30),
+            ("ch3.xhtml", "<p>body</p>" * 30),
+        ],
+        nav_entries=[{"title": "Missing", "href": "nope.xhtml", "children": []}],
+    ))
+    s = get_epub_structure(path)
+    titles = [e["title"] for e in s["toc"]]
+    assert titles == ["PART ONE", "PART TWO", "PART THREE"]
+
+
+def test_real_chapter_mentioning_contents_does_not_false_match(epub_path):
+    """A regular chapter that happens to use the word 'Contents' in its
+    heading must not be mistaken for a TOC page (low link-resolution ratio)."""
+    chapter_with_contents = """
+        <h1>Contents of the Cabinet</h1>
+        <p>Then the inspector turned to the cabinet's contents and...</p>
+        <p>Read more at <a href="https://example.com/footnote-1">our website</a></p>
+        <p>Or see <a href="mailto:reviewer@example.com">the reviewer</a></p>
+        <p>Chapter cross-ref: <a href="ch3.xhtml">somewhere</a></p>
+    """
+    path = epub_path(build_epub2_ncx(
+        chapters=[
+            ("ch1.xhtml", chapter_with_contents),
+            ("ch2.xhtml", "<h1>Chapter 2</h1><p>body</p>" * 20),
+            ("ch3.xhtml", "<h1>Chapter 3</h1><p>body</p>" * 20),
+        ],
+        nav_entries=[{"title": "Missing", "href": "doesnotexist.xhtml", "children": []}],
+    ))
+
+    s = get_epub_structure(path)
+    # Should NOT have used the chapter as a contents page (only 1/3 links resolve)
+    # → synthetic fallback
+    assert all(e.get("synthetic") for e in s["toc"])
+
+
+# --- get_chapter_title heuristic improvements ---------------------------------
+
+
+def _soup(html: str):
+    from bs4 import BeautifulSoup
+    return BeautifulSoup(f"<html><body>{html}</body></html>", "html.parser")
+
+
+def test_chapter_title_prefers_h1_over_h2_even_if_h2_appears_first():
+    from library.utils import get_chapter_title
+    html = "<h2>Subsection</h2><h1>The Real Title</h1>"
+    assert get_chapter_title(None, _soup(html)) == "The Real Title"
+
+
+def test_chapter_title_normalizes_whitespace():
+    from library.utils import get_chapter_title
+    html = "<h1>\n  The   Title  \n</h1>"
+    assert get_chapter_title(None, _soup(html)) == "The Title"
+
+
+def test_chapter_title_falls_back_to_head_title_when_no_headings():
+    from bs4 import BeautifulSoup
+
+    from library.utils import get_chapter_title
+    html = "<html><head><title>Chapter from head</title></head><body><p>body text</p></body></html>"
+    assert get_chapter_title(None, BeautifulSoup(html, "html.parser")) == "Chapter from head"
+
+
+def test_chapter_title_loosened_short_paragraph_threshold():
+    from library.utils import get_chapter_title
+    # 50-char paragraph: previously rejected (limit was 25), now accepted
+    html = "<p>A medium-length opening paragraph that fits in 50.</p>"
+    title = get_chapter_title(None, _soup(html))
+    assert title and title.startswith("A medium-length")
+
+
+def test_chapter_title_skips_headings_inside_nav():
+    from library.utils import get_chapter_title
+    # Contents page with the only heading inside <nav> should not return "Contents"
+    html = '<nav><h1>Contents</h1></nav><p>some content paragraph here</p>'
+    title = get_chapter_title(None, _soup(html))
+    assert title != "Contents"
+
+
 def test_structure_lists_images_with_paths(epub_path):
     path = epub_path(build_epub3())
     s = get_epub_structure(path)
