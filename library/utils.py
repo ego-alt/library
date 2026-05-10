@@ -428,7 +428,11 @@ def _resolve_toc_to_spine(entries: list[dict], spine_paths: dict[str, int]) -> l
 
 
 def get_epub_structure(epub_path: str) -> dict:
-    """Extract epub structure (spine, images, TOC) without loading full chapter content."""
+    """Extract epub structure (spine, images, TOC) without loading full chapter content.
+
+    The TOC resolution chain (nav doc → NCX → Contents page → synthetic) is
+    documented in detail at docs/toc-resolution.md.
+    """
     with zipfile.ZipFile(epub_path) as z:
         container = etree.fromstring(z.read("META-INF/container.xml"))
         rootfile_path = container.xpath(
