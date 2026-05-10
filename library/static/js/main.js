@@ -258,10 +258,14 @@ function showUploadMetadata(data) {
 }
 
 function focusFirstMetadataField() {
-    // Defer until after the fadeIn so focus actually lands on a visible input
+    // Defer until after the fadeIn so focus actually lands on a visible input.
+    // Place the caret at the end of the existing text rather than at the start.
     setTimeout(() => {
         const first = document.querySelector('#metadataContent .meta-title-input');
-        if (first) first.focus();
+        if (!first) return;
+        first.focus();
+        const end = first.value.length;
+        first.setSelectionRange(end, end);
     }, 50);
 }
 
