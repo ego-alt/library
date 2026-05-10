@@ -54,13 +54,28 @@ def get_epub_cover_path(path: str):
     return cover_path
 
 
-def get_epub_cover(epub_file_path: str, cover_path: str = None) -> str:
+_COVER_MIMETYPES = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+    ".svg": "image/svg+xml",
+}
+
+
+def cover_mimetype(cover_path: str) -> str:
+    ext = os.path.splitext(cover_path or "")[1].lower()
+    return _COVER_MIMETYPES.get(ext, "image/jpeg")
+
+
+def read_epub_cover(epub_file_path: str, cover_path: str = None) -> bytes:
+    """Return the raw bytes of an EPUB's cover image."""
     if cover_path is None:
         cover_path = get_epub_cover_path(epub_file_path)
-
     with zipfile.ZipFile(epub_file_path) as z:
         with z.open(cover_path) as f:
-            return base64.b64encode(f.read()).decode("utf-8")
+            return f.read()
 
 
 def normalize_path(path):

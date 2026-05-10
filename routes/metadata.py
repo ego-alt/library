@@ -1,14 +1,13 @@
-from flask import Blueprint, current_app, jsonify, request
+from flask import Blueprint, current_app, jsonify, request, url_for
 from flask_login import current_user
-from models import Book, Bookmark, Tag, book_tags, db, BookProgressChoice
+from models import Bookmark, Tag, book_tags, db, BookProgressChoice
 from routes._helpers import (
     commit_or_rollback,
     get_book_or_404,
     json_login_required,
 )
-from utils import get_epub_cover, update_epub_cover
+from utils import update_epub_cover
 import os
-import base64
 
 
 metadata_blueprint = Blueprint("metadata_routes", __name__)
@@ -118,10 +117,7 @@ def book_metadata(filename):
         "created_at": book.created_at.strftime("%Y-%m-%d %H:%M:%S"),
         "tags": [],
         "filename": book.filename,
-        "cover": get_epub_cover(
-            os.path.join(current_app.config["BOOK_DIR"], book.filename),
-            book.cover_path,
-        ),
+        "cover": url_for("index_routes.cover", filename=book.filename),
     }
 
     if current_user.is_authenticated:
@@ -147,8 +143,10 @@ def update_cover():
     try:
         new_cover_bytes = cover_file.read()
         update_epub_cover(epub_file_path, new_cover_bytes)
-        new_cover_b64 = base64.b64encode(new_cover_bytes).decode("utf-8")
-        return jsonify({"new_cover": new_cover_b64})
+        # Cache-bust the cover URL by appending the new mtime
+        cover_url = url_for("index_routes.cover", filename=book.filename)
+        cover_url = f"{cover_url}?v={int(os.path.getmtime(epub_file_path))}"
+        return jsonify({"cover": cover_url})
     except Exception as e:
         current_app.logger.error(f"Error updating cover: {str(e)}")
         return jsonify({"error": str(e)}), 500

@@ -89,7 +89,7 @@
                             </button>
                         </div>
                         <a href="{{ url_for('read_routes.read_book', filename=book.filename) }}">
-                            <img src="data:image/jpeg;base64, {{book.cover}}" alt="cover">
+                            <img src="{{ book.cover }}" alt="cover" loading="lazy">
                         </a>
                     </div>
                 </div>

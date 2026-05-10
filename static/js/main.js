@@ -18,7 +18,7 @@ function getBookTemplate(book) {
                     </button>
                 </div>
                 <a href="/read/${book.filename}">
-                    <img src="data:image/jpeg;base64, ${book.cover}" alt="cover">
+                    <img src="${book.cover}" alt="cover" loading="lazy">
                 </a>
             </div>
         </div>
@@ -161,7 +161,7 @@ function generateMetadataHtml(data, isUpload = false) {
         <div class="metadata-cover" style="text-align: left;">
             <strong style="display: block; margin-bottom: 10px;">Cover Preview:</strong>
             <div style="position: relative; display: inline-block;">
-                <img id="cover-preview-image" src="data:image/jpeg;base64, ${data.cover}" alt="cover thumbnail" style="max-width: 180px; border-radius: 8px;">
+                <img id="cover-preview-image" src="${data.cover}" alt="cover thumbnail" style="max-width: 180px; border-radius: 8px;">
                 ${isAdmin ? `<button class="book-button" style="position: absolute; top: 5px; right: 5px;" onclick="triggerCoverUpload('${data.filename}')">
                     <i class="fas fa-edit"></i>
                 </button>` : ''}
@@ -247,9 +247,8 @@ function saveMetadata(filename) {
                 return response.json();
             })
             .then(data => {
-                // Optionally update the preview again from server return
-                document.getElementById('cover-preview-image').src = `data:image/jpeg;base64, ${data.new_cover}`;
-                window.newCoverFile = null; // Clear the temporary file variable
+                document.getElementById('cover-preview-image').src = data.cover;
+                window.newCoverFile = null;
             });
         } else {
             return Promise.resolve();

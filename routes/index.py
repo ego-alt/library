@@ -1,17 +1,20 @@
 from flask import (
     Blueprint,
+    abort,
     current_app,
     jsonify,
+    make_response,
     request,
     render_template,
     send_from_directory,
+    url_for,
 )
 from flask_login import current_user
 from models import db, Book, Bookmark, Tag
 from choices import BookProgressChoice, UserRoleChoice
 import os
 from routes._helpers import get_book_or_404
-from utils import get_epub_cover
+from utils import cover_mimetype, read_epub_cover
 
 
 index_blueprint = Blueprint("index_routes", __name__)
@@ -87,10 +90,7 @@ def get_covers(offset=0, limit=BOOKS_PER_LOAD, filters=None):
     return [
         {
             "filename": book.filename,
-            "cover": get_epub_cover(
-                os.path.join(current_app.config["BOOK_DIR"], book.filename),
-                book.cover_path,
-            ),
+            "cover": url_for("index_routes.cover", filename=book.filename),
         }
         for book in query.offset(offset).limit(limit).all()
     ]
@@ -115,6 +115,27 @@ def load_more(offset):
     filters = {k: v for k, v in filters.items() if v}
     images = get_covers(offset, BOOKS_PER_LOAD, filters)
     return jsonify(images)
+
+
+@index_blueprint.route("/cover/<filename>")
+def cover(filename):
+    """Serve a book's cover with long-lived caching keyed on file mtime."""
+    book = get_book_or_404(filename)
+    epub_path = os.path.join(current_app.config["BOOK_DIR"], book.filename)
+    if not os.path.exists(epub_path):
+        abort(404, description="Cover not found")
+
+    mtime = int(os.path.getmtime(epub_path))
+    etag = f"{book.id}-{mtime}"
+    if request.if_none_match.contains(etag):
+        return "", 304
+
+    cover_bytes = read_epub_cover(epub_path, book.cover_path)
+    response = make_response(cover_bytes)
+    response.headers["Content-Type"] = cover_mimetype(book.cover_path or "")
+    response.headers["Cache-Control"] = "public, max-age=31536000"
+    response.set_etag(etag)
+    return response
 
 
 @index_blueprint.route("/download/<filename>")

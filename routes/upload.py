@@ -1,9 +1,15 @@
+import base64
 from ebooklib import epub
 from flask import Blueprint, current_app, jsonify, request
 from models import Book, db
 import re
 from routes._helpers import commit_or_rollback, json_login_required
-from utils import extract_metadata, get_epub_cover, get_epub_cover_path
+from utils import (
+    cover_mimetype,
+    extract_metadata,
+    get_epub_cover_path,
+    read_epub_cover,
+)
 import os
 import uuid
 
@@ -76,14 +82,20 @@ def upload_book():
         current_app.logger.info(f"Renamed file to {final_file_path}")
 
         cover_path = get_epub_cover_path(final_file_path)
+        cover_bytes = read_epub_cover(final_file_path, cover_path)
+        cover_data_url = (
+            f"data:{cover_mimetype(cover_path)};base64,"
+            f"{base64.b64encode(cover_bytes).decode('utf-8')}"
+        )
 
-        # Return the metadata plus file details
+        # Cover comes back as an inline data URL because no Book row exists yet
+        # to serve via the cached /cover route.
         return jsonify(
             {
                 "filename": filename,
                 "title": title,
                 "author": author,
-                "cover": get_epub_cover(final_file_path, cover_path),
+                "cover": cover_data_url,
                 "cover_path": cover_path,
             }
         )
