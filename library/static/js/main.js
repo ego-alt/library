@@ -7,21 +7,29 @@ let currentFilters = {};
 let currentView = window.initialView || 'all';
 
 function getBookTemplate(book) {
+    // book.filename comes from the DB and could contain anything if a malicious
+    // filename was placed in BOOK_DIR and imported via `flask import-books`.
+    // - URL paths: encodeURIComponent (handles spaces and HTML-special chars)
+    // - data-filename attribute: HTML-escape so attribute parsing stays safe
+    // - JS handler: event delegation reads dataset.filename, never inline onclick
+    const urlSafe = encodeURIComponent(book.filename);
+    const attrSafe = escapeHtml(book.filename);
+    const coverSafe = escapeHtml(book.cover);
     return `
         <div class="col-md-3 mb-3">
             <div class="book">
                 <div class="book-buttons">
                     <button class="book-button">
-                        <a href="/download/${book.filename}" download>
+                        <a href="/download/${urlSafe}" download>
                             <i class="fas fa-download"></i>
                         </a>
                     </button>
-                    <button class="book-button" onclick="showMetadata('${book.filename}')">
+                    <button class="book-button" data-action="show-metadata" data-filename="${attrSafe}">
                         <i class="fas fa-ellipsis-h"></i>
                     </button>
                 </div>
-                <a href="/read/${book.filename}">
-                    <img src="${book.cover}" alt="cover" loading="lazy">
+                <a href="/read/${urlSafe}">
+                    <img src="${coverSafe}" alt="cover" loading="lazy">
                 </a>
             </div>
         </div>

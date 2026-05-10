@@ -31,6 +31,22 @@ def create_app(config_overrides: dict | None = None):
     app.config.from_object(Config)
     if config_overrides:
         app.config.update(config_overrides)
+
+    # Prefer a SECRET_KEY from the environment. If one isn't set, fall back to
+    # a random per-process key so the app still boots — but warn loudly because
+    # sessions won't survive a restart in that mode.
+    if not app.config.get("SECRET_KEY"):
+        if app.config.get("TESTING"):
+            app.config["SECRET_KEY"] = "test-only-secret-key"
+        else:
+            import secrets
+            app.config["SECRET_KEY"] = secrets.token_hex(32)
+            logger.warning(
+                "SECRET_KEY env var is not set; generated a random key for "
+                "this process. Sessions will be invalidated on every restart. "
+                "Set SECRET_KEY in your environment to persist sessions."
+            )
+
     os.makedirs(DATA_DIR, exist_ok=True)
     os.makedirs(app.config["BOOK_DIR"], exist_ok=True)
     cache.init_app(app)

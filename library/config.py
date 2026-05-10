@@ -6,7 +6,9 @@ DATA_DIR = os.path.join(BASE_DIR, "instance")
 
 
 class Config:
-    SECRET_KEY = "your-secret-key-here"
+    # Loaded from the environment; create_app() raises if missing in non-test
+    # contexts so we never silently fall back to a known-public key.
+    SECRET_KEY = os.environ.get("SECRET_KEY")
 
     # Database configuration
     SQLALCHEMY_DATABASE_URI = "sqlite:///" + os.path.join(DATA_DIR, "library.db")
