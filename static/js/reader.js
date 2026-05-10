@@ -10,7 +10,6 @@ let lastSaveTimeout = null;
 
 let selectedRange = null;
 let hrefChapterMapping = {};
-let chapterSentences = [];
 
 
 document.documentElement.style.setProperty('--reader-font-size', currentFontSize + 'px');
@@ -93,26 +92,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 }, 200);
                 
                 try {
-                    const sentences = chapterSentences
-                        .slice(0, currentChapterNum + 1)
-                        .filter(Array.isArray)
-                        .flat();
-
-                    const payload = {
-                        context: highlightedText,
-                        question: userInput,
-                        chapter_sentences: sentences
-                    };
-                    console.log('Full payload being sent:', payload);
                     const response = await fetch('/ask_question', {
                         method: 'POST',
-                        headers: {'Content-Type': 'application/json',},
-                        body: JSON.stringify(payload)
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            context: highlightedText,
+                            question: userInput
+                        })
                     });
-                    
+
                     const data = await response.json();
-                    console.log('Claude Sonnet 3.5 answer:', data.answer);
-                    
+
                     // Clear thinking animation
                     clearInterval(thinkingAnimation);
                     responseElement.className = 'search-response';
@@ -265,7 +255,6 @@ window.addEventListener('DOMContentLoaded', () => {
                             currentChapter = data;
                             chapterNum = currentChapter.index;
                             hrefChapterMapping[currentChapter.href] = chapterNum;
-                            processChapter(currentChapter);
 
                             // Remove unprocessed state and update title if available
                             const tocItem = document.getElementById(`toc-item-${chapterNum}`);
@@ -495,29 +484,6 @@ function closeOverlay() {
     
     // Clear the stored range
     selectedRange = null;
-}
-
-function processChapter(chapter) {
-    console.log(`Processing chapter ${chapter.index}:`, {
-        title: chapter.title,
-        contentLength: chapter.content.length
-    });
-
-    // Use DOMParser for safer HTML parsing
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(chapter.content, 'text/html');
-    const text = doc.body.textContent
-    
-    // More sophisticated sentence splitting
-    const sentenceRegex = /[^.!?]+(?:[.!?](?!['"]?\s|$)[^.!?]*)*[.!?]*/g;
-    const sentences = text.match(sentenceRegex) || [];
-    // Filter out empty or whitespace-only sentences and normalize whitespace
-    const validSentences = sentences
-        .map(s => s.trim().replace(/\s+/g, ' ')) // normalize whitespace
-        .filter(s => s.length > 0);
-        
-    // Store sentences for this chapter at its index
-    chapterSentences[chapter.index] = validSentences;
 }
 
 function initializeOverlay(tempHighlight, mode = 'question') {

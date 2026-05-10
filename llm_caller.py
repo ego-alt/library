@@ -1,7 +1,6 @@
 from flask import current_app
 import anthropic
 import os
-from typing import Optional
 
 
 class LLMCaller:
@@ -32,9 +31,7 @@ class LLMCaller:
             current_app.logger.error(f"Error calling Claude API: {str(e)}")
             return f"Sorry, I encountered an error: {str(e)}"
 
-    def ask_question(
-        self, context: str, question: str, chapter_sentences: Optional[list[str]] = None
-    ) -> str:
+    def ask_question(self, context: str, question: str) -> str:
         system = (
             "You are a helpful personal assistant who answers general inquiries your manager has when reading. "
             "Provide clear answers which are as concise as possible."

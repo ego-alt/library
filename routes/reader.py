@@ -8,13 +8,11 @@ from flask import (
     Response,
     stream_with_context,
 )
-from flask_caching import Cache
 from flask_login import current_user
 from models import Book, db, Bookmark, BookProgressChoice
 from utils import rotate_list, get_epub_structure, process_chapter_content
 import logging
 import json
-import time
 import os
 from llm_caller import LLMCaller
 
@@ -205,12 +203,11 @@ def ask_question():
     data = request.get_json()
     context = data.get("context", "")
     question = data.get("question", "")
-    chapter_sentences = data.get("chapter_sentences")
 
     if not context or not question:
         return jsonify({"error": "Missing context or question"}), 400
 
-    answer = llm_caller.ask_question(context, question, chapter_sentences)
+    answer = llm_caller.ask_question(context, question)
     return jsonify({"answer": answer})
 
 
