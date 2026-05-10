@@ -1,8 +1,9 @@
 import logging
-from flask import Flask, request
+from flask import Flask, jsonify, request
 from flask_caching import Cache
 from flask_compress import Compress
 from flask_login import LoginManager
+from werkzeug.exceptions import HTTPException
 
 from config import Config
 from commands import init_commands
@@ -35,6 +36,11 @@ def create_app():
         if "/static/" in request.path:
             response.cache_control.max_age = 3600
         return response
+
+    # JSON error responses for aborted requests
+    @app.errorhandler(HTTPException)
+    def handle_http_exception(e):
+        return jsonify({"error": e.description}), e.code
 
     # Initialize Flask-Login
     login_manager = LoginManager()

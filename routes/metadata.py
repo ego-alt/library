@@ -1,6 +1,11 @@
 from flask import Blueprint, current_app, jsonify, request
 from flask_login import current_user
 from models import Book, Bookmark, Tag, book_tags, db, BookProgressChoice
+from routes._helpers import (
+    commit_or_rollback,
+    get_book_or_404,
+    json_login_required,
+)
 from utils import get_epub_cover, update_epub_cover
 import os
 import base64
@@ -59,9 +64,7 @@ def _set_bookmark_status(book_id: int, user_id: int, status_value: str | None):
 @metadata_blueprint.route("/book_metadata/<filename>", methods=["GET", "POST"])
 def book_metadata(filename):
     """Get or update book metadata."""
-    book = Book.query.filter_by(filename=filename).first()
-    if not book:
-        return jsonify({"error": "Book not found"}), 404
+    book = get_book_or_404(filename)
 
     if request.method == "POST":
         if not current_user.is_authenticated:
@@ -77,36 +80,34 @@ def book_metadata(filename):
         custom_tag_names = [t for t in incoming if t not in PROGRESS_TAG_VALUES]
 
         try:
-            # Replace this user's custom tags for the book
-            db.session.execute(
-                book_tags.delete().where(
-                    db.and_(
-                        book_tags.c.book_id == book.id,
-                        book_tags.c.user_id == current_user.id,
-                    )
-                )
-            )
-            for tag_name in custom_tag_names:
-                tag = Tag.query.filter_by(
-                    name=tag_name, user_id=current_user.id
-                ).first()
-                if not tag:
-                    tag = Tag(name=tag_name, user_id=current_user.id)
-                    db.session.add(tag)
-                    db.session.flush()
+            with commit_or_rollback():
+                # Replace this user's custom tags for the book
                 db.session.execute(
-                    book_tags.insert().values(
-                        book_id=book.id,
-                        tag_id=tag.id,
-                        user_id=current_user.id,
+                    book_tags.delete().where(
+                        db.and_(
+                            book_tags.c.book_id == book.id,
+                            book_tags.c.user_id == current_user.id,
+                        )
                     )
                 )
-
-            _set_bookmark_status(book.id, current_user.id, status_tag)
-            db.session.commit()
+                for tag_name in custom_tag_names:
+                    tag = Tag.query.filter_by(
+                        name=tag_name, user_id=current_user.id
+                    ).first()
+                    if not tag:
+                        tag = Tag(name=tag_name, user_id=current_user.id)
+                        db.session.add(tag)
+                        db.session.flush()
+                    db.session.execute(
+                        book_tags.insert().values(
+                            book_id=book.id,
+                            tag_id=tag.id,
+                            user_id=current_user.id,
+                        )
+                    )
+                _set_bookmark_status(book.id, current_user.id, status_tag)
             return jsonify({"message": "Metadata updated successfully"})
         except Exception as e:
-            db.session.rollback()
             return jsonify({"error": str(e)}), 500
 
     # GET request handling
@@ -130,24 +131,17 @@ def book_metadata(filename):
 
 
 @metadata_blueprint.route("/update_cover", methods=["POST"])
+@json_login_required
 def update_cover():
     """
     Update the cover image for a book. This route expects a file input named 'cover'
     and a form field 'filename' for locating the corresponding book.
     """
-    if not current_user.is_authenticated:
-        return jsonify({"error": "Authentication required"}), 401
-
     if "cover" not in request.files or "filename" not in request.form:
         return jsonify({"error": "Cover file and filename are required"}), 400
 
     cover_file = request.files["cover"]
-    filename = request.form["filename"]
-
-    book = Book.query.filter_by(filename=filename).first()
-    if not book:
-        return jsonify({"error": "Book not found"}), 404
-
+    book = get_book_or_404(request.form["filename"])
     epub_file_path = os.path.join(current_app.config["BOOK_DIR"], book.filename)
 
     try:

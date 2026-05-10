@@ -15,6 +15,11 @@ import logging
 import json
 import os
 from llm_caller import LLMCaller, LLMError
+from routes._helpers import (
+    commit_or_rollback,
+    get_book_or_404,
+    json_login_required,
+)
 
 
 read_blueprint = Blueprint("read_routes", __name__)
@@ -39,9 +44,7 @@ def read_book(filename):
 @read_blueprint.route("/load_book/<filename>")
 def load_book(filename):
     """Load the book and return the book data as a stream."""
-    book = Book.query.filter_by(filename=filename).first()
-    if not book:
-        return jsonify({"error": "Book not found"}), 404
+    book = get_book_or_404(filename)
     bookmark = None
 
     if current_user.is_authenticated:
@@ -142,32 +145,25 @@ def stream_book_content(
 
 @read_blueprint.route("/bookmark/<filename>", methods=["GET", "POST"])
 def bookmark(filename):
-    """Bookmark the current chapter of the book."""
+    """Get or update the user's bookmark for the book."""
     if not current_user.is_authenticated:
         return jsonify({"message": "Authentication required."}), 200
 
-    book = Book.query.filter_by(filename=filename).first()
-    if not book:
-        return jsonify({"error": "Book not found"}), 404
+    book = get_book_or_404(filename)
 
     if request.method == "POST":
         data = request.get_json()
-        bookmark = Bookmark.query.filter_by(
-            user_id=current_user.id, book_id=book.id
-        ).first()
-        if not bookmark:
-            bookmark = Bookmark(user_id=current_user.id, book_id=book.id)
-            db.session.add(bookmark)
-        bookmark.chapter_index = data.get("chapter_index", 0)
-        bookmark.position = data.get("position", 0)
-        bookmark.last_read = _utcnow()
-
-        try:
-            db.session.commit()
-            return jsonify({"message": "Bookmark updated successfully"})
-        except Exception as e:
-            db.session.rollback()
-            return jsonify({"error": str(e)}), 500
+        with commit_or_rollback():
+            bookmark = Bookmark.query.filter_by(
+                user_id=current_user.id, book_id=book.id
+            ).first()
+            if not bookmark:
+                bookmark = Bookmark(user_id=current_user.id, book_id=book.id)
+                db.session.add(bookmark)
+            bookmark.chapter_index = data.get("chapter_index", 0)
+            bookmark.position = data.get("position", 0)
+            bookmark.last_read = _utcnow()
+        return jsonify({"message": "Bookmark updated successfully"})
 
     # GET request - retrieve bookmark
     bookmark = Bookmark.query.filter_by(
@@ -183,14 +179,10 @@ def bookmark(filename):
 
 
 @read_blueprint.route("/tag_finished/<filename>", methods=["POST"])
+@json_login_required
 def tag_finished(filename):
     """Tag the book as finished."""
-    if not current_user.is_authenticated:
-        return jsonify({"error": "Authentication required"}), 401
-
-    book = Book.query.filter_by(filename=filename).first()
-    if not book:
-        return jsonify({"error": "Book not found"}), 404
+    book = get_book_or_404(filename)
 
     bookmark = Bookmark.query.filter_by(
         user_id=current_user.id, book_id=book.id

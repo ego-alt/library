@@ -1,8 +1,8 @@
 from ebooklib import epub
 from flask import Blueprint, current_app, jsonify, request
-from flask_login import current_user
 from models import Book, db
 import re
+from routes._helpers import commit_or_rollback, json_login_required
 from utils import extract_metadata, get_epub_cover, get_epub_cover_path
 import os
 import uuid
@@ -23,11 +23,9 @@ def generate_filename(title, author):
 
 
 @upload_blueprint.route("/upload_book", methods=["POST"])
+@json_login_required
 def upload_book():
     """Endpoint to save the uploaded EPUB and return pre-populated metadata."""
-    if not current_user.is_authenticated:
-        return jsonify({"error": "Authentication required"}), 401
-
     # Check for the file in the request
     if "file" not in request.files:
         return jsonify({"error": "No file part in the request"}), 400
@@ -92,11 +90,9 @@ def upload_book():
 
 
 @upload_blueprint.route("/upload_book_metadata", methods=["POST"])
+@json_login_required
 def upload_book_metadata():
     """Endpoint to save metadata for a newly uploaded book (creating a new DB record)."""
-    if not current_user.is_authenticated:
-        return jsonify({"error": "Authentication required"}), 401
-
     data = request.get_json()
     original_filename = data.get("original_filename")
     new_filename = data.get("new_filename")
@@ -104,7 +100,6 @@ def upload_book_metadata():
         return jsonify({"error": "Missing new filename"}), 400
 
     if original_filename != new_filename:
-        # Rename the file
         try:
             original_filepath = os.path.join(
                 current_app.config["BOOK_DIR"], original_filename
@@ -118,19 +113,18 @@ def upload_book_metadata():
             current_app.logger.error(f"Failed to rename file: {str(e)}")
             return jsonify({"error": "Failed to rename file: " + str(e)}), 500
 
-    # Create a new Book record with the submitted metadata
-    new_book = Book(
-        title=data.get("title"),
-        author=data.get("author"),
-        genre=data.get("genre"),
-        filename=new_filename,
-        cover_path=data.get("cover_path"),
-        access_level="standard",  # or any default you wish
-    )
-    db.session.add(new_book)
     try:
-        db.session.commit()
+        with commit_or_rollback():
+            db.session.add(
+                Book(
+                    title=data.get("title"),
+                    author=data.get("author"),
+                    genre=data.get("genre"),
+                    filename=new_filename,
+                    cover_path=data.get("cover_path"),
+                    access_level="standard",
+                )
+            )
         return jsonify({"message": "Book added successfully"})
     except Exception as e:
-        db.session.rollback()
         return jsonify({"error": str(e)}), 500

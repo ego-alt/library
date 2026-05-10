@@ -10,6 +10,7 @@ from flask_login import current_user
 from models import db, Book, Bookmark, Tag
 from choices import BookProgressChoice, UserRoleChoice
 import os
+from routes._helpers import get_book_or_404
 from utils import get_epub_cover
 
 
@@ -119,9 +120,7 @@ def load_more(offset):
 @index_blueprint.route("/download/<filename>")
 def download(filename):
     """Serve the EPUB file for download, respecting per-book access level."""
-    book = Book.query.filter_by(filename=filename).first()
-    if not book:
-        return jsonify({"error": "Book not found"}), 404
+    book = get_book_or_404(filename)
 
     if book.access_level != "standard" and (
         not current_user.is_authenticated
