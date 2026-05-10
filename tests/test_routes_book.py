@@ -27,6 +27,20 @@ def test_load_more_filters_by_title(client, book):
     assert r.get_json() == []
 
 
+def test_load_more_includes_total_count_header(client, book):
+    """Frontend uses X-Total-Count to cap how many skeletons to show."""
+    r = client.get("/load_more/0")
+    assert r.headers["X-Total-Count"] == "1"
+    r = client.get("/load_more/0?title=Nonexistent")
+    assert r.headers["X-Total-Count"] == "0"
+
+
+def test_index_template_exposes_total_books(client, book):
+    """Server-rendered initial total_books seeds window.totalBooks."""
+    r = client.get("/")
+    assert b"window.totalBooks = 1" in r.data
+
+
 # --- view=mine vs view=all ------------------------------------------------------
 
 

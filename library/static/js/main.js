@@ -5,6 +5,10 @@ let currentFilters = {};
 // View state — 'all' (every book, newest first) or 'mine' (only started, by last_read).
 // Server renders the initial batch using window.initialView; localStorage may override it.
 let currentView = window.initialView || 'all';
+// Total books available for the current view+filter. Server seeds it on
+// initial render; each /load_more response refreshes it via X-Total-Count.
+// Used to cap the number of loading skeletons we render.
+let totalBooks = (typeof window.totalBooks === 'number') ? window.totalBooks : null;
 
 function getBookTemplate(book) {
     // book.filename comes from the DB and could contain anything if a malicious
@@ -54,13 +58,16 @@ function debounce(func, wait) {
 // Update loadMoreImages function to use filters
 function loadMoreImages() {
     isLoading = true;
-    const skeletons = appendSkeletons(SKELETON_COUNT);
+    const skeletons = appendSkeletons(computeSkeletonCount());
 
     const queryParams = new URLSearchParams(currentFilters);
     queryParams.set('view', currentView);
 
-    $.get(`/load_more/${offset}?${queryParams.toString()}`, function(data) {
+    $.get(`/load_more/${offset}?${queryParams.toString()}`, function(data, _status, jqXHR) {
         skeletons.forEach(el => el.remove());
+        const reported = parseInt(jqXHR.getResponseHeader('X-Total-Count'), 10);
+        if (!Number.isNaN(reported)) totalBooks = reported;
+
         if (data.length === 0) {
             allImagesLoaded = true;
             if (offset === 0) {
@@ -84,9 +91,20 @@ function loadMoreImages() {
 }
 
 const SKELETON_COUNT = 8;
+
+function computeSkeletonCount() {
+    // If we don't know the total yet (e.g. anonymous browse before first
+    // /load_more response), assume a full page worth of cards.
+    if (totalBooks == null) return SKELETON_COUNT;
+    const displayed = document.querySelectorAll(
+        '#library .col-md-3:not(.book-skeleton-wrapper)'
+    ).length;
+    return Math.min(SKELETON_COUNT, Math.max(0, totalBooks - displayed));
+}
+
 function appendSkeletons(count) {
     const grid = document.getElementById('library');
-    if (!grid) return [];
+    if (!grid || count <= 0) return [];
     grid.style.display = '';
     const created = [];
     for (let i = 0; i < count; i++) {

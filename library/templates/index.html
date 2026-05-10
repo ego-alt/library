@@ -15,6 +15,7 @@
         window.isAuthenticated = {{ 'true' if current_user.is_authenticated else 'false' }};
         window.currentUserRole = "{{ current_user.role.value if current_user.is_authenticated else '' }}";
         window.initialView = "{{ current_view|default('all') }}";
+        window.totalBooks = {{ total_books|default(0) }};
     </script>
     <title>Library</title>
     <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">

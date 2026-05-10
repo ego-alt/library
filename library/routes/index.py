@@ -27,17 +27,16 @@ VIEW_ALL = "all"
 VIEW_MINE = "mine"
 
 
-def get_covers(offset=0, limit=BOOKS_PER_LOAD, filters=None, view=VIEW_ALL):
-    """Return the next batch of book covers.
-
-    view='all'  → every accessible book, newest first by created_at.
-    view='mine' → only books the user has started (IN_PROGRESS or FINISHED),
-                  ordered by last_read so the most recently opened is first.
-                  Falls back to 'all' for anonymous users.
-    """
+def _normalize_view(view):
     if view == VIEW_MINE and not current_user.is_authenticated:
-        view = VIEW_ALL
+        return VIEW_ALL
+    return view
 
+
+def _filtered_book_query(filters=None, view=VIEW_ALL):
+    """Build the base Book query with access, view, and filter WHERE clauses
+    applied. Returns None when the request can't possibly match (e.g. tag
+    filter requested by an anonymous user)."""
     query = Book.query
 
     if (
@@ -46,13 +45,11 @@ def get_covers(offset=0, limit=BOOKS_PER_LOAD, filters=None, view=VIEW_ALL):
     ):
         query = query.filter(Book.access_level == "standard")
 
-    # Joins for authenticated users let us read bookmark and tag context.
     if current_user.is_authenticated:
         query = query.outerjoin(
             Book.bookmarks.and_(Bookmark.user_id == current_user.id)
         ).outerjoin(Book.tags.and_(Tag.user_id == current_user.id))
 
-    # "My books": restrict to bookmarks with a started reading status.
     if view == VIEW_MINE:
         query = query.filter(Bookmark.status.in_([
             BookProgressChoice.IN_PROGRESS,
@@ -60,7 +57,6 @@ def get_covers(offset=0, limit=BOOKS_PER_LOAD, filters=None, view=VIEW_ALL):
         ]))
 
     if filters:
-        # Apply text filters for title, author, and genre
         for attr, column in (
             ("title", Book.title),
             ("author", Book.author),
@@ -70,15 +66,12 @@ def get_covers(offset=0, limit=BOOKS_PER_LOAD, filters=None, view=VIEW_ALL):
                 for word in value.split():
                     query = query.filter(column.ilike(f"%{word}%"))
 
-        # Apply tag filters if provided
         if tags := filters.get("tags"):
             if not current_user.is_authenticated:
-                return []
+                return None
 
             tags = [tag.strip() for tag in tags.split(",") if tag.strip()]
             tag_filters = []
-
-            # Handle unread books
             if BookProgressChoice.UNREAD.value in tags:
                 tag_filters.append(
                     db.or_(
@@ -87,9 +80,7 @@ def get_covers(offset=0, limit=BOOKS_PER_LOAD, filters=None, view=VIEW_ALL):
                     )
                 )
 
-            # Handle progress tags and other tags in a single pass
-            progress_tags = []
-            other_tags = []
+            progress_tags, other_tags = [], []
             for tag in tags:
                 if tag in (BookProgressChoice.IN_PROGRESS.value, BookProgressChoice.FINISHED.value):
                     progress_tags.append(tag)
@@ -104,8 +95,22 @@ def get_covers(offset=0, limit=BOOKS_PER_LOAD, filters=None, view=VIEW_ALL):
             if tag_filters:
                 query = query.filter(db.or_(*tag_filters))
 
-    # Sort: 'mine' uses last_read; 'all' uses created_at so freshly added books
-    # are visible at the top regardless of how much you've already read.
+    return query
+
+
+def get_covers(offset=0, limit=BOOKS_PER_LOAD, filters=None, view=VIEW_ALL):
+    """Return the next batch of book covers.
+
+    view='all'  → every accessible book, newest first by created_at.
+    view='mine' → only books the user has started (IN_PROGRESS or FINISHED),
+                  ordered by last_read so the most recently opened is first.
+                  Falls back to 'all' for anonymous users.
+    """
+    view = _normalize_view(view)
+    query = _filtered_book_query(filters, view)
+    if query is None:
+        return []
+
     if view == VIEW_MINE:
         query = query.order_by(Bookmark.last_read.desc(), Book.created_at.desc())
     else:
@@ -120,6 +125,17 @@ def get_covers(offset=0, limit=BOOKS_PER_LOAD, filters=None, view=VIEW_ALL):
     ]
 
 
+def count_books(filters=None, view=VIEW_ALL):
+    """Count of books visible to the current user under the given view+filters.
+    Used to cap the number of loading skeletons rendered on the home page."""
+    view = _normalize_view(view)
+    query = _filtered_book_query(filters, view)
+    if query is None:
+        return 0
+    # distinct() so the count isn't inflated by multi-tag join duplication.
+    return query.distinct().count()
+
+
 def _requested_view():
     view = request.args.get("view", VIEW_ALL)
     return view if view in (VIEW_ALL, VIEW_MINE) else VIEW_ALL
@@ -130,7 +146,10 @@ def index():
     """Render the initial page with the first batch of book covers."""
     view = _requested_view()
     images = get_covers(0, BOOKS_PER_LOAD, view=view)
-    return render_template("index.html", images=images, current_view=view)
+    total = count_books(view=view)
+    return render_template(
+        "index.html", images=images, current_view=view, total_books=total
+    )
 
 
 @index_blueprint.route("/load_more/<int:offset>", methods=["GET"])
@@ -143,8 +162,12 @@ def load_more(offset):
     }
     # Remove empty filters
     filters = {k: v for k, v in filters.items() if v}
-    images = get_covers(offset, BOOKS_PER_LOAD, filters, view=_requested_view())
-    return jsonify(images)
+    view = _requested_view()
+    images = get_covers(offset, BOOKS_PER_LOAD, filters, view=view)
+    response = jsonify(images)
+    # Frontend uses this to cap the number of loading skeletons it renders.
+    response.headers["X-Total-Count"] = str(count_books(filters, view))
+    return response
 
 
 @index_blueprint.route("/cover/<filename>")
