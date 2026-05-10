@@ -1,5 +1,9 @@
 from choices import UserRoleChoice, BookProgressChoice
-from datetime import datetime
+from datetime import datetime, timezone
+
+
+def _utcnow():
+    return datetime.now(timezone.utc)
 from flask_login import UserMixin
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -25,7 +29,7 @@ class User(UserMixin, db.Model):
     role = db.Column(
         db.Enum(UserRoleChoice), nullable=False, default=UserRoleChoice.STANDARD
     )
-    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, nullable=False, default=_utcnow)
 
     # Add these methods
     def set_password(self, password):
@@ -52,7 +56,7 @@ class Book(db.Model):
     cover_path = db.Column(db.String(255))  # Path to stored cover image
     genre = db.Column(db.String(100))
     access_level = db.Column(db.String(20), nullable=False, default="standard")
-    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, nullable=False, default=_utcnow)
     uploaded_by = db.Column(db.Integer, db.ForeignKey("users.id"))
 
     # Relationships
@@ -71,7 +75,7 @@ class Tag(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(50), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
-    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, nullable=False, default=_utcnow)
 
     # Add user relationship
     user = db.relationship("User", back_populates="tags")
@@ -92,7 +96,7 @@ class Bookmark(db.Model):
     chapter_index = db.Column(db.Integer, default=0)
     position = db.Column(db.Float, default=0)  # Percentage through chapter
 
-    last_read = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    last_read = db.Column(db.DateTime, nullable=False, default=_utcnow)
     status = db.Column(
         db.Enum(BookProgressChoice),
         nullable=False,

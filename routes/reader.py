@@ -1,4 +1,4 @@
-from datetime import datetime
+from models import _utcnow
 from flask import (
     Blueprint,
     current_app,
@@ -50,7 +50,7 @@ def load_book(filename):
                 f"Setting status to IN_PROGRESS for book {book.id} and user {current_user.id}"
             )
 
-        bookmark.last_read = datetime.utcnow()
+        bookmark.last_read = _utcnow()
         db.session.commit()
 
     try:
@@ -152,7 +152,7 @@ def bookmark(filename):
             db.session.add(bookmark)
         bookmark.chapter_index = data.get("chapter_index", 0)
         bookmark.position = data.get("position", 0)
-        bookmark.last_read = datetime.utcnow()
+        bookmark.last_read = _utcnow()
 
         try:
             db.session.commit()
