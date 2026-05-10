@@ -1,7 +1,6 @@
 from flask import Blueprint, current_app, jsonify, request
 from flask_login import current_user
-from models import Book, db, Tag, book_tags, BookProgressChoice
-from tag_manager import TagManager
+from models import Book, Bookmark, Tag, book_tags, db, BookProgressChoice
 from utils import get_epub_cover, update_epub_cover
 import os
 import base64
@@ -9,24 +8,52 @@ import base64
 
 metadata_blueprint = Blueprint("metadata_routes", __name__)
 
-BOOKMARK_ATTRIBUTES = {
-    "status": [BookProgressChoice.IN_PROGRESS.value, BookProgressChoice.FINISHED.value]
+PROGRESS_TAG_VALUES = {
+    BookProgressChoice.IN_PROGRESS.value,
+    BookProgressChoice.FINISHED.value,
 }
 
 
-def bulk_create_tags(book, tags: list[Tag]):
-    for tag in tags:
-        db.session.execute(
-            book_tags.insert().values(
-                book_id=book.id, tag_id=tag.id, user_id=current_user.id
-            )
+def _list_book_tags(book_id: int, user_id: int) -> list[str]:
+    """Return all tag names a user has on a book, including the bookmark
+    status when it isn't the default UNREAD."""
+    user_tag_names = [
+        name
+        for (name,) in db.session.query(Tag.name)
+        .join(
+            book_tags,
+            db.and_(
+                book_tags.c.tag_id == Tag.id,
+                book_tags.c.book_id == book_id,
+                book_tags.c.user_id == user_id,
+            ),
         )
+        .all()
+    ]
+
+    bookmark = Bookmark.query.filter_by(book_id=book_id, user_id=user_id).first()
+    progress = []
+    if bookmark and bookmark.status != BookProgressChoice.UNREAD:
+        progress.append(bookmark.status.value)
+
+    return progress + user_tag_names
 
 
-def bulk_update_bookmark(book, field_to_update):
-    tag_manager = TagManager(db.session, current_user.id)
-    for key, value in field_to_update.items():
-        tag_manager.update_from_virtual_tag(book.id, key, value)
+def _set_bookmark_status(book_id: int, user_id: int, status_value: str | None):
+    """Set the bookmark's status from a tag value, defaulting to UNREAD."""
+    new_status = (
+        BookProgressChoice(status_value) if status_value else BookProgressChoice.UNREAD
+    )
+    bookmark = Bookmark.query.filter_by(book_id=book_id, user_id=user_id).first()
+
+    if bookmark is None:
+        if new_status == BookProgressChoice.UNREAD:
+            return
+        db.session.add(
+            Bookmark(user_id=user_id, book_id=book_id, status=new_status)
+        )
+    else:
+        bookmark.status = new_status
 
 
 @metadata_blueprint.route("/book_metadata/<filename>", methods=["GET", "POST"])
@@ -44,8 +71,13 @@ def book_metadata(filename):
         book.title = data.get("title", book.title)
         book.author = data.get("author", book.author)
         book.genre = data.get("genre", book.genre)
+
+        incoming = data.get("tags", [])
+        status_tag = next((t for t in incoming if t in PROGRESS_TAG_VALUES), None)
+        custom_tag_names = [t for t in incoming if t not in PROGRESS_TAG_VALUES]
+
         try:
-            # First, remove all existing tags for this user and book
+            # Replace this user's custom tags for the book
             db.session.execute(
                 book_tags.delete().where(
                     db.and_(
@@ -54,36 +86,23 @@ def book_metadata(filename):
                     )
                 )
             )
-            # Create/get tags and commit them
-            bookmark_fields_to_update = {
-                key: None for key in BOOKMARK_ATTRIBUTES.keys()
-            }
-            tags_to_add = []
-
-            for tag_name in data.get("tags", []):
-                next_iter = False
-                for key, value in BOOKMARK_ATTRIBUTES.items():
-                    if tag_name in value:
-                        bookmark_fields_to_update[key] = tag_name
-                        next_iter = True
-                        break
-
-                if next_iter:
-                    continue
-
+            for tag_name in custom_tag_names:
                 tag = Tag.query.filter_by(
                     name=tag_name, user_id=current_user.id
                 ).first()
-
                 if not tag:
                     tag = Tag(name=tag_name, user_id=current_user.id)
                     db.session.add(tag)
-                    db.session.flush()  # This assigns the ID without committing
+                    db.session.flush()
+                db.session.execute(
+                    book_tags.insert().values(
+                        book_id=book.id,
+                        tag_id=tag.id,
+                        user_id=current_user.id,
+                    )
+                )
 
-                tags_to_add.append(tag)
-
-            bulk_create_tags(book, tags_to_add)
-            bulk_update_bookmark(book, bookmark_fields_to_update)
+            _set_bookmark_status(book.id, current_user.id, status_tag)
             db.session.commit()
             return jsonify({"message": "Metadata updated successfully"})
         except Exception as e:
@@ -99,15 +118,13 @@ def book_metadata(filename):
         "tags": [],
         "filename": book.filename,
         "cover": get_epub_cover(
-            os.path.join(current_app.config["BOOK_DIR"], book.filename), book.cover_path
+            os.path.join(current_app.config["BOOK_DIR"], book.filename),
+            book.cover_path,
         ),
     }
 
-    # Only include tags if user is authenticated
     if current_user.is_authenticated:
-        # Get tags specific to this user and book
-        tag_manager = TagManager(db.session, current_user.id)
-        response["tags"] = tag_manager.get_all_tags(book.id)
+        response["tags"] = _list_book_tags(book.id, current_user.id)
 
     return jsonify(response)
 
@@ -127,7 +144,6 @@ def update_cover():
     cover_file = request.files["cover"]
     filename = request.form["filename"]
 
-    # Query the Book record by filename
     book = Book.query.filter_by(filename=filename).first()
     if not book:
         return jsonify({"error": "Book not found"}), 404
@@ -136,7 +152,6 @@ def update_cover():
 
     try:
         new_cover_bytes = cover_file.read()
-        # Delegate EPUB cover replacement to our utils helper function
         update_epub_cover(epub_file_path, new_cover_bytes)
         new_cover_b64 = base64.b64encode(new_cover_bytes).decode("utf-8")
         return jsonify({"new_cover": new_cover_b64})
