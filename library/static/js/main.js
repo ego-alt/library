@@ -120,98 +120,161 @@ initializeTagInput('filterTags', 'filter-tags-container');
 
 
 // <== FUNCTIONS FOR VIEWING AND EDITING METADATA ==>
+function escapeHtml(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[c]));
+}
+
 function generateMetadataHtml(data, isUpload = false) {
     const isAuth = window.isAuthenticated;
-    const isAdmin = (window.currentUserRole || "") === 'admin';
+    const isAdmin = (window.currentUserRole || '') === 'admin';
+    // Admins can edit existing books; an uploader edits their own incoming book.
+    const editable = isAdmin || isUpload;
 
-    // Helper function to create a field.
-    // Only admin users get an <input> so they can edit the field.
-    // Non-admins (or guests) see a <span> with the value.
-    const createField = (label, value, id) => `
-        <div class="metadata-field" style="margin-bottom: 10px;">
-            <strong>${label}:</strong>
-            ${isAdmin 
-                ? `<input type="text" value="${value}" id="${id}">` 
-                : `<span class="metadata-value" id="${id}">${value}</span>`}
-        </div>
+    const ids = isUpload
+        ? { title: 'upload-metadata-title', author: 'upload-metadata-author',
+            genre: 'upload-metadata-genre', filename: 'upload-metadata-filename' }
+        : { title: 'metadata-title', author: 'metadata-author',
+            genre: 'metadata-genre' };
+
+    // --- Header: title and author act as the panel's heading ---
+    const titleEl = editable
+        ? `<input type="text" id="${ids.title}" class="meta-title-input"
+                  value="${escapeHtml(data.title || '')}" placeholder="Untitled">`
+        : `<h2 id="${ids.title}" class="meta-title">${escapeHtml(data.title || 'Untitled')}</h2>`;
+
+    const authorEl = editable
+        ? `<input type="text" id="${ids.author}" class="meta-author-input"
+                  value="${escapeHtml(data.author || '')}" placeholder="Author">`
+        : `<p id="${ids.author}" class="meta-author">${escapeHtml(data.author || 'Unknown author')}</p>`;
+
+    // --- Cover with hover overlay for admins ---
+    const coverChange = isAdmin
+        ? `<button type="button" class="meta-cover__change"
+                   onclick="triggerCoverUpload('${escapeHtml(data.filename)}')">
+              <i class="fas fa-camera"></i><span>Change cover</span>
+           </button>`
+        : '';
+    const cover = `
+        <figure class="meta-cover${isAdmin ? ' meta-cover--editable' : ''}">
+            <img id="cover-preview-image" src="${escapeHtml(data.cover)}"
+                 alt="Cover of ${escapeHtml(data.title || 'this book')}">
+            ${coverChange}
+        </figure>
     `;
 
-    // Create fields for title, author, and genre.
-    const titleField = createField('Title', data.title, isUpload ? 'upload-metadata-title' : 'metadata-title');
-    const authorField = createField('Author', data.author, isUpload ? 'upload-metadata-author' : 'metadata-author');
-    const genreField = createField('Genre', data.genre || '', isUpload ? 'upload-metadata-genre' : 'metadata-genre');
+    // --- Always-shown genre field ---
+    const genreField = `
+        <label class="meta-field">
+            <span class="meta-label">Genre</span>
+            ${editable
+                ? `<input type="text" id="${ids.genre}" class="meta-input"
+                          value="${escapeHtml(data.genre || '')}"
+                          placeholder="e.g. Fiction, Memoir">`
+                : `<span id="${ids.genre}" class="meta-value">${escapeHtml(data.genre || '—')}</span>`}
+        </label>
+    `;
 
-    // For uploading a new book, include a filename field.
-    const extraField = isUpload 
-        ? createField('Filename', data.filename, 'upload-metadata-filename')
+    // --- Tags (existing book) or filename (upload) ---
+    const extraField = isUpload
+        ? `
+            <label class="meta-field meta-field--muted">
+                <span class="meta-label">Filename</span>
+                <input type="text" id="${ids.filename}"
+                       class="meta-input meta-input--mono"
+                       value="${escapeHtml(data.filename || '')}">
+            </label>
+          `
         : `
-            <div class="metadata-field" style="margin-bottom: 10px;">
-                <strong>Custom Tags:</strong>
-                ${isAuth 
+            <div class="meta-field">
+                <span class="meta-label">Custom tags</span>
+                ${isAuth
                     ? `<div class="tag-input-container">
-                        <div class="tags-container" id="tags-container"></div>
-                        <input type="text" id="tags-input" placeholder="Type and press Enter">
-                    </div>` 
-                    : `<span class="metadata-value">${data.tags.join(', ') || ''}</span>`}
+                          <div class="tags-container" id="tags-container"></div>
+                          <input type="text" id="tags-input"
+                                 placeholder="Type and press Enter">
+                       </div>`
+                    : `<span class="meta-value">${escapeHtml((data.tags || []).join(', ') || 'No tags yet')}</span>`}
             </div>
-        `;
-    
-    // Cover preview with an edit button if the user is authenticated
-    const coverPreview = `
-        <div class="metadata-cover" style="text-align: left;">
-            <strong style="display: block; margin-bottom: 10px;">Cover Preview:</strong>
-            <div style="position: relative; display: inline-block;">
-                <img id="cover-preview-image" src="${data.cover}" alt="cover thumbnail" style="max-width: 180px; border-radius: 8px;">
-                ${isAdmin ? `<button class="book-button" style="position: absolute; top: 5px; right: 5px;" onclick="triggerCoverUpload('${data.filename}')">
-                    <i class="fas fa-edit"></i>
-                </button>` : ''}
-            </div>
-        </div>
-    `;
+          `;
 
-    // Action buttons. Admins on an existing book also get a destructive Delete.
+    // --- Footer: timestamp on the left, actions on the right ---
+    const created = (!isUpload && data.created_at)
+        ? `<span class="meta-footer-info">Added ${escapeHtml(data.created_at.split(' ')[0])}</span>`
+        : `<span class="meta-footer-info"></span>`;
+
     const deleteButton = (isAdmin && !isUpload)
-        ? `<button class="delete-book-button" onclick="confirmDeleteBook('${data.filename}')">Delete Book</button>`
-        : ``;
+        ? `<button type="button" class="delete-book-button"
+                   onclick="confirmDeleteBook('${escapeHtml(data.filename)}')">
+              <i class="fas fa-trash"></i><span>Delete</span>
+           </button>`
+        : '';
+    const saveLabel = isUpload ? 'Add to library' : 'Save changes';
     const saveButton = isAuth
-        ? `<button class="save-button" onclick="${isUpload ? `saveNewBook('${data.filename}', '${data.cover_path}')` : `saveMetadata('${data.filename}')`}">Save Changes</button>`
-        : ``;
-    const actionButtons = `
-        <div class="metadata-actions">
-            ${deleteButton}
-            ${saveButton}
-        </div>
-    `;
-    
-    // Combine all parts into the final HTML.
+        ? `<button type="button" class="save-button"
+                   onclick="${isUpload
+                       ? `saveNewBook('${escapeHtml(data.filename)}', '${escapeHtml(data.cover_path || '')}')`
+                       : `saveMetadata('${escapeHtml(data.filename)}')`}">
+              ${saveLabel}
+           </button>`
+        : '';
+
     return `
-        <div class="metadata-grid" style="display: flex; align-items: flex-start;">
-            <div class="metadata-fields" style="flex: 1; margin-right: 20px;">
-                ${titleField}
-                ${authorField}
+        <header class="meta-header">
+            ${titleEl}
+            ${authorEl}
+        </header>
+        <section class="meta-body">
+            ${cover}
+            <div class="meta-fields">
                 ${genreField}
                 ${extraField}
             </div>
-            ${coverPreview}
-        </div>
-        ${actionButtons}
+        </section>
+        <footer class="meta-footer">
+            ${created}
+            <div class="meta-footer-actions">
+                ${deleteButton}
+                ${saveButton}
+            </div>
+        </footer>
     `;
 }
 
 function showMetadata(filename) {
     $.get(`/book_metadata/${filename}`, function(data) {
-        const metadataHtml = generateMetadataHtml(data);
-        $('#metadataContent').html(metadataHtml);
+        $('#metadataContent').html(generateMetadataHtml(data));
         $('#metadataOverlay').css('display', 'flex').fadeIn();
         initializeTagInput('tags-input', 'tags-container', data.tags);
+        focusFirstMetadataField();
     });
 }
 
 function showUploadMetadata(data) {
-    const metadataHtml = generateMetadataHtml(data, true);
-    $('#metadataContent').html(metadataHtml);
+    $('#metadataContent').html(generateMetadataHtml(data, true));
     $('#metadataOverlay').css('display', 'flex').fadeIn();
+    focusFirstMetadataField();
 }
+
+function focusFirstMetadataField() {
+    // Defer until after the fadeIn so focus actually lands on a visible input
+    setTimeout(() => {
+        const first = document.querySelector('#metadataContent .meta-title-input');
+        if (first) first.focus();
+    }, 50);
+}
+
+function closeMetadataOverlay() {
+    $('#metadataOverlay').fadeOut(150);
+}
+
+// Close on Escape
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && $('#metadataOverlay').is(':visible')) {
+        closeMetadataOverlay();
+    }
+});
 
 function saveMetadata(filename) {
     // Determine if the current user is an admin.

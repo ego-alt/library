@@ -105,12 +105,11 @@
         </div>
     </div>
 
-    <div class="metadata-overlay" id="metadataOverlay">
+    <div class="metadata-overlay" id="metadataOverlay" role="dialog" aria-modal="true" aria-labelledby="metadata-title">
         <div class="metadata-content">
-            <button class="close-metadata">&times;</button>
-            <h3>Book Details</h3>
+            <button class="close-metadata" aria-label="Close">&times;</button>
             <div id="metadataContent">
-                <!-- Metadata will be inserted here -->
+                <!-- Metadata is rendered by main.js -->
             </div>
         </div>
     </div>
