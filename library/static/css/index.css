@@ -137,6 +137,112 @@ body {
 }
 
 /* ============================================================
+   Bookshelf view — spines lined up on wooden shelves
+   ============================================================ */
+.library-shelf {
+    /* Planks are drawn as full-width absolutely-positioned children by JS
+       (repaintShelfPlanks) so they span the page even on partial last rows.
+       Plank height is shared with JS via the SHELF_PLANK_H constant. */
+    --plank-h: 14px;
+    --wood: #8b6f47;
+    --wood-edge: #6f5638;
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    row-gap: 0;
+    column-gap: 0;
+    padding: 20px 0 0;
+    margin-bottom: 30px;
+}
+.dark-mode .library-shelf {
+    --wood: #4a3a26;
+    --wood-edge: #2f2418;
+}
+.shelf-slot {
+    position: relative;
+    flex: 0 0 auto;
+    padding-bottom: var(--plank-h);
+    z-index: 1;
+}
+.shelf-plank {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: var(--plank-h);
+    background: linear-gradient(
+        to bottom,
+        var(--wood) 0,
+        var(--wood) calc(100% - 3px),
+        var(--wood-edge) calc(100% - 3px),
+        var(--wood-edge) 100%
+    );
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.25);
+    z-index: 0;
+    pointer-events: none;
+}
+.book-spine {
+    position: relative;
+    width: 100%;
+    background-color: #333;
+    background-size: auto 100%;
+    background-position: center center;
+    background-repeat: no-repeat;
+    cursor: pointer;
+    box-shadow:
+        inset 1px 0 1px rgba(255, 255, 255, 0.12),
+        inset -1px 0 2px rgba(0, 0, 0, 0.45),
+        0 2px 4px rgba(0, 0, 0, 0.18);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    z-index: 1;
+}
+.book-spine:hover {
+    transform: translateY(-4px);
+    box-shadow:
+        inset 1px 0 1px rgba(255, 255, 255, 0.2),
+        inset -1px 0 2px rgba(0, 0, 0, 0.45),
+        0 8px 12px rgba(0, 0, 0, 0.3);
+}
+.book-spine__link {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    display: block;
+}
+.book-spine .book-buttons {
+    position: absolute;
+    top: 6px;
+    left: 50%;
+    transform: translateX(-50%);
+    flex-direction: column;
+    gap: 4px;
+    z-index: 2;
+}
+.book-spine:hover .book-buttons {
+    display: flex;
+}
+.book-button--spine {
+    width: 24px;
+    height: 24px;
+    font-size: 11px;
+}
+.book-spine--skeleton {
+    cursor: default;
+    background: linear-gradient(
+        90deg,
+        var(--input-field-background) 0%,
+        var(--hover-background) 50%,
+        var(--input-field-background) 100%
+    );
+    background-size: 200% 100%;
+    animation: skeleton-shimmer 1.4s linear infinite;
+    box-shadow: none;
+}
+.dark-mode .book-spine:not(.book-spine--skeleton) {
+    filter: brightness(0.65);
+}
+
+/* ============================================================
    Toast notifications — non-blocking replacement for alert()
    ============================================================ */
 .toast-container {
@@ -535,7 +641,7 @@ body {
     display: flex;
     gap: 0.5rem;
 }
-.filter-button, .login-button, .upload-button, .dark-mode-toggle, .view-toggle {
+.filter-button, .login-button, .upload-button, .dark-mode-toggle, .view-toggle, .layout-toggle {
     background: none;
     border: none;
     font-size: 1.2em;
@@ -544,13 +650,15 @@ body {
     cursor: pointer;
     transition: color 0.2s;
 }
-.filter-button:hover, .login-button:hover, .upload-button:hover, .dark-mode-toggle:hover, .view-toggle:hover {
+.filter-button:hover, .login-button:hover, .upload-button:hover, .dark-mode-toggle:hover, .view-toggle:hover, .layout-toggle:hover {
     color: var(--text-color-light);
 }
-.view-toggle.active {
+.view-toggle.active,
+.layout-toggle.active {
     color: var(--accent-color);
 }
-.view-toggle.active:hover {
+.view-toggle.active:hover,
+.layout-toggle.active:hover {
     color: var(--accent-color);
     opacity: 0.8;
 }

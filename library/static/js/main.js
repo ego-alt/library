@@ -5,10 +5,116 @@ let currentFilters = {};
 // View state — 'all' (every book, newest first) or 'mine' (only started, by last_read).
 // Server renders the initial batch using window.initialView; localStorage may override it.
 let currentView = window.initialView || 'all';
+// Layout state — 'grid' (cover cards) or 'shelf' (cover-slice spines on a wooden shelf).
+// Server always renders grid; JS swaps to shelf on load if that's the stored preference.
+let currentLayout = localStorage.getItem('libraryLayout') === 'shelf' ? 'shelf' : 'grid';
+// Mirror of every book currently displayed, in insertion order. Seeded from the
+// server-rendered HTML and appended to by loadMoreImages, so toggling layouts
+// can re-render without re-fetching.
+const loadedBooks = [];
 // Total books available for the current view+filter. Server seeds it on
 // initial render; each /load_more response refreshes it via X-Total-Count.
 // Used to cap the number of loading skeletons we render.
 let totalBooks = (typeof window.totalBooks === 'number') ? window.totalBooks : null;
+
+// Spine thickness is a log-scaled mapping of book length (uncompressed HTML
+// bytes — a cheap proxy for word count, computed server-side). When length
+// is missing (older payloads, empty/broken EPUBs), fall back to a stable
+// per-filename hash so we still get visual variety.
+const SPINE_MIN_W = 22;
+const SPINE_MAX_W = 80;
+const SPINE_MIN_BYTES = 30_000;     // ~novella
+const SPINE_MAX_BYTES = 3_000_000;  // ~doorstopper
+function spineWidth(book) {
+    const len = book.length;
+    if (typeof len === 'number' && len > 0) {
+        const clamped = Math.max(SPINE_MIN_BYTES, Math.min(SPINE_MAX_BYTES, len));
+        const t = Math.log(clamped / SPINE_MIN_BYTES) / Math.log(SPINE_MAX_BYTES / SPINE_MIN_BYTES);
+        return Math.round(SPINE_MIN_W + t * (SPINE_MAX_W - SPINE_MIN_W));
+    }
+    let h = 0;
+    for (let i = 0; i < book.filename.length; i++) {
+        h = ((h << 5) - h + book.filename.charCodeAt(i)) | 0;
+    }
+    return 32 + (Math.abs(h) % 28); // 32–59 px fallback
+}
+
+// Spine height is purely cosmetic — derived from the filename so re-renders
+// stay stable and adjacent books vary in height like a real shelf.
+function spineHeight(filename) {
+    let h = 0;
+    for (let i = 0; i < filename.length; i++) {
+        h = ((h << 5) - h + filename.charCodeAt(i) * 7) | 0;
+    }
+    return 230 + (Math.abs(h) % 71); // 230–300 px
+}
+
+function getSpineTemplate(book) {
+    const urlSafe = encodeURIComponent(book.filename);
+    const attrSafe = escapeHtml(book.filename);
+    const coverSafe = escapeHtml(book.cover);
+    const width = spineWidth(book);
+    const height = spineHeight(book.filename);
+    return `
+        <div class="shelf-slot" style="width: ${width}px">
+            <div class="book-spine"
+                 style="height: ${height}px; background-image: url(${coverSafe})"
+                 title="${attrSafe}">
+                <a class="book-spine__link" href="/read/${urlSafe}" aria-label="${attrSafe}"></a>
+                <div class="book-buttons">
+                    <button class="book-button book-button--spine">
+                        <a href="/download/${urlSafe}" download>
+                            <i class="fas fa-download"></i>
+                        </a>
+                    </button>
+                    <button class="book-button book-button--spine"
+                            data-action="show-metadata" data-filename="${attrSafe}">
+                        <i class="fas fa-ellipsis-h"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function appendBookToLibrary(book) {
+    const html = currentLayout === 'shelf' ? getSpineTemplate(book) : getBookTemplate(book);
+    $('#library').append(html);
+}
+
+// Plank height — keep in sync with --plank-h in index.css. Used to position
+// the per-row planks rendered by repaintShelfPlanks.
+const SHELF_PLANK_H = 14;
+
+// Draw a full-page-width plank under each row of spines. Detect rows by their
+// shared bottom edge: with align-items:flex-end + uniform plank padding, every
+// slot in a wrapped flex row resolves to the same offsetTop+offsetHeight.
+function repaintShelfPlanks() {
+    const lib = document.getElementById('library');
+    if (!lib) return;
+    lib.querySelectorAll('.shelf-plank').forEach(p => p.remove());
+    if (currentLayout !== 'shelf') return;
+
+    const rowBottoms = new Set();
+    lib.querySelectorAll('.shelf-slot').forEach(slot => {
+        rowBottoms.add(slot.offsetTop + slot.offsetHeight);
+    });
+
+    rowBottoms.forEach(bottom => {
+        const plank = document.createElement('div');
+        plank.className = 'shelf-plank';
+        plank.style.top = (bottom - SHELF_PLANK_H) + 'px';
+        lib.appendChild(plank);
+    });
+}
+
+// Rows rewrap when the window resizes — repaint to keep planks aligned.
+let _shelfPlankResizeTimer;
+window.addEventListener('resize', () => {
+    if (currentLayout !== 'shelf') return;
+    clearTimeout(_shelfPlankResizeTimer);
+    _shelfPlankResizeTimer = setTimeout(repaintShelfPlanks, 120);
+});
 
 function getBookTemplate(book) {
     // book.filename comes from the DB and could contain anything if a malicious
@@ -59,6 +165,7 @@ function debounce(func, wait) {
 function loadMoreImages() {
     isLoading = true;
     const skeletons = appendSkeletons(computeSkeletonCount());
+    repaintShelfPlanks();
 
     const queryParams = new URLSearchParams(currentFilters);
     queryParams.set('view', currentView);
@@ -78,8 +185,10 @@ function loadMoreImages() {
             $('#emptyState').hide();
             $('#library').show();
             data.forEach(function(book) {
-                $('#library').append(getBookTemplate(book));
+                loadedBooks.push(book);
+                appendBookToLibrary(book);
             });
+            repaintShelfPlanks();
         }
         offset += 8;
         isLoading = false;
@@ -96,9 +205,10 @@ function computeSkeletonCount() {
     // If we don't know the total yet (e.g. anonymous browse before first
     // /load_more response), assume a full page worth of cards.
     if (totalBooks == null) return SKELETON_COUNT;
-    const displayed = document.querySelectorAll(
-        '#library .col-md-3:not(.book-skeleton-wrapper)'
-    ).length;
+    const selector = currentLayout === 'shelf'
+        ? '#library .shelf-slot:not(.shelf-slot--skeleton)'
+        : '#library .col-md-3:not(.book-skeleton-wrapper)';
+    const displayed = document.querySelectorAll(selector).length;
     return Math.min(SKELETON_COUNT, Math.max(0, totalBooks - displayed));
 }
 
@@ -109,8 +219,18 @@ function appendSkeletons(count) {
     const created = [];
     for (let i = 0; i < count; i++) {
         const el = document.createElement('div');
-        el.className = 'col-md-3 mb-3 book-skeleton-wrapper';
-        el.innerHTML = '<div class="book-skeleton" aria-hidden="true"></div>';
+        if (currentLayout === 'shelf') {
+            el.className = 'shelf-slot shelf-slot--skeleton';
+            el.style.width = (SPINE_MIN_W + Math.floor(Math.random() * (SPINE_MAX_W - SPINE_MIN_W))) + 'px';
+            const inner = document.createElement('div');
+            inner.className = 'book-spine book-spine--skeleton';
+            inner.style.height = (230 + Math.floor(Math.random() * 71)) + 'px';
+            el.appendChild(inner);
+            el.setAttribute('aria-hidden', 'true');
+        } else {
+            el.className = 'col-md-3 mb-3 book-skeleton-wrapper';
+            el.innerHTML = '<div class="book-skeleton" aria-hidden="true"></div>';
+        }
         grid.appendChild(el);
         created.push(el);
     }
@@ -204,6 +324,7 @@ function updateViewToggleUI() {
 function reloadLibrary() {
     offset = 0;
     allImagesLoaded = false;
+    loadedBooks.length = 0;
     $('#emptyState').hide();
     $('#library').empty().show();
     loadMoreImages();
@@ -218,7 +339,66 @@ $(function() {
         reloadLibrary();
     }
     updateViewToggleUI();
+
+    // Mirror the initial grid HTML into loadedBooks so flipping to shelf doesn't
+    // require a refetch. Then, if 'shelf' is the stored preference, swap layout.
+    seedLoadedBooksFromDOM();
+    applyLayoutClasses();
+    if (currentLayout === 'shelf') rerenderLibrary();
+    updateLayoutToggleUI();
 });
+
+
+// <== LAYOUT TOGGLE (Grid vs Bookshelf) ==>
+function seedLoadedBooksFromDOM() {
+    document.querySelectorAll('#library .col-md-3').forEach((col) => {
+        const link = col.querySelector('a[href^="/read/"]');
+        const img = col.querySelector('img');
+        if (!link || !img) return;
+        const href = link.getAttribute('href') || '';
+        const rawLength = parseInt(col.dataset.length || '', 10);
+        loadedBooks.push({
+            filename: decodeURIComponent(href.slice('/read/'.length)),
+            cover: img.getAttribute('src') || '',
+            length: Number.isFinite(rawLength) ? rawLength : 0,
+        });
+    });
+}
+
+function toggleLayout() {
+    currentLayout = currentLayout === 'shelf' ? 'grid' : 'shelf';
+    localStorage.setItem('libraryLayout', currentLayout);
+    applyLayoutClasses();
+    rerenderLibrary();
+    updateLayoutToggleUI();
+}
+
+function applyLayoutClasses() {
+    const lib = $('#library');
+    if (currentLayout === 'shelf') {
+        lib.removeClass('row').addClass('library-shelf');
+    } else {
+        lib.removeClass('library-shelf').addClass('row');
+    }
+}
+
+function rerenderLibrary() {
+    $('#library').empty().show();
+    $('#emptyState').hide();
+    loadedBooks.forEach(appendBookToLibrary);
+    repaintShelfPlanks();
+}
+
+function updateLayoutToggleUI() {
+    const btn = document.getElementById('layoutToggle');
+    if (!btn) return;
+    const icon = btn.querySelector('i');
+    const isShelf = currentLayout === 'shelf';
+    btn.classList.toggle('active', isShelf);
+    btn.setAttribute('aria-pressed', isShelf ? 'true' : 'false');
+    btn.title = isShelf ? 'Switch to grid view' : 'Switch to bookshelf view';
+    if (icon) icon.className = isShelf ? 'fas fa-th-large' : 'fas fa-grip-vertical';
+}
 
 
 // <== FUNCTIONS FOR FILTERING ==>
@@ -241,9 +421,10 @@ function applyFilters() {
         ].filter(tag => tag) // Filter out any empty strings
     };
 
-    // Clear existing books
+    // Clear existing books (DOM + in-memory mirror)
+    loadedBooks.length = 0;
     $('#library').empty();
-    
+
     // Load filtered books
     loadMoreImages();
 }
@@ -532,11 +713,16 @@ async function confirmDeleteBook(filename) {
             const data = await response.json().catch(() => ({}));
             throw new Error(data.error || `HTTP ${response.status}`);
         }
-        // Drop the card from the grid (matched via the read link's filename)
-        const card = document.querySelector(
-            `a[href="/read/${CSS.escape(filename)}"]`
-        )?.closest('.col-md-3');
+        // Drop the card/spine from the library, and from the in-memory mirror
+        // so a later layout switch doesn't resurrect it.
+        const link = document.querySelector(
+            `a[href="/read/${CSS.escape(encodeURIComponent(filename))}"]`
+        );
+        const card = link?.closest('.col-md-3, .shelf-slot');
         if (card) card.remove();
+        const idx = loadedBooks.findIndex(b => b.filename === filename);
+        if (idx !== -1) loadedBooks.splice(idx, 1);
+        repaintShelfPlanks();
         $('#metadataOverlay').fadeOut();
     } catch (err) {
         showToast(`Failed to delete: ${err.message}`, 'error');

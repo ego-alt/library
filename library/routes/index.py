@@ -15,7 +15,7 @@ from flask_login import current_user
 
 from ..choices import BookProgressChoice, UserRoleChoice
 from ..models import Book, Bookmark, Tag, book_tags, db
-from ..utils import cover_mimetype, read_epub_cover
+from ..utils import cover_mimetype, epub_text_size, read_epub_cover
 from ._helpers import commit_or_rollback, get_book_or_404, json_admin_required
 
 index_blueprint = Blueprint("index_routes", __name__)
@@ -120,9 +120,31 @@ def get_covers(offset=0, limit=BOOKS_PER_LOAD, filters=None, view=VIEW_ALL):
         {
             "filename": book.filename,
             "cover": url_for("index_routes.cover", filename=book.filename),
+            "length": _book_text_size(book),
         }
         for book in query.offset(offset).limit(limit).all()
     ]
+
+
+def _book_text_size(book) -> int:
+    """Cached EPUB text size for `book`, in bytes. Used to size spine thickness
+    in the bookshelf view. Cached per (book_id, file mtime) since text size
+    only changes if the EPUB is rewritten on disk."""
+    epub_path = os.path.join(current_app.config["BOOK_DIR"], book.filename)
+    try:
+        mtime = int(os.path.getmtime(epub_path))
+    except OSError:
+        return 0
+
+    # Local import to avoid circular import via library/__init__.py.
+    from .. import cache
+
+    cache_key = f"length:{book.id}:{mtime}"
+    size = cache.get(cache_key)
+    if size is None:
+        size = epub_text_size(epub_path)
+        cache.set(cache_key, size, timeout=86400)
+    return size
 
 
 def count_books(filters=None, view=VIEW_ALL):

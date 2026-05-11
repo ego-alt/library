@@ -56,6 +56,9 @@
                 <button class="dark-mode-toggle" onclick="toggleDarkMode()">
                     <i id="dark-mode-icon" class="fas fa-moon"></i>
                 </button>
+                <button class="layout-toggle" id="layoutToggle" onclick="toggleLayout()" aria-pressed="false" title="Switch to bookshelf view">
+                    <i id="layout-toggle-icon" class="fas fa-grip-vertical"></i>
+                </button>
                 {% if current_user.is_authenticated %}
                 <button class="view-toggle" id="viewToggle" onclick="toggleView()" aria-pressed="false" title="Show only books you've started reading">
                     <i class="far fa-bookmark"></i>
@@ -83,7 +86,7 @@
         </div>
         <div class="row library" id="library">
             {% for book in images %}
-                <div class="col-md-3 mb-3">
+                <div class="col-md-3 mb-3" data-length="{{ book.length }}">
                     <div class="book">
                         <div class="book-buttons">
                             <button class="book-button">

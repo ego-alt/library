@@ -24,6 +24,9 @@
   - Content streaming ensures lightning-fast delivery, even for massive epubs.
   - Mobile-friendly layout with intuitive controls.
   - Support for table of contents navigation.
+- **Library Views**
+  - Cover grid (default), ordered by most recently added or last read.
+  - Bookshelf view that renders each book as a spine on a wooden shelf — spine thickness scales with the book's length.
 - **Filtering & Search**
   - Filter books by title, author, genre, or custom tags.
   - Track reading status with automatically generated tags for Unread, In Progress, and Finished books.

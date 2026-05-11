@@ -76,6 +76,28 @@ def read_epub_cover(epub_file_path: str, cover_path: str = None) -> bytes:
             return f.read()
 
 
+_HTML_EXTENSIONS = (".html", ".xhtml", ".htm")
+
+
+def epub_text_size(epub_file_path: str) -> int:
+    """Total uncompressed bytes of HTML/XHTML content inside an EPUB.
+
+    A cheap proxy for "book length" used to size spine thickness in the
+    bookshelf view. Reads only the zip's central directory — no decompression,
+    no parsing — so it's fast enough to compute on first request and cache.
+    """
+    total = 0
+    try:
+        with zipfile.ZipFile(epub_file_path) as z:
+            for info in z.infolist():
+                if info.filename.lower().endswith(_HTML_EXTENSIONS):
+                    total += info.file_size
+    except (zipfile.BadZipFile, FileNotFoundError, OSError) as e:
+        logger.warning(f"Could not measure text size for {epub_file_path}: {e}")
+        return 0
+    return total
+
+
 def normalize_path(path):
     """Normalize image paths"""
     path = path.replace("../", "").replace("./", "")
