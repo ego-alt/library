@@ -54,6 +54,20 @@ a {
     justify-content: center;
     gap: 15px;
     align-items: center;
+    transform: translateY(0);
+    transition: transform 0.25s ease;
+}
+.controls.controls--hidden {
+    transform: translateY(110%);
+    pointer-events: none;
+}
+.bottom-trigger {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 24px;
+    z-index: 97;
 }
 .controls .btn {
     min-width: 75px;
@@ -339,4 +353,68 @@ a {
     font-size: 14px;
     padding: 4px 16px 12px;
     opacity: 0.7;
+}
+
+/* ============================================================
+   Paginated reading mode — chapter HTML flows into column-width
+   pages, scrollLeft on #chapter-content advances pages. Class is
+   on <html> (set by the inline head script) so the layout is
+   established before the first paint.
+   ============================================================ */
+html.paginated, html.paginated body {
+    overflow: hidden;
+    height: 100vh;
+}
+.paginated .container {
+    padding: 0;
+    max-width: 100vw;
+    height: 100vh;
+}
+.paginated .reader-container {
+    max-width: min(var(--reader-max-w, 820px), 100vw);
+    height: 100vh;
+    padding: 72px 30px 60px;
+    box-sizing: border-box;
+    margin: 0 auto;
+    overflow: hidden;
+}
+.paginated #reader-content {
+    height: 100%;
+    overflow: hidden;
+    position: relative;
+}
+/* Title/author render above the column flow in scroll mode; in paginate
+   mode the title bar is implicit in the controls, so hide them to avoid
+   the first page being mostly blank. */
+.paginated #book-title,
+.paginated #book-author {
+    display: none;
+}
+.paginated #chapter-content {
+    height: 100%;
+    margin-bottom: 0;
+    column-width: var(--col-w);
+    column-gap: var(--col-gap, 40px);
+    column-fill: auto;
+    overflow-x: scroll;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+.paginated #chapter-content::-webkit-scrollbar {
+    display: none;
+}
+/* Keep figures and large elements from straddling a page break. */
+.paginated #chapter-content img,
+.paginated #chapter-content figure,
+.paginated #chapter-content table,
+.paginated #chapter-content blockquote,
+.paginated #chapter-content pre {
+    break-inside: avoid;
+}
+.paginated #chapter-content img {
+    max-width: 100%;
+    max-height: calc(var(--page-h, 600px) - 40px);
+    width: auto;
+    object-fit: contain;
 }

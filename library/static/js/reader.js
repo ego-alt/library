@@ -11,6 +11,210 @@ let lastSaveTimeout = null;
 let selectedRange = null;
 let hrefChapterMapping = {};
 
+// Reading mode: 'scroll' (default, vertical) or 'paginate' (CSS column-based
+// horizontal pagination). Bookmark.position is a 0..1 fraction in both modes;
+// scroll mode treats it as scrollY/scrollHeight, paginate mode as
+// currentPageIndex / (totalPages - 1).
+let readingMode = localStorage.getItem('readingMode') === 'paginate' ? 'paginate' : 'scroll';
+let currentPageIndex = 0;   // index of the *spread* currently visible
+let totalPages = 1;          // total number of spreads
+let spreadCount = 1;         // 1 (one page) or 2 (two-page spread)
+const PAGE_GAP = 40;
+const SPREAD_WIDTH_THRESHOLD = 1000; // px — show 2-up when viewport is at least this wide
+const READER_MAX_W_SINGLE = 820;
+const READER_MAX_W_SPREAD = 1280;
+
+function isPaginated() { return readingMode === 'paginate'; }
+
+function applyReadingModeClass() {
+    document.documentElement.classList.toggle('paginated', isPaginated());
+}
+
+function updateReadingModeButton() {
+    const btn = document.getElementById('reading-mode-toggle');
+    if (!btn) return;
+    const icon = btn.querySelector('i');
+    if (icon) icon.className = isPaginated() ? 'fas fa-scroll' : 'fas fa-book-open';
+    btn.title = isPaginated() ? 'Switch to scroll view' : 'Switch to paginated view';
+}
+
+function computeSpreadCount() {
+    return window.innerWidth >= SPREAD_WIDTH_THRESHOLD ? 2 : 1;
+}
+
+// Scroll distance to advance one user-visible "page" (= a 1- or 2-column spread).
+function spreadStep() {
+    const css = getComputedStyle(document.documentElement);
+    const colW = parseFloat(css.getPropertyValue('--col-w')) || 0;
+    const colGap = parseFloat(css.getPropertyValue('--col-gap')) || 0;
+    return spreadCount * (colW + colGap);
+}
+
+// Recompute layout variables and totalPages for the current chapter. Forces
+// synchronous reflow by reading clientWidth and scrollWidth so the result is
+// usable immediately by the caller.
+function layoutPaginatedChapter() {
+    if (!isPaginated()) return;
+    const content = document.getElementById('chapter-content');
+    const reader = document.getElementById('reader-content');
+    if (!content || !reader) return;
+
+    spreadCount = computeSpreadCount();
+    const maxW = spreadCount === 2 ? READER_MAX_W_SPREAD : READER_MAX_W_SINGLE;
+    document.documentElement.style.setProperty('--reader-max-w', maxW + 'px');
+
+    // Reading clientWidth flushes layout with the new max-width applied.
+    const w = reader.clientWidth;
+    const h = reader.clientHeight;
+    if (w <= 0 || h <= 0) return;
+
+    const colW = (w - (spreadCount - 1) * PAGE_GAP) / spreadCount;
+    document.documentElement.style.setProperty('--col-w', colW + 'px');
+    document.documentElement.style.setProperty('--col-gap', PAGE_GAP + 'px');
+    document.documentElement.style.setProperty('--page-h', h + 'px');
+
+    // Flush so scrollWidth reflects the new column layout.
+    void content.offsetHeight;
+
+    const step = colW + PAGE_GAP;
+    const totalCols = Math.max(1, Math.round(content.scrollWidth / step));
+    totalPages = Math.max(1, Math.ceil(totalCols / spreadCount));
+    currentPageIndex = Math.max(0, Math.min(currentPageIndex, totalPages - 1));
+    applyPageTransform(false);
+}
+
+const PAGE_FLIP_MS = 140;
+let _pageFlipRaf = null;
+
+// Custom rAF animation: the browser's smooth scroll is ~300ms with no knob,
+// and that feels slow for a page turn. 140ms ease-out lands snappy without
+// the harshness of instant scroll.
+function applyPageTransform(animate = true) {
+    const content = document.getElementById('chapter-content');
+    if (!content) return;
+    const targetLeft = currentPageIndex * spreadStep();
+
+    if (_pageFlipRaf) {
+        cancelAnimationFrame(_pageFlipRaf);
+        _pageFlipRaf = null;
+    }
+    if (!animate) {
+        content.scrollLeft = targetLeft;
+        return;
+    }
+
+    const startLeft = content.scrollLeft;
+    const delta = targetLeft - startLeft;
+    if (Math.abs(delta) < 1) {
+        content.scrollLeft = targetLeft;
+        return;
+    }
+    const startTime = performance.now();
+    function step(now) {
+        const t = Math.min(1, (now - startTime) / PAGE_FLIP_MS);
+        // Ease-out cubic: fast start, gentle landing.
+        const eased = 1 - Math.pow(1 - t, 3);
+        content.scrollLeft = startLeft + delta * eased;
+        if (t < 1) {
+            _pageFlipRaf = requestAnimationFrame(step);
+        } else {
+            _pageFlipRaf = null;
+        }
+    }
+    _pageFlipRaf = requestAnimationFrame(step);
+}
+
+function pageOfElement(el) {
+    if (!el) return 0;
+    const content = document.getElementById('chapter-content');
+    // Measure via bounding rect offset; offsetLeft would be wrong if any
+    // intermediate ancestor is positioned.
+    const contentRect = content.getBoundingClientRect();
+    const elRect = el.getBoundingClientRect();
+    // Add current scrollLeft because rects are viewport-relative.
+    const x = (elRect.left - contentRect.left) + content.scrollLeft;
+    const step = spreadStep();
+    return step > 0 ? Math.max(0, Math.floor(x / step)) : 0;
+}
+
+function updateChapterNumberLabel() {
+    if (!currentBook) return;
+    const el = document.getElementById('chapter-number');
+    let text = `Section ${currentChapterNum + 1} of ${currentBook.spine_length}`;
+    if (isPaginated() && totalPages > 1) {
+        text += ` · ${currentPageIndex + 1}/${totalPages}`;
+    }
+    el.textContent = text;
+}
+
+function nextPage() {
+    if (!currentBook) return;
+    if (currentPageIndex < totalPages - 1) {
+        currentPageIndex++;
+        applyPageTransform(true);
+        updateProgressBar();
+        updateChapterNumberLabel();
+        saveBookmark();
+    } else {
+        nextChapter();
+    }
+}
+
+function prevPage() {
+    if (!currentBook) return;
+    if (currentPageIndex > 0) {
+        currentPageIndex--;
+        applyPageTransform(true);
+        updateProgressBar();
+        updateChapterNumberLabel();
+        saveBookmark();
+    } else {
+        prevChapter();
+    }
+}
+
+function toggleReadingMode() {
+    if (!currentBook) return;
+    // Capture position before switching so we can land on roughly the same
+    // content in the new mode.
+    const fraction = currentPositionFraction();
+    readingMode = isPaginated() ? 'scroll' : 'paginate';
+    localStorage.setItem('readingMode', readingMode);
+    applyReadingModeClass();
+    updateReadingModeButton();
+
+    if (isPaginated()) {
+        // Clear stray scroll position so the page columns line up cleanly.
+        window.scrollTo(0, 0);
+        requestAnimationFrame(() => {
+            layoutPaginatedChapter();
+            currentPageIndex = Math.round(fraction * Math.max(0, totalPages - 1));
+            applyPageTransform(false);
+            updateProgressBar();
+            updateChapterNumberLabel();
+        });
+    } else {
+        // Reset column scroll so going back into paginate mode later isn't
+        // sticky if user had it half-scrolled.
+        const content = document.getElementById('chapter-content');
+        if (content) content.scrollLeft = 0;
+        requestAnimationFrame(() => {
+            const target = fraction * document.documentElement.scrollHeight;
+            window.scrollTo({top: target, behavior: 'instant'});
+            updateProgressBar();
+            updateChapterNumberLabel();
+        });
+    }
+}
+
+function currentPositionFraction() {
+    if (isPaginated()) {
+        return totalPages > 1 ? currentPageIndex / (totalPages - 1) : 0;
+    }
+    const sh = document.documentElement.scrollHeight;
+    return sh > 0 ? window.scrollY / sh : 0;
+}
+
 
 document.documentElement.style.setProperty('--reader-font-size', currentFontSize + 'px');
 document.documentElement.style.setProperty('--highlight-color', 'rgba(225, 204, 171)'); // Light mode
@@ -266,14 +470,26 @@ window.addEventListener('DOMContentLoaded', () => {
                             if (chapterNum == currentChapterNum) {
                                 document.getElementById('loading-spinner').style.display = 'none';
                                 document.getElementById('reader-content').style.display = 'block';
+                                applyReadingModeClass();
+                                updateReadingModeButton();
                                 displayChapter();
 
                                 // Wait for next paint to ensure content is rendered
                                 requestAnimationFrame(() => {
-                                    window.scrollTo({
-                                        top: currentPagePosition * document.documentElement.scrollHeight,
-                                        behavior: 'instant'
-                                    });
+                                    if (isPaginated()) {
+                                        layoutPaginatedChapter();
+                                        currentPageIndex = Math.round(
+                                            currentPagePosition * Math.max(0, totalPages - 1)
+                                        );
+                                        applyPageTransform(false);
+                                        updateProgressBar();
+                                        updateChapterNumberLabel();
+                                    } else {
+                                        window.scrollTo({
+                                            top: currentPagePosition * document.documentElement.scrollHeight,
+                                            behavior: 'instant'
+                                        });
+                                    }
                                 });
                             }
                     }    
@@ -346,16 +562,26 @@ function highlightActiveTocItem() {
 }
 
 function updateProgressBar() {
-    const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
-    const position = Math.min(1, window.scrollY / scrollHeight);
+    let position;
+    if (isPaginated()) {
+        position = totalPages > 1 ? currentPageIndex / (totalPages - 1) : 0;
+    } else {
+        const scrollHeight = document.documentElement.scrollHeight - window.innerHeight;
+        position = scrollHeight > 0 ? Math.min(1, window.scrollY / scrollHeight) : 0;
+    }
     document.getElementById('chapter-progress').style.width = `${position * 100}%`;
 }
 
 function saveBookmark() {
     if (!lastSaveTimeout) {
         lastSaveTimeout = setTimeout(() => {
-            const position = window.scrollY / document.documentElement.scrollHeight;
-            
+            let position;
+            if (isPaginated()) {
+                position = totalPages > 1 ? currentPageIndex / (totalPages - 1) : 0;
+            } else {
+                position = window.scrollY / document.documentElement.scrollHeight;
+            }
+
             fetch(`/bookmark/${filename}`, {
                 method: 'POST',
                 headers: {
@@ -366,7 +592,7 @@ function saveBookmark() {
                     position: position
                 })
             }).catch(error => console.error('Error saving bookmark:', error));
-            
+
             lastSaveTimeout = null;
         }, 1000); // Debounce save for 1 second
     }
@@ -375,16 +601,21 @@ function saveBookmark() {
 function displayChapter() {
     const content = allChapters[currentChapterNum].content;
     document.getElementById('chapter-content').innerHTML = content;
-    document.getElementById('chapter-number').textContent =
-        `Section ${currentChapterNum + 1} of ${currentBook.spine_length}`;
-    
+
+    if (isPaginated()) {
+        currentPageIndex = 0;
+        layoutPaginatedChapter();
+    }
+    updateChapterNumberLabel();
+
     // Initialize progress bar position
     updateProgressBar();
-    
+
     // Show controls on chapter load
     const controls = document.querySelector('.top-controls');
     controls.classList.add('visible');
-    
+    showBottomControls();
+
     // Add scroll listener
     let lastScrollY = window.scrollY;
     const scrollHandler = () => {
@@ -409,8 +640,14 @@ function nextChapter() {
     if (currentChapterNum < currentBook.spine_length - 1) {
         currentChapterNum++;
         displayChapter();
-        window.scrollTo({top: 0, behavior: 'instant'});
+        if (isPaginated()) {
+            currentPageIndex = 0;
+            applyPageTransform(false);
+        } else {
+            window.scrollTo({top: 0, behavior: 'instant'});
+        }
         updateProgressBar();
+        updateChapterNumberLabel();
         highlightActiveTocItem();
         saveBookmark();
     }
@@ -426,8 +663,17 @@ function prevChapter() {
     if (currentChapterNum > 0) {
         currentChapterNum--;
         displayChapter();
-        window.scrollTo({top: document.body.scrollHeight, behavior: 'instant'});
+        if (isPaginated()) {
+            // Land on the last page so "prev" from page 1 of chapter N lands
+            // at the end of chapter N-1, mirroring the scroll-mode behaviour
+            // of jumping to the bottom of the previous chapter.
+            currentPageIndex = Math.max(0, totalPages - 1);
+            applyPageTransform(false);
+        } else {
+            window.scrollTo({top: document.body.scrollHeight, behavior: 'instant'});
+        }
         updateProgressBar();
+        updateChapterNumberLabel();
         highlightActiveTocItem();
         saveBookmark();
     }
@@ -438,7 +684,19 @@ function jumpToChapter(index, sectionId) {
     currentChapterNum = index;
     displayChapter();
 
-    if (sectionId) {
+    if (isPaginated()) {
+        requestAnimationFrame(() => {
+            if (sectionId) {
+                const target = document.getElementById(sectionId);
+                currentPageIndex = target ? pageOfElement(target) : 0;
+            } else {
+                currentPageIndex = 0;
+            }
+            applyPageTransform(false);
+            updateProgressBar();
+            updateChapterNumberLabel();
+        });
+    } else if (sectionId) {
         requestAnimationFrame(() => {
             const target = document.getElementById(sectionId);
             if (target) {
@@ -465,12 +723,128 @@ function adjustFontSize(delta) {
     currentFontSize = Math.max(12, Math.min(24, currentFontSize + delta));
     document.documentElement.style.setProperty('--reader-font-size', currentFontSize + 'px');
     localStorage.setItem('readerFontSize', currentFontSize);
+    if (isPaginated()) {
+        // Capture the position fraction so we land near the same content
+        // after the relayout, then recompute totalPages.
+        const fraction = currentPositionFraction();
+        layoutPaginatedChapter();
+        currentPageIndex = Math.round(fraction * Math.max(0, totalPages - 1));
+        applyPageTransform(false);
+        updateProgressBar();
+        updateChapterNumberLabel();
+    }
 }
 
 // Update scroll event listener to handle both functions
 window.addEventListener('scroll', () => {
     updateProgressBar();
     saveBookmark();
+    showBottomControls();
+});
+
+
+// <== AUTO-HIDE BOTTOM CONTROLS ==>
+// Bottom bar fades out after a few seconds of mouse/touch inactivity, so it
+// doesn't sit on top of the last line you're reading. Any mouse movement,
+// touch, hover near the bottom edge, or chapter change brings it back.
+const CONTROLS_AUTOHIDE_MS = 2500;
+let _controlsAutoHideTimer = null;
+
+function showBottomControls() {
+    const c = document.querySelector('.controls');
+    if (!c) return;
+    c.classList.remove('controls--hidden');
+    scheduleControlsAutoHide();
+}
+
+function scheduleControlsAutoHide() {
+    if (_controlsAutoHideTimer) clearTimeout(_controlsAutoHideTimer);
+    _controlsAutoHideTimer = setTimeout(() => {
+        const c = document.querySelector('.controls');
+        if (c) c.classList.add('controls--hidden');
+    }, CONTROLS_AUTOHIDE_MS);
+}
+
+// Reveal on mouse / touch activity. Keydown is *not* a trigger because in
+// paginated mode every page turn would flash the bar.
+document.addEventListener('mousemove', showBottomControls, {passive: true});
+document.addEventListener('touchstart', showBottomControls, {passive: true});
+// Hovering near the bottom edge of the viewport reveals the bar even when
+// the user isn't moving the mouse — CSS sibling selector can't reach the
+// controls from here, so handle it in JS.
+document.querySelector('.bottom-trigger')?.addEventListener('mouseenter', showBottomControls);
+
+
+// <== PAGINATED MODE: input + lifecycle ==>
+// Plain arrows = page nav (paginated only). Shift+arrows = section jump
+// (both modes). Avoids stealing keys from inputs or from the existing
+// Cmd/Ctrl+K/D/L selection shortcuts.
+document.addEventListener('keydown', (e) => {
+    if (e.target.matches('input, textarea')) return;
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+    if (e.shiftKey) {
+        if (e.key === 'ArrowRight') {
+            e.preventDefault();
+            nextChapter();
+        } else if (e.key === 'ArrowLeft') {
+            e.preventDefault();
+            prevChapter();
+        }
+        return;
+    }
+
+    if (!isPaginated()) return;
+    if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') {
+        e.preventDefault();
+        nextPage();
+    } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+        e.preventDefault();
+        prevPage();
+    }
+});
+
+// Click left third of the reader to go back a page, right third forward.
+// Middle third is a no-op so text selection still works freely.
+document.addEventListener('click', (e) => {
+    if (!isPaginated()) return;
+    // Don't trigger when clicking interactive chrome or the user has text
+    // selected (probably trying to use the selection menu).
+    if (e.target.closest(
+        'button, a, input, textarea, .toc-menu, .top-controls, .controls, ' +
+        '.selection-menu, .search-overlay, .temp-highlight'
+    )) return;
+    if (window.getSelection().toString().trim()) return;
+
+    const w = window.innerWidth;
+    if (e.clientX < w * 0.35) {
+        prevPage();
+    } else if (e.clientX > w * 0.65) {
+        nextPage();
+    }
+});
+
+// Recompute pagination on resize. Debounced; preserves the user's relative
+// position in the chapter across the relayout.
+let _readerResizeTimer;
+window.addEventListener('resize', () => {
+    if (!isPaginated()) return;
+    clearTimeout(_readerResizeTimer);
+    _readerResizeTimer = setTimeout(() => {
+        const fraction = currentPositionFraction();
+        layoutPaginatedChapter();
+        currentPageIndex = Math.round(fraction * Math.max(0, totalPages - 1));
+        applyPageTransform(false);
+        updateProgressBar();
+        updateChapterNumberLabel();
+    }, 150);
+});
+
+// Reflect the persisted mode in the toggle button as soon as the DOM is ready,
+// before the book has streamed in.
+document.addEventListener('DOMContentLoaded', () => {
+    applyReadingModeClass();
+    updateReadingModeButton();
 });
 
 // Resolve in-content chapter links via the same path as TOC clicks.
