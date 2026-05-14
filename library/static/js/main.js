@@ -146,8 +146,22 @@ function getBookTemplate(book) {
     `;
 }
 
+function nearPageBottom(thresholdPx = 100) {
+    return $(window).scrollTop() + $(window).height() >= $(document).height() - thresholdPx;
+}
+
+/** Shelf view packs many spines per row, so the first batch often fits entirely in
+ *  the viewport — no scroll event fires and /load_more never runs. Keep fetching
+ *  until the document is tall enough to scroll (or everything is loaded). */
+function tryLoadMoreIfPageStillShort() {
+    if (isLoading || allImagesLoaded) return;
+    if ($(document).height() <= $(window).height() + 100) {
+        loadMoreImages();
+    }
+}
+
 $(window).scroll(function() {
-    if (!isLoading && !allImagesLoaded && $(window).scrollTop() + $(window).height() >= $(document).height() - 100) {
+    if (!isLoading && !allImagesLoaded && nearPageBottom()) {
         loadMoreImages();
     }
 });
@@ -192,6 +206,7 @@ function loadMoreImages() {
         }
         offset += 8;
         isLoading = false;
+        requestAnimationFrame(tryLoadMoreIfPageStillShort);
     }).fail(function() {
         skeletons.forEach(el => el.remove());
         isLoading = false;
@@ -346,6 +361,7 @@ $(function() {
     applyLayoutClasses();
     if (currentLayout === 'shelf') rerenderLibrary();
     updateLayoutToggleUI();
+    requestAnimationFrame(tryLoadMoreIfPageStillShort);
 });
 
 
@@ -371,6 +387,7 @@ function toggleLayout() {
     applyLayoutClasses();
     rerenderLibrary();
     updateLayoutToggleUI();
+    requestAnimationFrame(tryLoadMoreIfPageStillShort);
 }
 
 function applyLayoutClasses() {
