@@ -53,8 +53,9 @@ def create_app(config_overrides: dict | None = None):
     os.makedirs(app.config["BOOK_DIR"], exist_ok=True)
     cache.init_app(app)
 
-    # Honor X-Forwarded-* from nginx when TLS terminates upstream.
-    app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+    # Honor X-Forwarded-* from nginx when TLS terminates upstream. x_prefix
+    # picks up X-Forwarded-Prefix so url_for() emits the /library mount path.
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1, x_prefix=1)
 
     @app.get("/healthz")
     def healthz():
