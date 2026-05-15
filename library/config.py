@@ -27,3 +27,11 @@ class Config:
 
     # Book directory
     BOOK_DIR = os.getenv("BOOK_DIR", os.path.join(BASE_DIR, "books"))
+
+    # When set (e.g. "X-Forwarded-User"), trust the dashboard nginx header instead of
+    # Flask-Login sessions. Unset for standalone dev / step-4 routing tests.
+    AUTH_PROXY_HEADER = os.environ.get("AUTH_PROXY_HEADER") or None
+
+    # Subpath mount behind nginx (e.g. "/library"). Empty/unset = served at "/".
+    _app_root = os.environ.get("APPLICATION_ROOT", "").strip()
+    APPLICATION_ROOT = _app_root if _app_root else "/"

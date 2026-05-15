@@ -11,7 +11,9 @@
         })();
     </script>
     <!-- Expose the current user's role to client-side scripts -->
+    <script src="{{ url_for('static', filename='js/app_root.js') }}"></script>
     <script>
+        window.APP_ROOT = "{{ request.script_root }}";
         window.isAuthenticated = {{ 'true' if current_user.is_authenticated else 'false' }};
         window.currentUserRole = "{{ current_user.role.value if current_user.is_authenticated else '' }}";
         window.initialView = "{{ current_view|default('all') }}";

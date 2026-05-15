@@ -69,6 +69,28 @@
    uv run flask run --port=8002
    ```
 
+## Home stack (with dashboard)
+
+Served at `/library/` behind the [dashboard](../dashboard) nginx proxy. In that
+mode, set:
+
+```bash
+AUTH_PROXY_HEADER=X-Forwarded-User
+APPLICATION_ROOT=/library
+```
+
+Dashboard handles login; this app trusts the `X-Forwarded-User` header and keeps
+its own `users` rows for bookmarks and tags. Omit both variables for standalone
+dev (local login on port 8002).
+
+After adding a user in dashboard, sync shadow accounts:
+
+```bash
+cd ../dashboard && uv run python scripts/sync_household_users.py
+```
+
+See `dashboard/README.md` for compose and bootstrap (`household_sql_pass.py`).
+
 ## Usage
 
 - **Access the application**: Open your web browser and go to `http://127.0.0.1:8002`.

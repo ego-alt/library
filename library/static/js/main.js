@@ -60,10 +60,10 @@ function getSpineTemplate(book) {
             <div class="book-spine"
                  style="height: ${height}px; background-image: url(${coverSafe})"
                  title="${attrSafe}">
-                <a class="book-spine__link" href="/read/${urlSafe}" aria-label="${attrSafe}"></a>
+                <a class="book-spine__link" href="${appUrl(`/read/${urlSafe}`)}" aria-label="${attrSafe}"></a>
                 <div class="book-buttons">
                     <button class="book-button book-button--spine">
-                        <a href="/download/${urlSafe}" download>
+                        <a href="${appUrl(`/download/${urlSafe}`)}" download>
                             <i class="fas fa-download"></i>
                         </a>
                     </button>
@@ -130,7 +130,7 @@ function getBookTemplate(book) {
             <div class="book">
                 <div class="book-buttons">
                     <button class="book-button">
-                        <a href="/download/${urlSafe}" download>
+                        <a href="${appUrl(`/download/${urlSafe}`)}" download>
                             <i class="fas fa-download"></i>
                         </a>
                     </button>
@@ -138,7 +138,7 @@ function getBookTemplate(book) {
                         <i class="fas fa-ellipsis-h"></i>
                     </button>
                 </div>
-                <a href="/read/${urlSafe}">
+                <a href="${appUrl(`/read/${urlSafe}`)}">
                     <img src="${coverSafe}" alt="cover" loading="lazy">
                 </a>
             </div>
@@ -184,7 +184,7 @@ function loadMoreImages() {
     const queryParams = new URLSearchParams(currentFilters);
     queryParams.set('view', currentView);
 
-    $.get(`/load_more/${offset}?${queryParams.toString()}`, function(data, _status, jqXHR) {
+    $.get(appUrl(`/load_more/${offset}?${queryParams.toString()}`), function(data, _status, jqXHR) {
         skeletons.forEach(el => el.remove());
         const reported = parseInt(jqXHR.getResponseHeader('X-Total-Count'), 10);
         if (!Number.isNaN(reported)) totalBooks = reported;
@@ -368,13 +368,16 @@ $(function() {
 // <== LAYOUT TOGGLE (Grid vs Bookshelf) ==>
 function seedLoadedBooksFromDOM() {
     document.querySelectorAll('#library .col-md-3').forEach((col) => {
-        const link = col.querySelector('a[href^="/read/"]');
+        const link = col.querySelector('a[href*="/read/"]');
         const img = col.querySelector('img');
         if (!link || !img) return;
         const href = link.getAttribute('href') || '';
+        const readMarker = '/read/';
+        const readIdx = href.indexOf(readMarker);
+        if (readIdx === -1) return;
         const rawLength = parseInt(col.dataset.length || '', 10);
         loadedBooks.push({
-            filename: decodeURIComponent(href.slice('/read/'.length)),
+            filename: decodeURIComponent(href.slice(readIdx + readMarker.length)),
             cover: img.getAttribute('src') || '',
             length: Number.isFinite(rawLength) ? rawLength : 0,
         });
@@ -663,7 +666,7 @@ function saveMetadata(filename) {
             const formData = new FormData();
             formData.append('cover', window.newCoverFile);
             formData.append('filename', filename);
-            return fetch('/update_cover', {
+            return fetch(appUrl('/update_cover'), {
                 method: 'POST',
                 body: formData
             })
@@ -684,7 +687,7 @@ function saveMetadata(filename) {
 
     updateCover().then(() => {
         $.ajax({
-            url: `/book_metadata/${filename}`,
+            url: appUrl(`/book_metadata/${filename}`),
             type: 'POST',
             contentType: 'application/json',
             data: JSON.stringify(metadata),
@@ -723,7 +726,7 @@ async function confirmDeleteBook(filename) {
     button.text('Deleting...').prop('disabled', true);
 
     try {
-        const response = await fetch(`/book/${encodeURIComponent(filename)}`, {
+        const response = await fetch(appUrl(`/book/${encodeURIComponent(filename)}`), {
             method: 'DELETE',
         });
         if (!response.ok) {
@@ -733,7 +736,7 @@ async function confirmDeleteBook(filename) {
         // Drop the card/spine from the library, and from the in-memory mirror
         // so a later layout switch doesn't resurrect it.
         const link = document.querySelector(
-            `a[href="/read/${CSS.escape(encodeURIComponent(filename))}"]`
+            `a[href="${CSS.escape(appUrl(`/read/${encodeURIComponent(filename)}`))}"]`
         );
         const card = link?.closest('.col-md-3, .shelf-slot');
         if (card) card.remove();
@@ -758,7 +761,7 @@ async function fetchUserTags() {
         return [];
     }
     try {
-        const r = await fetch('/tags');
+        const r = await fetch(appUrl('/tags'));
         window._userTagsCache = r.ok ? await r.json() : [];
     } catch {
         window._userTagsCache = [];
@@ -942,7 +945,7 @@ async function handleFileUpload(files) {
         formData.append('file', file);
         
         try {
-            const response = await fetch('/upload_book', {
+            const response = await fetch(appUrl('/upload_book'), {
                 method: 'POST',
                 body: formData
             });
@@ -977,7 +980,7 @@ function saveNewBook(originalFilename, cover_path) {
     };
 
     $.ajax({
-        url: '/upload_book_metadata', // Adjust this URL if necessary
+        url: appUrl('/upload_book_metadata'),
         type: 'POST',
         contentType: 'application/json',
         data: JSON.stringify(metadata),
@@ -1033,7 +1036,7 @@ async function handleLogin(event) {
     const formData = new FormData(event.target);
 
     try {
-        const response = await fetch('/auth/login', {
+        const response = await fetch(appUrl('/auth/login'), {
             method: 'POST',
             body: formData
         });
@@ -1052,7 +1055,7 @@ async function handleLogin(event) {
 
 async function handleLogout() {
     try {
-        const response = await fetch('/auth/logout');
+        const response = await fetch(appUrl('/auth/logout'));
         if (response.ok) {
             location.reload();
         }

@@ -292,7 +292,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }, 200);
                 
                 try {
-                    const response = await fetch('/ask_question', {
+                    const response = await fetch(appUrl('/ask_question'), {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
                         body: JSON.stringify({
@@ -427,7 +427,7 @@ window.addEventListener('DOMContentLoaded', () => {
     // Show controls immediately on load
     document.querySelector('.top-controls').classList.add('visible');
     
-    fetch(`/load_book/${filename}`)
+    fetch(appUrl(`/load_book/${filename}`))
         .then(response => {
             const reader = response.body.getReader();
             const decoder = new TextDecoder("utf-8");
@@ -582,7 +582,7 @@ function saveBookmark() {
                 position = window.scrollY / document.documentElement.scrollHeight;
             }
 
-            fetch(`/bookmark/${filename}`, {
+            fetch(appUrl(`/bookmark/${filename}`), {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -653,7 +653,7 @@ function nextChapter() {
     }
 
     if (currentChapterNum === currentBook.spine_length - 1) {
-        fetch(`/tag_finished/${filename}`, {
+        fetch(appUrl(`/tag_finished/${filename}`), {
             method: 'POST'
         }).catch(error => console.error('Error adding tag:', error));
     }
@@ -1001,9 +1001,9 @@ function handleTextRequest(selectedString, tempHighlight, endpoint, loadingMessa
 }
 
 function handleDefinitionRequest(selectedString, tempHighlight) {
-    handleTextRequest(selectedString, tempHighlight, '/define_word', 'Looking up definition...');
+    handleTextRequest(selectedString, tempHighlight, appUrl('/define_word'), 'Looking up definition...');
 }
 
 function handleTranslationRequest(selectedString, tempHighlight) {
-    handleTextRequest(selectedString, tempHighlight, '/translate_text', 'Translating...');
+    handleTextRequest(selectedString, tempHighlight, appUrl('/translate_text'), 'Translating...');
 }

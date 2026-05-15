@@ -7,10 +7,12 @@ from flask_compress import Compress
 from flask_login import LoginManager
 from flask_migrate import Migrate
 from werkzeug.exceptions import HTTPException
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from .commands import init_commands
 from .config import DATA_DIR, Config
-from .models import User, db
+from .models import db
+from .proxy_auth import load_user_from_proxy_header
 from .routes import (
     auth_blueprint,
     index_blueprint,
@@ -51,6 +53,13 @@ def create_app(config_overrides: dict | None = None):
     os.makedirs(app.config["BOOK_DIR"], exist_ok=True)
     cache.init_app(app)
 
+    # Honor X-Forwarded-* from nginx when TLS terminates upstream.
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+
+    @app.get("/healthz")
+    def healthz():
+        return "", 200
+
     @app.after_request
     def add_cache_headers(response):
         if "/static/" in request.path:
@@ -69,7 +78,13 @@ def create_app(config_overrides: dict | None = None):
 
     @login_manager.user_loader
     def load_user(user_id):
+        from .models import User
+
         return db.session.get(User, int(user_id))
+
+    @login_manager.request_loader
+    def load_user_from_request(_request):
+        return load_user_from_proxy_header()
 
     app.register_blueprint(auth_blueprint)
     app.register_blueprint(index_blueprint)
