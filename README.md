@@ -132,11 +132,6 @@ The application includes several CLI commands for managing books:
   uv run flask import-books --directory /path/to/epub/files
   ```
 
-- **Flush Books**: Remove books from the database that no longer exist in the specified directory.
-  ```bash
-  uv run flask flush-books --directory /path/to/epub/files
-  ```
-
 - **Refresh cover paths**: Re-scan each EPUB’s package document and update stored `cover_path` values (optional; serving covers no longer depends on this being perfect).
   ```bash
   uv run flask refresh-cover-paths
