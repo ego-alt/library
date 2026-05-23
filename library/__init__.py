@@ -26,6 +26,34 @@ logger.setLevel(logging.INFO)
 
 cache = Cache(config={"CACHE_TYPE": "flask_caching.backends.simplecache.SimpleCache"})
 
+BOOK_DIR_SENTINEL = ".library-mount"
+
+
+def _verify_book_dir(book_dir: str) -> None:
+    """Refuse to boot unless BOOK_DIR exists and carries the mount sentinel.
+
+    Previously, create_app() auto-created BOOK_DIR with exist_ok=True. When the
+    Pi's external drive failed to mount, that turned a hard error into a silent
+    empty directory — and the old flush-books CLI then treated every row as
+    orphaned and wiped the database. The sentinel is positive proof the right
+    disk is mounted here; if it's absent, fail loud at boot.
+    """
+    if not os.path.isdir(book_dir):
+        raise RuntimeError(
+            f"BOOK_DIR does not exist: {book_dir}. "
+            f"Create the directory and `touch {book_dir}/{BOOK_DIR_SENTINEL}` "
+            "to confirm it's the right location."
+        )
+
+    sentinel = os.path.join(book_dir, BOOK_DIR_SENTINEL)
+    if not os.path.isfile(sentinel):
+        raise RuntimeError(
+            f"Missing mount sentinel: {sentinel}. "
+            "This file proves BOOK_DIR is your real library mount (not a "
+            "freshly-created stub from a failed mount). If this IS your "
+            f"library directory, run `touch {sentinel}` once to confirm."
+        )
+
 
 def create_app(config_overrides: dict | None = None):
     app = Flask(__name__)
@@ -50,7 +78,8 @@ def create_app(config_overrides: dict | None = None):
             )
 
     os.makedirs(DATA_DIR, exist_ok=True)
-    os.makedirs(app.config["BOOK_DIR"], exist_ok=True)
+    if not app.config.get("TESTING"):
+        _verify_book_dir(app.config["BOOK_DIR"])
     cache.init_app(app)
 
     # Honor X-Forwarded-* from nginx when TLS terminates upstream. x_prefix

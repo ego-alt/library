@@ -57,12 +57,23 @@
    BOOK_DIR=/path/to/your/books
    ```
 
-3. **Build and run with Docker Compose**:
+3. **Mark the books directory**:
+   The app refuses to boot unless `BOOK_DIR` contains a `.library-mount`
+   sentinel file. This is a guard against a failed mount silently presenting
+   an empty directory (which previously caused data loss).
+   ```bash
+   mkdir -p "$BOOK_DIR"
+   touch "$BOOK_DIR/.library-mount"
+   ```
+   On a NAS/external-drive setup, create the sentinel on the *mounted* disk so
+   it disappears whenever the mount fails.
+
+4. **Build and run with Docker Compose**:
    ```bash
    docker compose up -d
    ```
 
-4. **Alternative (local) setup**:
+5. **Alternative (local) setup**:
    Ensure you have Python (3.10+) and `uv` installed:
    ```bash
    uv sync
@@ -119,11 +130,6 @@ The application includes several CLI commands for managing books:
 - **Import Books**: Import EPUB files from a specified directory.
   ```bash
   uv run flask import-books --directory /path/to/epub/files
-  ```
-
-- **Flush Books**: Remove books from the database that no longer exist in the specified directory.
-  ```bash
-  uv run flask flush-books --directory /path/to/epub/files
   ```
 
 - **Create User**: Create a new user account.
