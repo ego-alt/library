@@ -15,7 +15,12 @@ from flask_login import current_user
 
 from ..choices import BookProgressChoice, UserRoleChoice
 from ..models import Book, Bookmark, Tag, book_tags, db
-from ..utils import cover_mimetype, epub_text_size, read_epub_cover
+from ..utils import (
+    cover_mimetype,
+    epub_text_size,
+    guess_cover_mimetype_from_bytes,
+    read_epub_cover,
+)
 from ._helpers import commit_or_rollback, get_book_or_404, json_admin_required
 
 index_blueprint = Blueprint("index_routes", __name__)
@@ -222,7 +227,10 @@ def cover(filename):
         cache.set(cache_key, cover_bytes, timeout=86400)
 
     response = make_response(cover_bytes)
-    response.headers["Content-Type"] = cover_mimetype(book.cover_path or "")
+    response.headers["Content-Type"] = (
+        guess_cover_mimetype_from_bytes(cover_bytes)
+        or cover_mimetype(book.cover_path or "")
+    )
     response.headers["Cache-Control"] = "public, max-age=31536000"
     response.set_etag(etag)
     return response

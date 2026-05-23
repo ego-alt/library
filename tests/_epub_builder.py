@@ -35,6 +35,7 @@ def build_epub3(
     chapters: list[tuple[str, str]] | None = None,
     nav_entries: list[dict] | None = None,
     include_cover: bool = True,
+    cover_meta_name: bool = True,
 ) -> bytes:
     """EPUB3 with a nav doc.
 
@@ -64,7 +65,9 @@ def build_epub3(
         manifest_items.append(
             '<item id="cover-img" href="cover.png" media-type="image/png" properties="cover-image"/>'
         )
-        cover_meta = '<meta name="cover" content="cover-img"/>'
+        cover_meta = (
+            '<meta name="cover" content="cover-img"/>' if cover_meta_name else ""
+        )
     else:
         cover_meta = ""
 
@@ -115,6 +118,69 @@ def _render_nav_ol(entries: list[dict]) -> str:
         out += "</li>"
     out += "</ol>"
     return out
+
+
+def build_epub3_xhtml_cover_wrapper(
+    *,
+    title: str = "XHTML Cover Book",
+    author: str = "Author",
+) -> bytes:
+    """EPUB3 where ``meta name=cover`` points at XHTML that embeds a PNG via ``<img>``."""
+    chapters = [("ch1.xhtml", "<h1>One</h1><p>body</p>")]
+    nav_entries = [{"title": "Chapter 1", "href": "ch1.xhtml", "children": []}]
+    manifest_items = [
+        '<item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>',
+        '<item id="cover-xhtml" href="cover.xhtml" media-type="application/xhtml+xml"/>',
+        '<item id="cover-img" href="cover.png" media-type="image/png"/>',
+    ]
+    spine_refs = ['<itemref idref="cover-xhtml"/>', '<itemref idref="nav"/>']
+    for i, (fn, _) in enumerate(chapters):
+        item_id = f"ch{i}"
+        manifest_items.append(
+            f'<item id="{item_id}" href="{fn}" media-type="application/xhtml+xml"/>'
+        )
+        spine_refs.append(f'<itemref idref="{item_id}"/>')
+
+    opf = dedent(f"""\
+        <?xml version="1.0" encoding="utf-8"?>
+        <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="id">
+          <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+            <dc:identifier id="id">test-{title}</dc:identifier>
+            <dc:title>{title}</dc:title>
+            <dc:creator>{author}</dc:creator>
+            <meta name="cover" content="cover-xhtml"/>
+          </metadata>
+          <manifest>
+            {''.join(manifest_items)}
+          </manifest>
+          <spine>
+            {''.join(spine_refs)}
+          </spine>
+        </package>
+    """)
+
+    nav = '<?xml version="1.0"?><html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops"><body><nav epub:type="toc">'
+    nav += _render_nav_ol(nav_entries)
+    nav += "</nav></body></html>"
+
+    cover_xhtml = """<?xml version="1.0"?>
+    <html xmlns="http://www.w3.org/1999/xhtml"><head><title>Cover</title></head>
+    <body><div><img src="cover.png" alt="Cover"/></div></body></html>"""
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr("mimetype", "application/epub+zip")
+        z.writestr("META-INF/container.xml", _container_xml())
+        z.writestr("OEBPS/content.opf", opf)
+        z.writestr("OEBPS/nav.xhtml", nav)
+        z.writestr("OEBPS/cover.xhtml", cover_xhtml)
+        z.writestr("OEBPS/cover.png", _TINY_PNG)
+        for fn, body in chapters:
+            z.writestr(
+                f"OEBPS/{fn}",
+                f'<?xml version="1.0"?><html xmlns="http://www.w3.org/1999/xhtml"><body>{body}</body></html>',
+            )
+    return buf.getvalue()
 
 
 def build_epub2_ncx(

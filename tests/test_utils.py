@@ -3,6 +3,7 @@ import pytest
 from library.utils import (
     cover_mimetype,
     extract_metadata,
+    get_epub_cover_path,
     get_epub_structure,
     process_chapter_content,
     read_epub_cover,
@@ -12,6 +13,7 @@ from library.utils import (
 from tests._epub_builder import (
     build_epub2_ncx,
     build_epub3,
+    build_epub3_xhtml_cover_wrapper,
     build_epub_no_toc,
 )
 
@@ -296,6 +298,26 @@ def test_read_epub_cover_returns_bytes(epub_path):
 def test_read_epub_cover_autodetects_path_when_omitted(epub_path):
     path = epub_path(build_epub3())
     # cover_path=None → looks up via the OPF metadata
+    data = read_epub_cover(path)
+    assert data.startswith(b"\x89PNG")
+
+
+def test_get_epub_cover_path_epub3_cover_image_without_meta_name(epub_path):
+    path = epub_path(build_epub3(cover_meta_name=False))
+    assert get_epub_cover_path(path) == "OEBPS/cover.png"
+    data = read_epub_cover(path)
+    assert data.startswith(b"\x89PNG")
+
+
+def test_read_epub_cover_falls_back_when_db_path_is_wrong(epub_path):
+    path = epub_path(build_epub3())
+    data = read_epub_cover(path, "OEBPS/does-not-exist.png")
+    assert data.startswith(b"\x89PNG")
+
+
+def test_read_epub_cover_xhtml_wrapper(epub_path):
+    path = epub_path(build_epub3_xhtml_cover_wrapper())
+    assert get_epub_cover_path(path) == "OEBPS/cover.xhtml"
     data = read_epub_cover(path)
     assert data.startswith(b"\x89PNG")
 

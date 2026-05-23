@@ -111,7 +111,43 @@ def create_user_command(username, password, role):
     click.echo(f"Created user: {username} with role {user.role.value}")
 
 
+@click.command("refresh-cover-paths")
+@with_appcontext
+def refresh_cover_paths_command():
+    """Re-scan each EPUB and update ``books.cover_path`` from the package document.
+
+    Use after upgrading cover discovery or if covers fail due to stale paths in
+    the database. Requires BOOK_DIR (or mount) to contain the files.
+    """
+    book_dir = current_app.config["BOOK_DIR"]
+    updated = 0
+    errors = 0
+    for book in Book.query.all():
+        full_path = os.path.join(book_dir, book.filename)
+        if not os.path.isfile(full_path):
+            logger.warning("refresh-cover-paths: missing file %s", full_path)
+            errors += 1
+            continue
+        try:
+            new_path = get_epub_cover_path(full_path)
+        except Exception as e:
+            logger.error("refresh-cover-paths: %s: %s", book.filename, e)
+            errors += 1
+            continue
+        if book.cover_path != new_path:
+            book.cover_path = new_path
+            updated += 1
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logger.error("refresh-cover-paths commit failed: %s", e)
+        raise
+    click.echo(f"Updated cover_path for {updated} book(s). {errors} skipped (errors/missing files).")
+
+
 def init_commands(app):
     """Register CLI commands."""
     app.cli.add_command(import_books_command)
     app.cli.add_command(create_user_command)
+    app.cli.add_command(refresh_cover_paths_command)

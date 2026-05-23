@@ -100,7 +100,7 @@ After adding a user in dashboard, sync shadow accounts:
 cd ../dashboard && uv run python scripts/sync_household_users.py
 ```
 
-See `dashboard/README.md` for compose and bootstrap (`household_sql_pass.py`).
+See `dashboard/README.md` for compose and user sync.
 
 ## Usage
 
@@ -130,6 +130,16 @@ The application includes several CLI commands for managing books:
 - **Import Books**: Import EPUB files from a specified directory.
   ```bash
   uv run flask import-books --directory /path/to/epub/files
+  ```
+
+- **Flush Books**: Remove books from the database that no longer exist in the specified directory.
+  ```bash
+  uv run flask flush-books --directory /path/to/epub/files
+  ```
+
+- **Refresh cover paths**: Re-scan each EPUB’s package document and update stored `cover_path` values (optional; serving covers no longer depends on this being perfect).
+  ```bash
+  uv run flask refresh-cover-paths
   ```
 
 - **Create User**: Create a new user account.

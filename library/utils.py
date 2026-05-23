@@ -1,5 +1,6 @@
 import logging
 import os
+import posixpath
 import re
 import shutil
 import tempfile
@@ -29,27 +30,62 @@ def rotate_list(items: list, n: int) -> list:
     return items[-n:] + items[:-n]
 
 
-def get_epub_cover_path(path: str):
+def _normalize_internal_epub_path(path: str) -> str:
+    """Normalize a path as stored in the DB / OPF for zipfile lookup."""
+    if not path:
+        return path
+    p = path.replace("\\", "/").lstrip("./")
+    return posixpath.normpath(p).lstrip("/")
+
+
+def _discover_cover_path_in_open_zip(z: zipfile.ZipFile) -> str:
+    """Return the package-relative path inside the zip to the cover resource.
+
+    Tries EPUB2 ``<meta name="cover" content="id"/>`` first, then EPUB3 manifest
+    items marked ``properties="... cover-image ..."``.
+    """
+    t = etree.fromstring(z.read("META-INF/container.xml"))
+    root_el = t.xpath("/u:container/u:rootfiles/u:rootfile", namespaces=namespaces)
+    if not root_el:
+        raise ValueError("EPUB container has no rootfile")
+    rootfile_path = root_el[0].get("full-path")
+    if not rootfile_path:
+        raise ValueError("EPUB rootfile missing full-path attribute")
+    rootfile_path = rootfile_path.replace("\\", "/")
+
+    t = etree.fromstring(z.read(rootfile_path))
+    opf_dir = posixpath.dirname(rootfile_path)
+
+    href = None
+    cover_meta = t.xpath("//opf:metadata/opf:meta[@name='cover']", namespaces=namespaces)
+    if cover_meta:
+        cover_id = cover_meta[0].get("content")
+        if cover_id:
+            for item in t.xpath("//opf:manifest/opf:item", namespaces=namespaces):
+                if item.get("id") == cover_id:
+                    href = item.get("href")
+                    break
+
+    if not href:
+        for item in t.xpath("//opf:manifest/opf:item", namespaces=namespaces):
+            props = (item.get("properties") or "").split()
+            if "cover-image" in props:
+                href = item.get("href")
+                break
+
+    if not href:
+        raise ValueError("No cover reference in package document")
+
+    href = unquote(href.strip())
+    if not href:
+        raise ValueError("Empty cover href in package document")
+
+    return posixpath.normpath(posixpath.join(opf_dir, href)).lstrip("/")
+
+
+def get_epub_cover_path(path: str) -> str:
     with zipfile.ZipFile(path) as z:
-        # Load container.xml to find the root file
-        t = etree.fromstring(z.read("META-INF/container.xml"))
-        rootfile_path = t.xpath(
-            "/u:container/u:rootfiles/u:rootfile", namespaces=namespaces
-        )[0].get("full-path")
-
-        # Load the root file to find cover image details
-        t = etree.fromstring(z.read(rootfile_path))
-        cover_id = t.xpath(
-            "//opf:metadata/opf:meta[@name='cover']", namespaces=namespaces
-        )[0].get("content")
-        cover_href = t.xpath(
-            "//opf:manifest/opf:item[@id='" + cover_id + "']", namespaces=namespaces
-        )[0].get("href")
-
-        # Get the cover image path and load it
-        cover_path = os.path.join(os.path.dirname(rootfile_path), cover_href)
-
-    return cover_path
+        return _discover_cover_path_in_open_zip(z)
 
 
 _COVER_MIMETYPES = {
@@ -67,13 +103,101 @@ def cover_mimetype(cover_path: str) -> str:
     return _COVER_MIMETYPES.get(ext, "image/jpeg")
 
 
-def read_epub_cover(epub_file_path: str, cover_path: str = None) -> bytes:
-    """Return the raw bytes of an EPUB's cover image."""
-    if cover_path is None:
-        cover_path = get_epub_cover_path(epub_file_path)
+def guess_cover_mimetype_from_bytes(data: bytes) -> str | None:
+    """Infer image Content-Type from magic bytes (used when DB cover_path is stale)."""
+    if not data or len(data) < 4:
+        return None
+    if data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if data.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    if data.startswith(b"GIF87a") or data.startswith(b"GIF89a"):
+        return "image/gif"
+    if len(data) >= 12 and data.startswith(b"RIFF") and data[8:12] == b"WEBP":
+        return "image/webp"
+    head = data.lstrip()[:800]
+    if b"<svg" in head or (head.startswith(b"<?xml") and b"<svg" in data[:2000]):
+        return "image/svg+xml"
+    return None
+
+
+def _cover_bytes_look_like_image(data: bytes) -> bool:
+    return guess_cover_mimetype_from_bytes(data) is not None
+
+
+def _might_be_markup(data: bytes) -> bool:
+    s = data.lstrip()[:200]
+    return s.startswith(b"<") or s.startswith(b"\xef\xbb\xbf<")
+
+
+def _unwrap_html_cover_to_image(
+    z: zipfile.ZipFile, wrapper_internal_path: str, raw: bytes
+) -> bytes:
+    """If the cover entry is an HTML/XHTML wrapper, follow the first image ref."""
+    if not _might_be_markup(raw):
+        return raw
+    try:
+        soup = BeautifulSoup(raw, "xml")
+    except Exception:
+        return raw
+    base = posixpath.dirname(wrapper_internal_path.replace("\\", "/"))
+    for tag in soup.find_all(["img", "image"]):
+        src = tag.get("src") or tag.get("href")
+        if not src or str(src).startswith("data:"):
+            continue
+        src = str(src).split("#")[0].strip()
+        target = posixpath.normpath(posixpath.join(base, unquote(src))).lstrip("/")
+        try:
+            nested = z.read(target)
+        except KeyError:
+            continue
+        if _cover_bytes_look_like_image(nested):
+            return nested
+    return raw
+
+
+def read_epub_cover(epub_file_path: str, cover_path: str | None = None) -> bytes:
+    """Return the raw bytes of an EPUB's cover image.
+
+    Tries the path stored in the database first (when provided), then fresh
+    discovery from the package document. Handles EPUB3 ``cover-image`` items and
+    XHTML cover wrappers that reference a raster file.
+    """
     with zipfile.ZipFile(epub_file_path) as z:
-        with z.open(cover_path) as f:
-            return f.read()
+        try:
+            discovered = _discover_cover_path_in_open_zip(z)
+        except Exception as exc:
+            logger.warning("Could not discover cover in %s: %s", epub_file_path, exc)
+            discovered = None
+
+        candidates: list[str] = []
+        if cover_path:
+            candidates.append(_normalize_internal_epub_path(cover_path))
+        if discovered and discovered not in candidates:
+            candidates.append(discovered)
+
+        if not candidates:
+            raise FileNotFoundError(f"No cover path for {epub_file_path}")
+
+        last_error: Exception | None = None
+        for internal in candidates:
+            try:
+                raw = z.read(internal)
+            except KeyError as exc:
+                last_error = exc
+                logger.debug("Cover zip member missing %s: %s", epub_file_path, internal)
+                continue
+            data = _unwrap_html_cover_to_image(z, internal, raw)
+            if _cover_bytes_look_like_image(data):
+                return data
+
+        if last_error:
+            raise KeyError(
+                f"Cover not found in EPUB {epub_file_path!r} (tried {candidates!r})"
+            ) from last_error
+        raise ValueError(
+            f"No usable raster/SVG cover bytes in {epub_file_path!r} (tried {candidates!r})"
+        )
 
 
 _HTML_EXTENSIONS = (".html", ".xhtml", ".htm")
