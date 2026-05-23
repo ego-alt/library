@@ -285,6 +285,15 @@ def test_structure_lists_images_with_paths(epub_path):
     assert cover_entry["media-type"] == "image/png"
 
 
+def test_normalize_internal_epub_path_percent_decodes():
+    from library.utils import _normalize_internal_epub_path
+
+    raw = "OEBPS/Images/Nabokov%2C%20Vladimir%20-%20Defense%20%28Vintage%2C%201990%29.jpg"
+    assert _normalize_internal_epub_path(raw) == (
+        "OEBPS/Images/Nabokov, Vladimir - Defense (Vintage, 1990).jpg"
+    )
+
+
 # --- read_epub_cover ------------------------------------------------------------
 
 

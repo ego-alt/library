@@ -31,10 +31,16 @@ def rotate_list(items: list, n: int) -> list:
 
 
 def _normalize_internal_epub_path(path: str) -> str:
-    """Normalize a path as stored in the DB / OPF for zipfile lookup."""
+    """Normalize a path as stored in the DB / OPF for zipfile lookup.
+
+    Zip member names use decoded path segments; some OPFs (e.g. Calibre) put
+    percent-encoded ``href`` values in the manifest — importers may have stored
+    those literally, so apply :func:`urllib.parse.unquote` here.
+    """
     if not path:
         return path
     p = path.replace("\\", "/").lstrip("./")
+    p = unquote(p)
     return posixpath.normpath(p).lstrip("/")
 
 
