@@ -7,4 +7,8 @@ services:
       - ${BOOK_DIR}:/mnt/backup/books
       - ./instance:/app/instance
     env_file:
-      - .env 
+      - .env
+    environment:
+      # Host's ${BOOK_DIR} is bind-mounted to /mnt/backup/books in the container,
+      # so the in-container app must read from the mount target, not the host path.
+      BOOK_DIR: /mnt/backup/books

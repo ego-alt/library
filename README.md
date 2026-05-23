@@ -142,6 +142,17 @@ The application includes several CLI commands for managing books:
   uv run flask create-user <username> <password> --role <role>
   ```
 
+- **Backup DB**: Take an online SQLite snapshot of the library DB. Safe with
+  the app running (uses SQLite's online backup API, not `cp`). Writes
+  `library-YYYYMMDD-HHMMSS.db` into `--to` and keeps the last `--keep`
+  (default 14). Recommended: schedule via cron, and write backups to a
+  *different* physical disk than the live DB.
+  ```bash
+  uv run flask backup-db --to /mnt/backup/library-backups
+  # crontab example (3am daily, keep 30):
+  # 0 3 * * * cd /path/to/library-app && uv run flask backup-db --to /mnt/backup/library-backups --keep 30
+  ```
+
 ## Contributing
 
 1. Fork the repository
