@@ -558,7 +558,7 @@ function generateMetadataHtml(data, isUpload = false) {
         : `<span class="meta-footer-info"></span>`;
 
     const deleteButton = (isAdmin && !isUpload)
-        ? `<button type="button" class="delete-book-button"
+        ? `<button type="button" class="delete-book-button btn btn-danger"
                    data-action="delete-book" data-filename="${escapeHtml(data.filename)}">
               <i class="fas fa-trash"></i><span>Delete</span>
            </button>`
@@ -566,13 +566,13 @@ function generateMetadataHtml(data, isUpload = false) {
     const saveLabel = isUpload ? 'Add to library' : 'Save changes';
     const saveButton = isAuth
         ? (isUpload
-            ? `<button type="button" class="save-button"
+            ? `<button type="button" class="save-button btn btn-primary"
                        data-action="save-new-book"
                        data-filename="${escapeHtml(data.filename)}"
                        data-cover-path="${escapeHtml(data.cover_path || '')}">
                   ${saveLabel}
                </button>`
-            : `<button type="button" class="save-button"
+            : `<button type="button" class="save-button btn btn-primary"
                        data-action="save-metadata" data-filename="${escapeHtml(data.filename)}">
                   ${saveLabel}
                </button>`)

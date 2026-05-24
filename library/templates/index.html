@@ -30,21 +30,21 @@
     <div class="filter-sidebar" id="filterSidebar">
         <div class="filter-group">
             <label for="filterTitle">Title</label>
-            <input type="text" id="filterTitle" placeholder="Filter by title...">
+            <input class="input" type="text" id="filterTitle" placeholder="Filter by title...">
         </div>
         <div class="filter-group">
             <label for="filterAuthor">Author</label>
-            <input type="text" id="filterAuthor" placeholder="Filter by author...">
+            <input class="input" type="text" id="filterAuthor" placeholder="Filter by author...">
         </div>
         <div class="filter-group">
             <label for="filterGenre">Genre</label>
-            <input type="text" id="filterGenre" placeholder="Filter by genre...">
+            <input class="input" type="text" id="filterGenre" placeholder="Filter by genre...">
         </div>
         <div class="filter-group">
             <label for="filterTags">Tags</label>
             <div class="tag-input-container">
                 <div class="tags-container" id="filter-tags-container"></div>
-                <input type="text" id="filterTags" placeholder="Unread, Finished...">
+                <input class="input" type="text" id="filterTags" placeholder="Unread, Finished...">
                 <style>
                     #filterTags::placeholder {font-style: italic;}
                 </style>
@@ -55,14 +55,14 @@
     <div class="container">
         <div class="header-row my-4">
             <div class="header-left">
-                <button class="dark-mode-toggle" onclick="toggleDarkMode()">
+                <button class="dark-mode-toggle btn btn-ghost" onclick="toggleDarkMode()">
                     <i id="dark-mode-icon" class="fas fa-moon"></i>
                 </button>
-                <button class="layout-toggle" id="layoutToggle" onclick="toggleLayout()" aria-pressed="false" title="Switch to bookshelf view">
+                <button class="layout-toggle btn btn-ghost" id="layoutToggle" onclick="toggleLayout()" aria-pressed="false" title="Switch to bookshelf view">
                     <i id="layout-toggle-icon" class="fas fa-grip-vertical"></i>
                 </button>
                 {% if current_user.is_authenticated %}
-                <button class="view-toggle" id="viewToggle" onclick="toggleView()" aria-pressed="false" title="Show only books you've started reading">
+                <button class="view-toggle btn btn-ghost" id="viewToggle" onclick="toggleView()" aria-pressed="false" title="Show only books you've started reading">
                     <i class="far fa-bookmark"></i>
                 </button>
                 {% endif %}
@@ -70,18 +70,18 @@
             <h1 class="header-title m-0">Library</h1>
             <div class="header-right">
                 {% if current_user.is_authenticated %}
-                    <button class="login-button" onclick="handleLogout()">
+                    <button class="login-button btn btn-ghost" onclick="handleLogout()">
                         <i class="fas fa-door-closed"></i>
                     </button>
                 {% else %}
-                    <button class="login-button" onclick="showLoginDialog()">
+                    <button class="login-button btn btn-ghost" onclick="showLoginDialog()">
                         <i class="fas fa-door-open"></i>
                     </button>
                 {% endif %}
-                <button class="upload-button" onclick="document.getElementById('fileUploadInput').click();">
+                <button class="upload-button btn btn-ghost" onclick="document.getElementById('fileUploadInput').click();">
                     <i class="fas fa-upload"></i>
                 </button>
-                <button class="filter-button">
+                <button class="filter-button btn btn-ghost">
                     <i class="fas fa-filter"></i>
                 </button>
             </div>
@@ -118,7 +118,7 @@
 
     <div class="metadata-overlay" id="metadataOverlay" role="dialog" aria-modal="true" aria-labelledby="metadata-title">
         <div class="metadata-content">
-            <button class="close-metadata" aria-label="Close">&times;</button>
+            <button class="close-metadata btn btn-ghost" aria-label="Close">&times;</button>
             <div id="metadataContent">
                 <!-- Metadata is rendered by main.js -->
             </div>
@@ -128,24 +128,24 @@
     <!-- Add login overlay -->
     <div class="login-overlay" id="loginOverlay">
         <div class="login-content">
-            <button class="close-login">&times;</button>
+            <button class="close-login btn btn-ghost">&times;</button>
             <h3>Login</h3>
             <div id="loginError" class="alert alert-danger" style="display: none;"></div>
             <form id="loginForm" onsubmit="handleLogin(event)">
                 <div class="login-field">
                     <label for="username">Username</label>
-                    <input type="text" id="username" name="username" required>
+                    <input class="input" type="text" id="username" name="username" required>
                 </div>
                 <div class="login-field">
                     <label for="password">Password</label>
-                    <input type="password" id="password" name="password" required>
+                    <input class="input" type="password" id="password" name="password" required>
                 </div>
                 <div class="login-field checkbox">
                     <label>
                         <input type="checkbox" name="remember"> Remember me
                     </label>
                 </div>
-                <button type="submit" class="login-submit">Login</button>
+                <button type="submit" class="login-submit btn btn-primary">Login</button>
             </form>
         </div>
     </div>

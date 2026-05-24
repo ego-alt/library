@@ -69,13 +69,15 @@
     transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
 }
 .btn:focus-visible { outline: 2px solid var(--color-accent-hover); outline-offset: 2px; }
-.btn-primary   { background: var(--color-accent); color: #fff; }
-.btn-primary:hover   { background: var(--color-accent-hover); }
+/* border-color is set explicitly on each variant — Bootstrap's CDN .btn-*
+ * rules otherwise leak their primary-blue border through. */
+.btn-primary   { background: var(--color-accent); border-color: var(--color-accent); color: #fff; }
+.btn-primary:hover   { background: var(--color-accent-hover); border-color: var(--color-accent-hover); }
 .btn-secondary { background: transparent; border-color: var(--color-border); color: var(--color-text-secondary); }
-.btn-secondary:hover { background: var(--color-highlight-soft); color: var(--color-text-primary); }
-.btn-danger    { background: var(--color-danger); color: #fff; }
-.btn-danger:hover    { background: var(--color-danger-hover); }
-.btn-ghost     { background: transparent; color: var(--color-text-muted); padding: var(--space-2); }
+.btn-secondary:hover { background: var(--color-highlight-soft); border-color: var(--color-border); color: var(--color-text-primary); }
+.btn-danger    { background: var(--color-danger); border-color: var(--color-danger); color: #fff; }
+.btn-danger:hover    { background: var(--color-danger-hover); border-color: var(--color-danger-hover); }
+.btn-ghost     { background: transparent; border-color: transparent; color: var(--color-text-muted); padding: var(--space-2); }
 .btn-ghost:hover     { color: var(--color-text-primary); }
 
 /* Input primitive — sans-serif (terminal vibe stays calendar-only). */
