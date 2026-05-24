@@ -11,7 +11,7 @@ body {
 }
 
 /* Unified type for top-level headings (overrides Bootstrap's reboot). */
-h1 { font-size: var(--text-xl); font-weight: 600; line-height: 1.2; }
+h1 { font-size: var(--text-xl); font-weight: 500; letter-spacing: -0.01em; line-height: 1.2; }
 h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 .header-row {
     display: flex;
