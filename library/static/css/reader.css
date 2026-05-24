@@ -1,26 +1,31 @@
+/* Reader tokens — duplicates the spec roles from index.css so the reader page
+ * can be served standalone. Reader-only roles (--controls-background,
+ * --toc-item-*) stay app-local; they describe surfaces unique to this view. */
 :root {
-    --background-color: #FFF1E5;
-    --overlay-box-shadow: rgba(0, 0, 0, 0.2);
+    --color-bg-base: #FFF1E5;
+    --color-shadow: rgba(0, 0, 0, 0.2);
+    --color-text-primary: #34495E;
+
+    /* Reader-only surfaces. */
     --controls-background: white;
     --toc-item-color: #333;
     --toc-item-highlight: #6AACFF;
     --toc-item-background: #6AACFF4f;
-    --text-color-dark: #34495E;
-}
-body {
-    background-color: var(--background-color);
 }
 .dark-mode {
-    --background-color: rgba(40, 44, 52, 0.9);
+    --color-bg-base: rgba(40, 44, 52, 0.9);
+    --color-text-primary: #888;
     --controls-background: #242424;
     --toc-item-color: #B0B0B0;
     --toc-item-highlight: #3A6D9A;
     --toc-item-background: #3a6d9a4f;
-    --text-color-dark: #888;
     --heading-color: #E0E0E0;
 }
+body {
+    background-color: var(--color-bg-base);
+}
 p {
-    color: var(--text-color-dark);
+    color: var(--color-text-primary);
 }
 a {
     color: var(--toc-item-highlight);
@@ -47,9 +52,9 @@ a {
     bottom: 0;
     left: 0;
     right: 0;
-    background: var(--background-color);
+    background: var(--color-bg-base);
     padding: 12px;
-    box-shadow: 0 -2px 8px var(--overlay-box-shadow);
+    box-shadow: 0 -2px 8px var(--color-shadow);
     display: flex;
     justify-content: center;
     gap: 15px;
@@ -104,7 +109,7 @@ a {
     right: 0;
     background: var(--controls-background);
     padding: 12px;
-    box-shadow: 0 2px 8px var(--overlay-box-shadow);
+    box-shadow: 0 2px 8px var(--color-shadow);
     z-index: 100;
     display: flex;
     justify-content: space-between;
@@ -136,8 +141,8 @@ a {
     left: -300px;
     width: 300px;
     height: calc(100vh - 60px);
-    background: var(--background-color);
-    box-shadow: 2px 0 8px var(--overlay-box-shadow);
+    background: var(--color-bg-base);
+    box-shadow: 2px 0 8px var(--color-shadow);
     transition: left 0.3s ease, top 0.3s ease, height 0.3s ease;
     overflow-y: auto;
     z-index: 98;
@@ -154,7 +159,7 @@ a {
 .toc-list .toc-list {
     /* nested levels: indent and shrink */
     padding-left: 14px;
-    border-left: 1px solid var(--input-field-border, rgba(0, 0, 0, 0.08));
+    border-left: 1px solid var(--color-border, rgba(0, 0, 0, 0.08));
     margin-left: 4px;
     font-size: 0.92em;
 }
@@ -181,7 +186,7 @@ a {
 }
 .toc-item.toc-section-header {
     cursor: default;
-    color: var(--text-color-gray, #888);
+    color: var(--color-text-muted, #888);
     font-weight: 600;
     text-transform: uppercase;
     font-size: 0.78em;
@@ -190,7 +195,7 @@ a {
 }
 .toc-item.toc-section-header:hover {
     background: transparent;
-    color: var(--text-color-gray, #888);
+    color: var(--color-text-muted, #888);
 }
 .top-controls:not(.visible) + .container + .toc-menu {
     top: 0;
@@ -222,7 +227,7 @@ a {
 }
 
 .toc-menu h5 {
-    color: var(--text-color-dark);
+    color: var(--color-text-primary);
 }
 ::selection {
     background-color: var(--highlight-color);
@@ -235,9 +240,9 @@ a {
 .selection-menu {
     display: none;
     position: absolute;
-    background: var(--background-color);
+    background: var(--color-bg-base);
     border-radius: 8px;
-    box-shadow: 0 2px 8px var(--overlay-box-shadow);
+    box-shadow: 0 2px 8px var(--color-shadow);
     padding: 4px;
     z-index: 1000;
     gap: 4px;
@@ -252,17 +257,17 @@ a {
     border: none;
     background: none;
     border-radius: 4px;
-    color: var(--text-color-dark);
+    color: var(--color-text-primary);
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
 }
 .selection-menu button:hover {
-    background: var(--hover-background, rgba(0, 0, 0, 0.05));
+    background: var(--color-highlight-soft, rgba(0, 0, 0, 0.05));
 }
 .dark-mode .selection-menu button:hover {
-    background: var(--hover-background, rgba(255, 255, 255, 0.05));
+    background: var(--color-highlight-soft, rgba(255, 255, 255, 0.05));
 }
 .highlighted-text {
     background-color: var(--highlight-color);
@@ -281,8 +286,8 @@ a {
 .search-container {
     position: relative;
     width: 300px;
-    box-shadow: 0 2px 8px var(--overlay-box-shadow);
-    background: var(--background-color);
+    box-shadow: 0 2px 8px var(--color-shadow);
+    background: var(--color-bg-base);
     border-radius: 4px;
     overflow: hidden;
     transition: width 0.3s ease-out;
@@ -309,21 +314,21 @@ a {
     padding: 4px 8px;
     border: 1px solid var(--toc-item-highlight);
     border-radius: 4px;
-    background: var(--background-color);
-    color: var(--text-color-dark);
+    background: var(--color-bg-base);
+    color: var(--color-text-primary);
     font-size: 14px;
 }
 .search-input:focus {
     outline: none;
 }
 .dark-mode .search-input {
-    border-color: var(--text-color-dark);
+    border-color: var(--color-text-primary);
 }
 .search-response-container {
     max-height: 0;
     overflow: hidden;
     transition: max-height 0.3s ease-out;
-    border-top: 1px solid var(--input-field-border);
+    border-top: 1px solid var(--color-border);
 }
 .search-response-container.active {
     max-height: 300px;
@@ -331,7 +336,7 @@ a {
 }
 .search-response {
     padding: 4px 16px 12px;
-    color: var(--text-color-dark);
+    color: var(--color-text-primary);
     font-size: 14px;
     line-height: 1.5;
 }
@@ -349,7 +354,7 @@ a {
     background-color: rgba(58, 109, 154, 0.6);
 }
 .thinking-animation {
-    color: var(--text-color-dark);
+    color: var(--color-text-primary);
     font-size: 14px;
     padding: 4px 16px 12px;
     opacity: 0.7;
