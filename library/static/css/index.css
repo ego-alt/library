@@ -5,8 +5,10 @@
     --tag-finished: #B2E0D9;
     --tag-unread: #A0B2D9;
 }
-body {
+html, body {
     background-color: var(--color-bg-base);
+}
+body {
     font-family: var(--font-sans);
 }
 

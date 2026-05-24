@@ -37,6 +37,7 @@
 /* Dark mode unified with calendar's Gruvbox-dark palette. Light mode keeps
  * library's soft-academia identity; the two apps converge at night. */
 .dark-mode {
+    color-scheme: dark;
     --color-bg-base: #282828;
     --color-bg-elevated: #3c3836;
     --color-bg-inset: rgba(40, 40, 40, 0.5);
