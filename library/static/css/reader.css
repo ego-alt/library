@@ -14,7 +14,6 @@
     --toc-item-color: #d5c4a1;           /* gruvbox fg2 */
     --toc-item-highlight: #689d6a;       /* gruvbox aqua */
     --toc-item-background: #689d6a4f;
-    --heading-color: #ebdbb2;            /* gruvbox fg1 */
 }
 body {
     background-color: var(--color-bg-base);
