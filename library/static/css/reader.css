@@ -9,12 +9,12 @@
     --toc-item-background: #6AACFF4f;
 }
 .dark-mode {
-    --color-text-primary: #888;
-    --controls-background: #242424;
-    --toc-item-color: #B0B0B0;
-    --toc-item-highlight: #3A6D9A;
-    --toc-item-background: #3a6d9a4f;
-    --heading-color: #E0E0E0;
+    --color-text-primary: #a89984;       /* gruvbox fg4 — softer body text */
+    --controls-background: #3c3836;      /* gruvbox bg1 */
+    --toc-item-color: #d5c4a1;           /* gruvbox fg2 */
+    --toc-item-highlight: #689d6a;       /* gruvbox aqua */
+    --toc-item-background: #689d6a4f;
+    --heading-color: #ebdbb2;            /* gruvbox fg1 */
 }
 body {
     background-color: var(--color-bg-base);

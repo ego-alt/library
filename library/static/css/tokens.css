@@ -34,17 +34,21 @@
     --font-sans: Arial, Helvetica, sans-serif;
     --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
+/* Dark mode unified with calendar's Gruvbox-dark palette. Light mode keeps
+ * library's soft-academia identity; the two apps converge at night. */
 .dark-mode {
-    --color-bg-base: rgba(40, 44, 52, 0.9);
-    --color-bg-elevated: rgba(40, 40, 40, 0.9);
-    --color-bg-inset: rgba(30, 30, 30, 0.5);
-    --color-bg-overlay: rgba(0, 0, 0, 0.8);
-    --color-border: rgba(255, 255, 255, 0.1);
-    --color-text-primary: #E0E0E0;
-    --color-text-secondary: #B0B0B0;
-    --color-text-muted: #888;
-    --color-accent: #3A6D9A;
-    --color-accent-hover: #2D5A82;
-    --color-shadow: rgba(45, 45, 45, 0.2);
-    --color-highlight-soft: rgba(255, 255, 255, 0.05);
+    --color-bg-base: #282828;
+    --color-bg-elevated: #3c3836;
+    --color-bg-inset: rgba(40, 40, 40, 0.5);
+    --color-bg-overlay: rgba(40, 40, 40, 0.85);
+    --color-border: #504945;
+    --color-text-primary: #ebdbb2;
+    --color-text-secondary: #d5c4a1;
+    --color-text-muted: #a89984;
+    --color-accent: #689d6a;
+    --color-accent-hover: #8ec07c;
+    --color-danger: #cc241d;
+    --color-danger-hover: #fb4934;
+    --color-shadow: rgba(0, 0, 0, 0.3);
+    --color-highlight-soft: rgba(235, 219, 178, 0.05);
 }
