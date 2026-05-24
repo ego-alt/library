@@ -38,4 +38,4 @@
     transition: border-color 0.2s ease;
 }
 .input:focus { outline: none; border-color: var(--color-accent); }
-.input::placeholder { color: var(--color-text-faint); }
+.input::placeholder { color: var(--color-text-muted); }
