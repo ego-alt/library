@@ -1,6 +1,5 @@
 """Tests for Flask CLI commands."""
 
-import os
 import sqlite3
 
 import pytest
