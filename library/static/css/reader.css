@@ -1,19 +1,14 @@
-/* Reader tokens — duplicates the spec roles from index.css so the reader page
- * can be served standalone. Reader-only roles (--controls-background,
- * --toc-item-*) stay app-local; they describe surfaces unique to this view. */
+/* Reader-only tokens — the rest of the palette comes from tokens.css (loaded
+ * by the template before this file). The dark-mode override of
+ * --color-text-primary intentionally diverges from the app-wide value: long-
+ * form reading wants softer body text than the rest of library's chrome. */
 :root {
-    --color-bg-base: #FFF1E5;
-    --color-shadow: rgba(0, 0, 0, 0.2);
-    --color-text-primary: #34495E;
-
-    /* Reader-only surfaces. */
     --controls-background: white;
     --toc-item-color: #333;
     --toc-item-highlight: #6AACFF;
     --toc-item-background: #6AACFF4f;
 }
 .dark-mode {
-    --color-bg-base: rgba(40, 44, 52, 0.9);
     --color-text-primary: #888;
     --controls-background: #242424;
     --toc-item-color: #B0B0B0;
