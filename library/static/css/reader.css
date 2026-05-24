@@ -90,7 +90,7 @@ a {
 }
 .btn-primary, .btn-secondary, .btn-outline-secondary {
     padding: 6px 12px;
-    font-size: 14px;
+    font-size: var(--text-sm);
 }
 .display-controls {
     display: flex;
@@ -156,7 +156,7 @@ a {
     padding-left: 14px;
     border-left: 1px solid var(--color-border, rgba(0, 0, 0, 0.08));
     margin-left: 4px;
-    font-size: 0.92em;
+    font-size: var(--text-sm);
 }
 .toc-list li {
     margin: 0;
@@ -184,7 +184,7 @@ a {
     color: var(--color-text-muted, #888);
     font-weight: 600;
     text-transform: uppercase;
-    font-size: 0.78em;
+    font-size: var(--text-xs);
     letter-spacing: 0.04em;
     padding-top: 12px;
 }
@@ -311,7 +311,7 @@ a {
     border-radius: 4px;
     background: var(--color-bg-base);
     color: var(--color-text-primary);
-    font-size: 14px;
+    font-size: var(--text-sm);
 }
 .search-input:focus {
     outline: none;
@@ -332,7 +332,7 @@ a {
 .search-response {
     padding: 4px 16px 12px;
     color: var(--color-text-primary);
-    font-size: 14px;
+    font-size: var(--text-sm);
     line-height: 1.5;
 }
 .temp-highlight {
@@ -350,7 +350,7 @@ a {
 }
 .thinking-animation {
     color: var(--color-text-primary);
-    font-size: 14px;
+    font-size: var(--text-sm);
     padding: 4px 16px 12px;
     opacity: 0.7;
 }
