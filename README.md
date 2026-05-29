@@ -57,16 +57,11 @@
    BOOK_DIR=/path/to/your/books
    ```
 
-3. **Mark the books directory**:
-   The app refuses to boot unless `BOOK_DIR` contains a `.library-mount`
-   sentinel file. This is a guard against a failed mount silently presenting
-   an empty directory (which previously caused data loss).
+3. **Books directory**:
+   `BOOK_DIR` must exist and be a directory before the app starts (create it if needed):
    ```bash
    mkdir -p "$BOOK_DIR"
-   touch "$BOOK_DIR/.library-mount"
    ```
-   On a NAS/external-drive setup, create the sentinel on the *mounted* disk so
-   it disappears whenever the mount fails.
 
 4. **Build and run with Docker Compose**:
    ```bash
