@@ -601,11 +601,14 @@ function generateMetadataHtml(data, isUpload = false) {
 }
 
 function showMetadata(filename) {
-    $.get(`/book_metadata/${filename}`, function(data) {
+    const urlSafe = encodeURIComponent(filename);
+    $.get(appUrl(`/book_metadata/${urlSafe}`), function(data) {
         $('#metadataContent').html(generateMetadataHtml(data));
         $('#metadataOverlay').css('display', 'flex').fadeIn();
         initializeTagInput('tags-input', 'tags-container', data.tags);
         focusFirstMetadataField();
+    }).fail(function() {
+        showToast('Could not load book metadata', 'error');
     });
 }
 
