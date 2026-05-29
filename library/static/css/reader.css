@@ -3,10 +3,10 @@
  * --color-text-primary intentionally diverges from the app-wide value: long-
  * form reading wants softer body text than the rest of library's chrome. */
 :root {
-    --controls-background: white;
-    --toc-item-color: #333;
-    --toc-item-highlight: #6AACFF;
-    --toc-item-background: #6AACFF4f;
+    --controls-background: var(--color-bg-elevated);
+    --toc-item-color: var(--color-text-primary);
+    --toc-item-highlight: var(--color-accent);
+    --toc-item-background: rgba(106, 172, 255, 0.31);  /* accent at ~30% */
 }
 .dark-mode {
     --color-text-primary: #a89984;       /* gruvbox fg4 — softer body text */
@@ -27,12 +27,12 @@ a {
 .reader-container {
     max-width: 800px;
     margin: 0 auto;
-    padding: 20px;
-    padding-top: 10px;
+    padding: var(--space-5);
+    padding-top: var(--space-3);
     transition: padding-top 0.3s ease;
 }
 #chapter-content {
-    margin-bottom: 80px;
+    margin-bottom: var(--space-8);
     font-size: var(--reader-font-size, 16px);
 }
 #chapter-content img {
@@ -47,11 +47,11 @@ a {
     left: 0;
     right: 0;
     background: var(--color-bg-base);
-    padding: 12px;
+    padding: var(--space-3);
     box-shadow: 0 -2px 8px var(--color-shadow);
     display: flex;
     justify-content: center;
-    gap: 15px;
+    gap: var(--space-4);
     align-items: center;
     transform: translateY(0);
     transition: transform 0.25s ease;
@@ -70,7 +70,7 @@ a {
 }
 .controls .btn {
     min-width: 75px;
-    padding: 4px 9px;
+    padding: var(--space-1) var(--space-2);
     color: var(--toc-item-highlight);
 }
 .btn-outline-primary {
@@ -80,7 +80,7 @@ a {
 .btn-outline-primary:hover {
     border-color: var(--toc-item-highlight);
     background: var(--toc-item-highlight);
-    color: white;
+    color: #fff;
     box-shadow: none;
 }
 .btn-outline-primary:focus, .btn-outline-primary:active {
@@ -88,13 +88,13 @@ a {
     box-shadow: none;
 }
 .btn-primary, .btn-secondary, .btn-outline-secondary {
-    padding: 6px 12px;
+    padding: var(--space-2) var(--space-3);
     font-size: var(--text-sm);
 }
 .display-controls {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: var(--space-3);
 }
 .top-controls {
     position: fixed;
@@ -102,7 +102,7 @@ a {
     left: 0;
     right: 0;
     background: var(--controls-background);
-    padding: 12px;
+    padding: var(--space-3);
     box-shadow: 0 2px 8px var(--color-shadow);
     z-index: 100;
     display: flex;
@@ -140,7 +140,7 @@ a {
     transition: left 0.3s ease, top 0.3s ease, height 0.3s ease;
     overflow-y: auto;
     z-index: 98;
-    padding: 20px;
+    padding: var(--space-5);
 }
 .toc-menu.visible {
     left: 0;
@@ -152,22 +152,22 @@ a {
 }
 .toc-list .toc-list {
     /* nested levels: indent and shrink */
-    padding-left: 14px;
-    border-left: 1px solid var(--color-border, rgba(0, 0, 0, 0.08));
-    margin-left: 4px;
+    padding-left: var(--space-4);
+    border-left: 1px solid var(--color-border);
+    margin-left: var(--space-1);
     font-size: var(--text-sm);
 }
 .toc-list li {
     margin: 0;
 }
 .toc-item {
-    padding: 6px 4px;
+    padding: var(--space-2) var(--space-1);
     cursor: pointer;
     color: var(--toc-item-color);
     text-decoration: none;
     display: block;
     line-height: 1.35;
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     transition: background-color 0.15s ease, color 0.15s ease;
 }
 .toc-item:hover {
@@ -180,16 +180,16 @@ a {
 }
 .toc-item.toc-section-header {
     cursor: default;
-    color: var(--color-text-muted, #888);
+    color: var(--color-text-muted);
     font-weight: 600;
     text-transform: uppercase;
     font-size: var(--text-sm);
     letter-spacing: 0.04em;
-    padding-top: 12px;
+    padding-top: var(--space-3);
 }
 .toc-item.toc-section-header:hover {
     background: transparent;
-    color: var(--color-text-muted, #888);
+    color: var(--color-text-muted);
 }
 .top-controls:not(.visible) + .container + .toc-menu {
     top: 0;
@@ -201,13 +201,13 @@ a {
     left: 0;
     right: 0;
     height: 2px;
-    background-color: #e9ecef;
+    background-color: var(--color-border);
 }
 
 .progress-bar {
     height: 100%;
     width: 0;
-    background-color: #6c757d;
+    background-color: var(--color-text-muted);
     transition: width 0.3s ease;
 }
 
@@ -235,11 +235,11 @@ a {
     display: none;
     position: absolute;
     background: var(--color-bg-base);
-    border-radius: 8px;
+    border-radius: var(--radius-md);
     box-shadow: 0 2px 8px var(--color-shadow);
-    padding: 4px;
+    padding: var(--space-1);
     z-index: 1000;
-    gap: 4px;
+    gap: var(--space-1);
     flex-direction: row;
 }
 .selection-menu.active {
@@ -250,7 +250,7 @@ a {
     height: 36px;
     border: none;
     background: none;
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     color: var(--color-text-primary);
     cursor: pointer;
     display: flex;
@@ -258,10 +258,10 @@ a {
     justify-content: center;
 }
 .selection-menu button:hover {
-    background: var(--color-highlight-soft, rgba(0, 0, 0, 0.05));
+    background: var(--color-highlight-soft);
 }
 .dark-mode .selection-menu button:hover {
-    background: var(--color-highlight-soft, rgba(255, 255, 255, 0.05));
+    background: var(--color-highlight-soft);
 }
 .highlighted-text {
     background-color: var(--highlight-color);
@@ -282,7 +282,7 @@ a {
     width: 300px;
     box-shadow: 0 2px 8px var(--color-shadow);
     background: var(--color-bg-base);
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     overflow: hidden;
     transition: width 0.3s ease-out;
 }
@@ -301,13 +301,13 @@ a {
     }
 }
 .search-input-container {
-    padding: 8px;
+    padding: var(--space-2);
 }
 .search-input {
     width: 100%;
-    padding: 4px 8px;
+    padding: var(--space-1) var(--space-2);
     border: 1px solid var(--toc-item-highlight);
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     background: var(--color-bg-base);
     color: var(--color-text-primary);
     font-size: var(--text-sm);
@@ -329,7 +329,7 @@ a {
     overflow-y: auto;
 }
 .search-response {
-    padding: 4px 16px 12px;
+    padding: var(--space-1) var(--space-4) var(--space-3);
     color: var(--color-text-primary);
     font-size: var(--text-sm);
     line-height: 1.5;
@@ -350,7 +350,7 @@ a {
 .thinking-animation {
     color: var(--color-text-primary);
     font-size: var(--text-sm);
-    padding: 4px 16px 12px;
+    padding: var(--space-1) var(--space-4) var(--space-3);
     opacity: 0.7;
 }
 

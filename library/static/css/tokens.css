@@ -16,11 +16,14 @@
     --color-accent-hover: #4F95E8;
     --color-danger: #C0392B;
     --color-danger-hover: #A52A1F;
+    --color-success: #2D8F5B;
     --color-shadow: rgba(0, 0, 0, 0.2);
     --color-highlight-soft: rgba(0, 0, 0, 0.05);
 
+    --space-1: 4px;
     --space-2: 8px;
     --space-3: 12px;
+    --space-4: 16px;
     --space-5: 20px;
     --space-8: 40px;
     --radius-sm: 4px;
@@ -50,6 +53,7 @@
     --color-accent-hover: #8ec07c;
     --color-danger: #cc241d;
     --color-danger-hover: #fb4934;
+    --color-success: #98971a;
     --color-shadow: rgba(0, 0, 0, 0.3);
     --color-highlight-soft: rgba(235, 219, 178, 0.05);
 }

@@ -38,14 +38,14 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     text-align: center;
 }
 .header-left button, .header-right button {
-    margin-left: 10px;
+    margin-left: var(--space-3);
 }
 .header-row h1 {
     color: var(--color-text-muted);
     margin: 0;
 }
 .library {
-    margin-bottom: 30px;
+    margin-bottom: var(--space-8);
 }
 .library img {
     position: absolute;
@@ -61,8 +61,8 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     width: 100%;
     padding-top: 133%;
     overflow: hidden;
-    border-radius: 8px;
-    box-shadow: 0 4px 8px var(--color-shadow);
+    border-radius: var(--radius-md);
+    box-shadow: 0 2px 6px var(--color-shadow);
     cursor: pointer;
 }
 .book:hover img {
@@ -70,30 +70,30 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 }
 .book-buttons {
     position: absolute;
-    top: 10px;
-    right: 10px;
+    top: var(--space-2);
+    right: var(--space-2);
     display: none;
     z-index: 10;
 }
 .book:hover .book-buttons {
     display: flex;
-    gap: 8px;
+    gap: var(--space-2);
 }
 .book-button {
     width: 32px;
     height: 32px;
-    border-radius: 50%;
+    border-radius: var(--radius-pill);
     background: var(--color-bg-elevated);
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     border: none;
-    color: #333;
+    color: var(--color-text-primary);
     transition: background-color 0.2s;
 }
 .book-button:hover {
-    background: white;
+    background: var(--color-bg-base);
 }
 /* ============================================================
    Loading skeleton — shown in the grid while /load_more fetches
@@ -102,7 +102,7 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     position: relative;
     width: 100%;
     padding-top: 133%;  /* match book card 2:3 aspect ratio */
-    border-radius: 8px;
+    border-radius: var(--radius-md);
     background: linear-gradient(
         90deg,
         var(--color-bg-inset) 0%,
@@ -111,7 +111,7 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     );
     background-size: 200% 100%;
     animation: skeleton-shimmer 1.4s linear infinite;
-    box-shadow: 0 4px 8px var(--color-shadow);
+    box-shadow: 0 2px 6px var(--color-shadow);
 }
 @keyframes skeleton-shimmer {
     0%   { background-position: 200% 0; }
@@ -232,42 +232,42 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
    ============================================================ */
 .toast-container {
     position: fixed;
-    bottom: 20px;
-    right: 20px;
+    bottom: var(--space-5);
+    right: var(--space-5);
     z-index: 1100;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--space-2);
     pointer-events: none;
-    max-width: calc(100vw - 40px);
+    max-width: calc(100vw - 2 * var(--space-5));
 }
 .toast {
     background: var(--color-text-secondary);
-    color: white;
-    padding: 11px 16px;
-    border-radius: 8px;
-    box-shadow: 0 6px 20px var(--color-shadow);
+    color: var(--color-bg-base);
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-md);
+    box-shadow: 0 4px 12px var(--color-shadow);
     max-width: 360px;
     font-size: var(--text-sm);
     line-height: 1.35;
     pointer-events: auto;
     cursor: pointer;
     opacity: 0;
-    transform: translateX(20px);
+    transform: translateX(var(--space-5));
     transition: opacity 0.2s ease, transform 0.2s ease;
 }
 .toast--shown {
     opacity: 1;
     transform: translateX(0);
 }
-.toast--success { background: #2d8f5b; }
-.toast--error   { background: #b03a2e; }
+.toast--success { background: var(--color-success); }
+.toast--error   { background: var(--color-danger); }
 .toast--info    { background: var(--color-text-primary); }
 @media (max-width: 600px) {
     .toast-container {
-        right: 12px;
-        left: 12px;
-        bottom: 12px;
+        right: var(--space-3);
+        left: var(--space-3);
+        bottom: var(--space-3);
         align-items: stretch;
     }
     .toast { max-width: none; }
@@ -291,25 +291,25 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
    ============================================================ */
 .metadata-content {
     background: var(--color-bg-base);
-    border-radius: 16px;
+    border-radius: var(--radius-lg);
     max-width: 680px;
     width: 92%;
     max-height: 90vh;
     overflow-y: auto;
     position: relative;
-    box-shadow: 0 24px 60px var(--color-shadow);
+    box-shadow: 0 8px 24px var(--color-shadow);
     animation: slideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-    padding: 26px 30px 20px;
+    padding: var(--space-5);
 }
 @keyframes slideIn {
-    from { transform: translateY(20px); opacity: 0; }
-    to   { transform: translateY(0);    opacity: 1; }
+    from { transform: translateY(var(--space-5)); opacity: 0; }
+    to   { transform: translateY(0);              opacity: 1; }
 }
 
 /* --- Header (book title + author as the modal heading) --- */
 .meta-header {
-    margin-bottom: 20px;
-    padding-right: 44px; /* room for the close × */
+    margin-bottom: var(--space-5);
+    padding-right: var(--space-8); /* room for the close × */
 }
 .meta-title,
 .meta-title-input {
@@ -324,10 +324,10 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 .meta-author-input {
     background: transparent;
     border: 1px solid transparent;
-    border-radius: 6px;
-    padding: 3px 6px;
-    margin-left: -6px;
-    width: calc(100% + 6px);
+    border-radius: var(--radius-sm);
+    padding: 3px var(--space-1);
+    margin-left: calc(-1 * var(--space-1));
+    width: calc(100% + var(--space-1));
     transition: background 0.15s ease, border-color 0.15s ease;
 }
 .meta-title-input:hover,
@@ -345,7 +345,7 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     font-size: var(--text-sm);
     font-weight: 400;
     color: var(--color-text-muted);
-    margin: 4px 0 0;
+    margin: var(--space-1) 0 0;
 }
 .meta-author-input::placeholder { font-style: italic; }
 
@@ -353,15 +353,15 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 .meta-body {
     display: grid;
     grid-template-columns: 150px 1fr;
-    gap: 22px;
+    gap: var(--space-5);
     align-items: start;
 }
 .meta-cover {
     margin: 0;
     position: relative;
-    border-radius: 10px;
+    border-radius: var(--radius-md);
     overflow: hidden;
-    box-shadow: 0 6px 20px var(--color-shadow);
+    box-shadow: 0 4px 12px var(--color-shadow);
     aspect-ratio: 2 / 3;
     background: var(--color-bg-inset);
 }
@@ -378,9 +378,9 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 8px;
+    gap: var(--space-2);
     background: rgba(0, 0, 0, 0.55);
-    color: white;
+    color: #fff;
     border: none;
     cursor: pointer;
     font-size: var(--text-sm);
@@ -393,19 +393,19 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 .meta-cover__change:focus-visible {
     opacity: 1;
 }
-.meta-cover__change:focus-visible { outline: 2px solid white; outline-offset: -4px; }
+.meta-cover__change:focus-visible { outline: 2px solid #fff; outline-offset: calc(-1 * var(--space-1)); }
 
 /* --- Fields stack --- */
 .meta-fields {
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: var(--space-4);
     min-width: 0;
 }
 .meta-field {
     display: flex;
     flex-direction: column;
-    gap: 5px;
+    gap: var(--space-1);
     margin: 0;
 }
 .meta-label {
@@ -419,8 +419,8 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 .meta-value {
     background: var(--color-bg-inset);
     border: 1px solid var(--color-border);
-    border-radius: 7px;
-    padding: 7px 11px;
+    border-radius: var(--radius-md);
+    padding: var(--space-2) var(--space-3);
     font-size: var(--text-sm);
     color: var(--color-text-secondary);
     line-height: 1.3;
@@ -434,7 +434,7 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     box-shadow: 0 0 0 3px var(--color-highlight-soft);
 }
 .meta-input--mono {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-family: var(--font-mono);
     font-size: var(--text-sm);
 }
 .meta-value {
@@ -446,13 +446,13 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 
 /* --- Footer: created-on + actions, with a hairline divider above --- */
 .meta-footer {
-    margin-top: 20px;
-    padding-top: 14px;
+    margin-top: var(--space-5);
+    padding-top: var(--space-4);
     border-top: 1px solid var(--color-border);
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
+    gap: var(--space-3);
 }
 .meta-footer-info {
     color: var(--color-text-muted);
@@ -461,16 +461,16 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 }
 .meta-footer-actions {
     display: flex;
-    gap: 8px;
+    gap: var(--space-2);
 }
 
 /* --- Buttons (preserve legacy class names so JS keeps working) --- */
 .save-button {
     background: var(--color-text-secondary);
-    color: white;
+    color: var(--color-bg-base);
     border: 1px solid transparent;
-    padding: 7px 18px;
-    border-radius: 7px;
+    padding: var(--space-2) var(--space-4);
+    border-radius: var(--radius-md);
     font-size: var(--text-sm);
     font-weight: 600;
     cursor: pointer;
@@ -480,30 +480,30 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 .save-button:active { transform: translateY(1px); }
 .delete-book-button {
     background: transparent;
-    color: #c0392b;
+    color: var(--color-danger);
     border: 1px solid transparent;
-    padding: 7px 14px;
-    border-radius: 7px;
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md);
     font-size: var(--text-sm);
     font-weight: 500;
     cursor: pointer;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--space-1);
     transition: background 0.15s ease, color 0.15s ease;
 }
 .delete-book-button i { font-size: var(--text-sm); }
 .delete-book-button:hover {
-    background: rgba(192, 57, 43, 0.1);
-    color: #962d22;
+    background: var(--color-highlight-soft);
+    color: var(--color-danger-hover);
 }
 .delete-book-button:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* --- Close button --- */
 .close-metadata {
     position: absolute;
-    top: 12px;
-    right: 12px;
+    top: var(--space-3);
+    right: var(--space-3);
     cursor: pointer;
     border: none;
     background: none;
@@ -516,7 +516,7 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 50%;
+    border-radius: var(--radius-pill);
     z-index: 1;
 }
 .close-metadata:hover {
@@ -527,10 +527,10 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 
 /* --- Responsive: stack the cover above fields on narrow viewports --- */
 @media (max-width: 600px) {
-    .metadata-content { padding: 28px 20px 22px; }
+    .metadata-content { padding: var(--space-5); }
     .meta-body {
         grid-template-columns: 1fr;
-        gap: 20px;
+        gap: var(--space-5);
     }
     .meta-cover {
         max-width: 200px;
@@ -543,11 +543,11 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 .tag-input-container {
     background: var(--color-bg-inset);
     border: 1px solid var(--color-border);
-    border-radius: 6px;
-    padding: 4px 8px;
+    border-radius: var(--radius-md);
+    padding: var(--space-1) var(--space-2);
     display: flex;
     flex-wrap: wrap;
-    gap: 4px;
+    gap: var(--space-1);
     align-items: center;
     min-height: 38px;
     position: relative;
@@ -560,14 +560,14 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     margin-top: 2px;
     background: var(--color-bg-base);
     border: 1px solid var(--color-border);
-    border-radius: 6px;
+    border-radius: var(--radius-md);
     box-shadow: 0 4px 12px var(--color-shadow);
     max-height: 180px;
     overflow-y: auto;
     z-index: 1100;
 }
 .tag-suggestion {
-    padding: 6px 10px;
+    padding: var(--space-2) var(--space-3);
     font-size: var(--text-sm);
     color: var(--color-text-secondary);
     cursor: pointer;
@@ -577,11 +577,13 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     background: var(--color-highlight-soft);
     color: var(--color-text-primary);
 }
+/* Plain-text input inside the chip row. Selector is specific enough (0,1,1)
+ * to beat Bootstrap's `.form-control` (0,1,0) without `!important`. */
 .tag-input-container input {
-    border: none !important;
-    background: none !important;
-    padding: 4px !important;
-    margin: 0 !important;
+    border: none;
+    background: none;
+    padding: var(--space-1);
+    margin: 0;
     min-width: 120px;
     flex: 1;
 }
@@ -591,17 +593,17 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 .tags-container {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px;
+    gap: var(--space-1);
 }
 .tag {
     background: var(--color-text-primary);
-    color: white;
-    padding: 2px 8px;
-    border-radius: 12px;
+    color: var(--color-bg-base);
+    padding: 2px var(--space-2);
+    border-radius: var(--radius-pill);
     font-size: var(--text-sm);
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--space-1);
 }
 
 .tag .remove-tag {
@@ -624,14 +626,14 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     top: 50%;
     transform: translateY(-50%);
     display: flex;
-    gap: 0.5rem;
+    gap: var(--space-2);
 }
 .filter-button, .login-button, .upload-button, .dark-mode-toggle, .view-toggle, .layout-toggle {
     background: none;
     border: none;
     font-size: var(--text-lg);
     color: var(--color-text-primary);
-    padding: 8px;
+    padding: var(--space-2);
     cursor: pointer;
     transition: color 0.2s;
 }
@@ -654,8 +656,8 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     width: 300px;
     height: 100%;
     background: var(--color-bg-base);
-    box-shadow: -5px 0 15px var(--color-border);
-    padding: 20px;
+    box-shadow: -2px 0 8px var(--color-shadow);
+    padding: var(--space-5);
     transition: right 0.3s ease;
     z-index: 999;
     overflow-y: auto;
@@ -664,24 +666,24 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     right: 0;
 }
 .filter-sidebar h3 {
-    margin-bottom: 20px;
-    padding-bottom: 10px;
+    margin-bottom: var(--space-5);
+    padding-bottom: var(--space-3);
     border-bottom: 1px solid var(--color-border);
 }
 .filter-group {
-    margin-bottom: 20px;
+    margin-bottom: var(--space-5);
 }
 .filter-group label {
     display: block;
-    margin-bottom: 8px;
+    margin-bottom: var(--space-2);
     color: var(--color-text-primary);
     font-weight: 600;
 }
 .filter-group input {
     width: 100%;
-    padding: 8px;
+    padding: var(--space-2);
     border: 1px solid var(--color-border);
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     background: var(--color-bg-inset);
 }
 .filter-overlay {
@@ -709,48 +711,48 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 }
 .login-content {
     background: var(--color-bg-base);
-    padding: 30px;
-    border-radius: 16px;
+    padding: var(--space-5);
+    border-radius: var(--radius-lg);
     max-width: 400px;
     width: 90%;
     position: relative;
-    box-shadow: 0 10px 30px var(--color-shadow);
+    box-shadow: 0 8px 24px var(--color-shadow);
     animation: slideIn 0.3s ease-out;
 }
 .login-content h3 {
-    margin-bottom: 20px;
+    margin-bottom: var(--space-5);
     color: var(--color-text-secondary);
     text-align: center;
 }
 .login-field {
-    margin-bottom: 20px;
+    margin-bottom: var(--space-5);
 }
 
 .login-field label {
     display: block;
-    margin-bottom: 8px;
+    margin-bottom: var(--space-2);
     color: var(--color-text-primary);
     font-weight: 500;
 }
 .login-field input:not([type="checkbox"]) {
     width: 100%;
-    padding: 10px;
+    padding: var(--space-3);
     border: 1px solid var(--color-border);
-    border-radius: 6px;
+    border-radius: var(--radius-md);
     background: var(--color-bg-inset);
 }
 .login-field.checkbox {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--space-2);
 }
 .login-submit {
     width: 100%;
-    padding: 12px;
+    padding: var(--space-3);
     background: var(--color-text-secondary);
-    color: white;
+    color: var(--color-bg-base);
     border: none;
-    border-radius: 6px;
+    border-radius: var(--radius-md);
     font-size: var(--text-lg);
     cursor: pointer;
     transition: background-color 0.2s;
@@ -760,8 +762,8 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 }
 .close-login {
     position: absolute;
-    top: 15px;
-    right: 15px;
+    top: var(--space-4);
+    right: var(--space-4);
     background: none;
     border: none;
     font-size: var(--text-lg);
@@ -772,14 +774,14 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 50%;
+    border-radius: var(--radius-pill);
     transition: background-color 0.2s;
 }
 .close-login:hover {
     background: var(--color-highlight-soft);
 }
 #loginError {
-    margin-bottom: 20px;
+    margin-bottom: var(--space-5);
 }
 .started-tag {
     background: var(--tag-started);
@@ -796,7 +798,9 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 .dark-mode .book img {
     filter: brightness(0.6);
 }
+/* Specificity (0,1,1) beats Bootstrap's `.form-control` (0,1,0), so the
+ * override sticks without `!important`. */
 .dark-mode input,
 .dark-mode textarea {
-    color: var(--color-text-secondary) !important;
+    color: var(--color-text-secondary);
 }
