@@ -14,6 +14,7 @@ from flask import (
 from flask_login import current_user
 
 from ..choices import BookProgressChoice, UserRoleChoice
+from ..matching import DEFAULT_MATCH_THRESHOLD, rank_matches
 from ..models import Book, Bookmark, Tag, book_tags, db
 from ..utils import (
     cover_mimetype,
@@ -21,7 +22,12 @@ from ..utils import (
     guess_cover_mimetype_from_bytes,
     read_epub_cover,
 )
-from ._helpers import commit_or_rollback, get_book_or_404, json_admin_required
+from ._helpers import (
+    commit_or_rollback,
+    get_book_or_404,
+    json_admin_required,
+    json_login_required,
+)
 
 index_blueprint = Blueprint("index_routes", __name__)
 
@@ -274,3 +280,37 @@ def delete_book(filename):
             current_app.logger.warning(f"Removed DB row but failed to unlink {epub_path}: {e}")
 
     return jsonify({"message": "Book deleted"})
+
+
+@index_blueprint.route("/books", methods=["GET"])
+@json_login_required
+def search_books():
+    """Fuzzy title+author lookup. Answers "do I already own this scanned book?" — 
+    returns the closest library books (best first) so the app can show ownership 
+    without exact-string luck. Matching tolerates edition/format and name-order 
+    differences; the cutoff is LIBRARY_MATCH_THRESHOLD.
+    """
+    title = (request.args.get("title") or "").strip()
+    author = (request.args.get("author") or "").strip()
+    if not title and not author:
+        return jsonify({"error": "title or author is required"}), 400
+
+    query = Book.query
+    if current_user.role == UserRoleChoice.STANDARD:
+        query = query.filter(Book.access_level == "standard")
+
+    threshold = current_app.config.get(
+        "LIBRARY_MATCH_THRESHOLD", DEFAULT_MATCH_THRESHOLD
+    )
+    matches = rank_matches(title, author, query.all(), threshold)
+    return jsonify({
+        "matches": [
+            {
+                "title": book.title,
+                "author": book.author,
+                "filename": book.filename,
+                "score": round(score, 3),
+            }
+            for book, score in matches
+        ]
+    })

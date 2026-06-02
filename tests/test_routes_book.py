@@ -257,3 +257,44 @@ def test_delete_book_succeeds_even_when_file_missing(admin_client, app, book):
 def test_delete_unknown_book_returns_404(admin_client):
     r = admin_client.delete("/book/nope.epub")
     assert r.status_code == 404
+
+
+# --- GET /books (book-scanner title+author lookup) ------------------------------
+
+
+def test_books_search_requires_auth(client, book):
+    r = client.get("/books?title=Test%20Book")
+    assert r.status_code == 401
+
+
+def test_books_search_finds_owned_book(standard_client, book):
+    r = standard_client.get("/books?title=Test%20Book&author=Test%20Author")
+    assert r.status_code == 200
+    matches = r.get_json()["matches"]
+    assert len(matches) == 1
+    assert matches[0]["filename"] == book.filename
+    assert matches[0]["score"] >= 0.99
+
+
+def test_books_search_tolerates_fuzzy_title(standard_client, book):
+    """A slightly-off scanned title still resolves to the owned book."""
+    r = standard_client.get("/books?title=The%20Test%20Book&author=Test%20Author")
+    matches = r.get_json()["matches"]
+    assert matches and matches[0]["filename"] == book.filename
+
+
+def test_books_search_returns_empty_for_unrelated(standard_client, book):
+    r = standard_client.get("/books?title=War%20and%20Peace&author=Tolstoy")
+    assert r.get_json()["matches"] == []
+
+
+def test_books_search_requires_a_query(standard_client):
+    r = standard_client.get("/books")
+    assert r.status_code == 400
+
+
+def test_books_search_excludes_restricted_for_standard_user(standard_client, book):
+    book.access_level = "restricted"
+    db.session.commit()
+    r = standard_client.get("/books?title=Test%20Book&author=Test%20Author")
+    assert r.get_json()["matches"] == []
