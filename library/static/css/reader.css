@@ -21,6 +21,18 @@ body {
 p {
     color: var(--color-text-primary);
 }
+/* Chapter headings + book title aren't covered by index.css (not loaded here),
+   so without this they fall back to Bootstrap's dark default and vanish against
+   the dark-mode background. Secondary stays brighter than the muted body text. */
+#chapter-content h1,
+#chapter-content h2,
+#chapter-content h3,
+#chapter-content h4,
+#chapter-content h5,
+#chapter-content h6,
+#book-title {
+    color: var(--color-text-secondary);
+}
 a {
     color: var(--toc-item-highlight);
 }
