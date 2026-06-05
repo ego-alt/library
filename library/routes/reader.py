@@ -25,6 +25,7 @@ from ._helpers import (
     commit_or_rollback,
     get_book_or_404,
     json_login_required,
+    user_can_access_book,
 )
 
 read_blueprint = Blueprint("read_routes", __name__)
@@ -43,6 +44,9 @@ def _llm_response(payload_key: str, fn, *args):
 @read_blueprint.route("/read/<filename>")
 def read_book(filename):
     """Render the in-browser epub reader."""
+    book = get_book_or_404(filename)
+    if not user_can_access_book(book):
+        abort(403, description="Forbidden")
     return render_template("reader.html")
 
 
@@ -50,6 +54,8 @@ def read_book(filename):
 def load_book(filename):
     """Load the book and return the book data as a stream."""
     book = get_book_or_404(filename)
+    if not user_can_access_book(book):
+        abort(403, description="Forbidden")
     bookmark = None
 
     if current_user.is_authenticated:
@@ -162,6 +168,8 @@ def stream_book_content(
 def book_asset(filename, asset_path):
     """Serve a single file (image, font, etc) from inside an EPUB with long-lived caching."""
     book = get_book_or_404(filename)
+    if not user_can_access_book(book):
+        abort(403, description="Forbidden")
     epub_path = os.path.join(current_app.config["BOOK_DIR"], book.filename)
     if not os.path.exists(epub_path):
         abort(404, description="Book file not found")

@@ -1,7 +1,7 @@
 import json
 
 from library.choices import BookProgressChoice
-from library.models import Bookmark
+from library.models import Bookmark, db
 
 
 def _read_ndjson(response):
@@ -120,3 +120,53 @@ def test_book_asset_returns_304_on_matching_etag(client, book):
 def test_book_asset_404s_for_missing_path_inside_zip(client, book):
     r = client.get(f"/book_asset/{book.filename}/OEBPS/missing.png")
     assert r.status_code == 404
+
+
+# --- access control for restricted books ----------------------------------------
+
+
+def _restrict(book):
+    book.access_level = "restricted"
+    db.session.commit()
+
+
+def test_read_book_blocks_anonymous_for_restricted(client, book):
+    _restrict(book)
+    r = client.get(f"/read/{book.filename}")
+    assert r.status_code == 403
+
+
+def test_read_book_blocks_standard_for_restricted(standard_client, book):
+    _restrict(book)
+    r = standard_client.get(f"/read/{book.filename}")
+    assert r.status_code == 403
+
+
+def test_read_book_allows_admin_for_restricted(admin_client, book):
+    _restrict(book)
+    r = admin_client.get(f"/read/{book.filename}")
+    assert r.status_code == 200
+
+
+def test_load_book_blocks_standard_for_restricted(standard_client, book):
+    _restrict(book)
+    r = standard_client.get(f"/load_book/{book.filename}")
+    assert r.status_code == 403
+
+
+def test_load_book_allows_admin_for_restricted(admin_client, book):
+    _restrict(book)
+    r = admin_client.get(f"/load_book/{book.filename}")
+    assert r.status_code == 200
+
+
+def test_book_asset_blocks_standard_for_restricted(standard_client, book):
+    _restrict(book)
+    r = standard_client.get(f"/book_asset/{book.filename}/OEBPS/cover.png")
+    assert r.status_code == 403
+
+
+def test_book_asset_allows_admin_for_restricted(admin_client, book):
+    _restrict(book)
+    r = admin_client.get(f"/book_asset/{book.filename}/OEBPS/cover.png")
+    assert r.status_code == 200

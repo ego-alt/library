@@ -4,7 +4,7 @@ from functools import wraps
 from flask import abort, jsonify
 from flask_login import current_user
 
-from ..choices import UserRoleChoice
+from ..choices import AccessLevelChoice, UserRoleChoice
 from ..models import Book, db
 
 
@@ -40,6 +40,14 @@ def get_book_or_404(filename: str) -> Book:
     if not book:
         abort(404, description="Book not found")
     return book
+
+
+def user_can_access_book(book: Book) -> bool:
+    """Whether the current user may see/read/download this book. Standard-access
+    books are open to everyone; anything else is admin-only."""
+    if book.access_level == AccessLevelChoice.STANDARD.value:
+        return True
+    return current_user.is_authenticated and current_user.role == UserRoleChoice.ADMIN
 
 
 @contextmanager

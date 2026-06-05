@@ -95,6 +95,9 @@
             {% for book in images %}
                 <div class="col-md-3 mb-3" data-length="{{ book.length }}">
                     <div class="book">
+                        {% if book.access_level and book.access_level != 'standard' %}
+                        <span class="book-lock" title="Admin only" aria-label="Admin only"><i class="fas fa-lock"></i></span>
+                        {% endif %}
                         <div class="book-buttons">
                             <button class="book-button">
                                 <a href="{{ url_for('index_routes.download', filename=book.filename) }}" download>

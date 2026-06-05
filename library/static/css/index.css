@@ -95,6 +95,30 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 .book-button:hover {
     background: var(--color-bg-base);
 }
+/* Admin-only marker — top-left so it clears the top-right .book-buttons. */
+.book-lock {
+    position: absolute;
+    top: var(--space-2);
+    left: var(--space-2);
+    z-index: 10;
+    width: 26px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-pill);
+    background: var(--color-bg-overlay);
+    color: #fff;
+    font-size: var(--text-sm);
+    pointer-events: none;
+}
+.book-spine .book-lock {
+    top: 6px;
+    left: 6px;
+    width: 20px;
+    height: 20px;
+    font-size: 11px;
+}
 /* ============================================================
    Loading skeleton — shown in the grid while /load_more fetches
    ============================================================ */
@@ -443,6 +467,15 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     align-items: center;
 }
 .meta-field--muted .meta-label { opacity: 0.7; }
+/* Access toggle: checkbox + inline label on one row, not the stacked default. */
+.meta-checkbox-field {
+    flex-direction: row;
+    align-items: center;
+    gap: var(--space-2);
+    cursor: pointer;
+}
+.meta-checkbox-field input { cursor: pointer; }
+.meta-checkbox-field .meta-label { text-transform: none; letter-spacing: normal; }
 
 /* --- Footer: created-on + actions, with a hairline divider above --- */
 .meta-footer {

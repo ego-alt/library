@@ -90,6 +90,60 @@ def test_anonymous_metadata_omits_tags(client, book):
     assert r.get_json()["tags"] == []
 
 
+# --- access_level (admin-only books) --------------------------------------------
+
+
+def test_get_metadata_exposes_access_level(client, book):
+    r = client.get(f"/book_metadata/{book.filename}")
+    assert r.get_json()["access_level"] == "standard"
+
+
+def test_admin_can_set_access_level_restricted(admin_client, book):
+    r = admin_client.post(
+        f"/book_metadata/{book.filename}",
+        json={"title": book.title, "author": book.author, "genre": "",
+              "tags": [], "access_level": "restricted"},
+    )
+    assert r.status_code == 200
+    db.session.refresh(book)
+    assert book.access_level == "restricted"
+
+
+def test_admin_can_clear_access_level_back_to_standard(admin_client, book):
+    book.access_level = "restricted"
+    db.session.commit()
+    r = admin_client.post(
+        f"/book_metadata/{book.filename}",
+        json={"title": book.title, "author": book.author, "genre": "",
+              "tags": [], "access_level": "standard"},
+    )
+    assert r.status_code == 200
+    db.session.refresh(book)
+    assert book.access_level == "standard"
+
+
+def test_standard_user_cannot_change_access_level(standard_client, book):
+    r = standard_client.post(
+        f"/book_metadata/{book.filename}",
+        json={"title": book.title, "author": book.author, "genre": "",
+              "tags": [], "access_level": "restricted"},
+    )
+    assert r.status_code == 200  # the rest of the save still succeeds
+    db.session.refresh(book)
+    assert book.access_level == "standard"  # but access_level is untouched
+
+
+def test_admin_invalid_access_level_is_ignored(admin_client, book):
+    r = admin_client.post(
+        f"/book_metadata/{book.filename}",
+        json={"title": book.title, "author": book.author, "genre": "",
+              "tags": [], "access_level": "superuser"},
+    )
+    assert r.status_code == 200
+    db.session.refresh(book)
+    assert book.access_level == "standard"
+
+
 # --- /tags (autocomplete suggestions) -------------------------------------------
 
 

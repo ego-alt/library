@@ -3,6 +3,7 @@ import os
 from flask import Blueprint, current_app, jsonify, request, url_for
 from flask_login import current_user
 
+from ..choices import AccessLevelChoice, UserRoleChoice
 from ..models import Bookmark, BookProgressChoice, Tag, book_tags, db
 from ..utils import update_epub_cover
 from ._helpers import (
@@ -75,6 +76,15 @@ def book_metadata(filename):
         book.author = data.get("author", book.author)
         book.genre = data.get("genre", book.genre)
 
+        # Access level is admin-only to change. Non-admins (and unknown values)
+        # leave it untouched — the toggle isn't rendered for them either.
+        if (
+            current_user.role == UserRoleChoice.ADMIN
+            and "access_level" in data
+            and data["access_level"] in (c.value for c in AccessLevelChoice)
+        ):
+            book.access_level = data["access_level"]
+
         incoming = data.get("tags", [])
         status_tag = next((t for t in incoming if t in PROGRESS_TAG_VALUES), None)
         custom_tag_names = [t for t in incoming if t not in PROGRESS_TAG_VALUES]
@@ -119,6 +129,7 @@ def book_metadata(filename):
         "tags": [],
         "filename": book.filename,
         "cover": url_for("index_routes.cover", filename=book.filename),
+        "access_level": book.access_level,
     }
 
     if current_user.is_authenticated:

@@ -18,6 +18,29 @@ def test_load_more_returns_book_list(client, book):
     assert len(items) == 1
     assert items[0]["filename"] == book.filename
     assert items[0]["cover"] == f"/cover/{book.filename}"
+    assert items[0]["access_level"] == "standard"
+
+
+def test_load_more_excludes_restricted_for_standard_user(standard_client, book):
+    book.access_level = "restricted"
+    db.session.commit()
+    r = standard_client.get("/load_more/0")
+    assert r.get_json() == []
+    assert r.headers["X-Total-Count"] == "0"
+
+
+def test_load_more_excludes_restricted_for_anonymous(client, book):
+    book.access_level = "restricted"
+    db.session.commit()
+    assert client.get("/load_more/0").get_json() == []
+
+
+def test_load_more_includes_restricted_for_admin(admin_client, book):
+    book.access_level = "restricted"
+    db.session.commit()
+    items = admin_client.get("/load_more/0").get_json()
+    assert len(items) == 1
+    assert items[0]["access_level"] == "restricted"
 
 
 def test_load_more_filters_by_title(client, book):

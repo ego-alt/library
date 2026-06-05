@@ -49,6 +49,13 @@ function spineHeight(filename) {
     return 230 + (Math.abs(h) % 71); // 230–300 px
 }
 
+// Lock badge for admin-only books. Only admins ever receive such books in
+// their cover feed, so its presence doubles as the "restricted" marker.
+function lockBadge(book) {
+    if (!book.access_level || book.access_level === 'standard') return '';
+    return `<span class="book-lock" title="Admin only" aria-label="Admin only"><i class="fas fa-lock"></i></span>`;
+}
+
 function getSpineTemplate(book) {
     const urlSafe = encodeURIComponent(book.filename);
     const attrSafe = escapeHtml(book.filename);
@@ -61,6 +68,7 @@ function getSpineTemplate(book) {
                  style="height: ${height}px; background-image: url(${coverSafe})"
                  title="${attrSafe}">
                 <a class="book-spine__link" href="${appUrl(`/read/${urlSafe}`)}" aria-label="${attrSafe}"></a>
+                ${lockBadge(book)}
                 <div class="book-buttons">
                     <button class="book-button book-button--spine">
                         <a href="${appUrl(`/download/${urlSafe}`)}" download>
@@ -128,6 +136,7 @@ function getBookTemplate(book) {
     return `
         <div class="col-md-3 mb-3">
             <div class="book">
+                ${lockBadge(book)}
                 <div class="book-buttons">
                     <button class="book-button">
                         <a href="${appUrl(`/download/${urlSafe}`)}" download>
@@ -380,6 +389,8 @@ function seedLoadedBooksFromDOM() {
             filename: decodeURIComponent(href.slice(readIdx + readMarker.length)),
             cover: img.getAttribute('src') || '',
             length: Number.isFinite(rawLength) ? rawLength : 0,
+            // The lock badge encodes admin-only state in the server-rendered grid.
+            access_level: col.querySelector('.book-lock') ? 'restricted' : 'standard',
         });
     });
 }
@@ -529,6 +540,17 @@ function generateMetadataHtml(data, isUpload = false) {
         </label>
     `;
 
+    // --- Admin-only access toggle (admins, existing books) ---
+    const adminOnlyField = (isAdmin && !isUpload)
+        ? `
+            <label class="meta-field meta-checkbox-field">
+                <input type="checkbox" id="metadata-admin-only"
+                       ${data.access_level !== 'standard' ? 'checked' : ''}>
+                <span class="meta-label">Admin only — hide from standard users</span>
+            </label>
+          `
+        : '';
+
     // --- Tags (existing book) or filename (upload) ---
     const extraField = isUpload
         ? `
@@ -587,6 +609,7 @@ function generateMetadataHtml(data, isUpload = false) {
             ${cover}
             <div class="meta-fields">
                 ${genreField}
+                ${adminOnlyField}
                 ${extraField}
             </div>
         </section>
@@ -658,6 +681,12 @@ function saveMetadata(filename) {
             tag.textContent.replace(/×/g, '').trim()
         )
     };
+
+    // Access level is admin-only; the toggle only renders for admins. The
+    // server ignores the field for non-admins regardless.
+    if (isAdmin && $('#metadata-admin-only').length) {
+        metadata.access_level = $('#metadata-admin-only').is(':checked') ? 'restricted' : 'standard';
+    }
 
     const saveButton = $('.save-button');
     const originalText = saveButton.text();

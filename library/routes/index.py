@@ -13,7 +13,7 @@ from flask import (
 )
 from flask_login import current_user
 
-from ..choices import BookProgressChoice, UserRoleChoice
+from ..choices import AccessLevelChoice, BookProgressChoice, UserRoleChoice
 from ..matching import DEFAULT_MATCH_THRESHOLD, rank_matches
 from ..models import Book, Bookmark, Tag, book_tags, db
 from ..utils import (
@@ -27,6 +27,7 @@ from ._helpers import (
     get_book_or_404,
     json_admin_required,
     json_login_required,
+    user_can_access_book,
 )
 
 index_blueprint = Blueprint("index_routes", __name__)
@@ -54,7 +55,7 @@ def _filtered_book_query(filters=None, view=VIEW_ALL):
         not current_user.is_authenticated
         or current_user.role == UserRoleChoice.STANDARD
     ):
-        query = query.filter(Book.access_level == "standard")
+        query = query.filter(Book.access_level == AccessLevelChoice.STANDARD.value)
 
     if current_user.is_authenticated:
         query = query.outerjoin(
@@ -132,6 +133,7 @@ def get_covers(offset=0, limit=BOOKS_PER_LOAD, filters=None, view=VIEW_ALL):
             "filename": book.filename,
             "cover": url_for("index_routes.cover", filename=book.filename),
             "length": _book_text_size(book),
+            "access_level": book.access_level,
         }
         for book in query.offset(offset).limit(limit).all()
     ]
@@ -247,10 +249,7 @@ def download(filename):
     """Serve the EPUB file for download, respecting per-book access level."""
     book = get_book_or_404(filename)
 
-    if book.access_level != "standard" and (
-        not current_user.is_authenticated
-        or current_user.role == UserRoleChoice.STANDARD
-    ):
+    if not user_can_access_book(book):
         return jsonify({"error": "Forbidden"}), 403
 
     return send_from_directory(
@@ -297,7 +296,7 @@ def search_books():
 
     query = Book.query
     if current_user.role == UserRoleChoice.STANDARD:
-        query = query.filter(Book.access_level == "standard")
+        query = query.filter(Book.access_level == AccessLevelChoice.STANDARD.value)
 
     threshold = current_app.config.get(
         "LIBRARY_MATCH_THRESHOLD", DEFAULT_MATCH_THRESHOLD
