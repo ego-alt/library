@@ -609,8 +609,8 @@ function generateMetadataHtml(data, isUpload = false) {
             ${cover}
             <div class="meta-fields">
                 ${genreField}
-                ${adminOnlyField}
                 ${extraField}
+                ${adminOnlyField}
             </div>
         </section>
         <footer class="meta-footer">
