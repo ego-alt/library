@@ -94,7 +94,10 @@ def _filtered_book_query(filters=None, view=VIEW_ALL):
 
             progress_tags, other_tags = [], []
             for tag in tags:
-                if tag in (BookProgressChoice.IN_PROGRESS.value, BookProgressChoice.FINISHED.value):
+                if tag in (
+                    BookProgressChoice.IN_PROGRESS.value,
+                    BookProgressChoice.FINISHED.value,
+                ):
                     progress_tags.append(tag)
                 elif tag != BookProgressChoice.UNREAD.value:
                     other_tags.append(tag)
@@ -276,7 +279,9 @@ def delete_book(filename):
         try:
             os.remove(epub_path)
         except OSError as e:
-            current_app.logger.warning(f"Removed DB row but failed to unlink {epub_path}: {e}")
+            current_app.logger.warning(
+                f"Removed DB row but failed to unlink {epub_path}: {e}"
+            )
 
     return jsonify({"message": "Book deleted"})
 
@@ -284,9 +289,9 @@ def delete_book(filename):
 @index_blueprint.route("/books", methods=["GET"])
 @json_login_required
 def search_books():
-    """Fuzzy title+author lookup. Answers "do I already own this scanned book?" — 
-    returns the closest library books (best first) so the app can show ownership 
-    without exact-string luck. Matching tolerates edition/format and name-order 
+    """Fuzzy title+author lookup. Answers "do I already own this scanned book?" —
+    returns the closest library books (best first) so the app can show ownership
+    without exact-string luck. Matching tolerates edition/format and name-order
     differences; the cutoff is LIBRARY_MATCH_THRESHOLD.
     """
     title = (request.args.get("title") or "").strip()

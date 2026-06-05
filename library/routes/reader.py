@@ -76,13 +76,16 @@ def load_book(filename):
         elif bookmark.status == BookProgressChoice.UNREAD:
             bookmark.status = BookProgressChoice.IN_PROGRESS
             logging.info(
-                f"Setting status to IN_PROGRESS for book {book.id} and user {current_user.id}"
+                "Setting status to IN_PROGRESS for book "
+                f"{book.id} and user {current_user.id}"
             )
 
         bookmark.last_read = _utcnow()
         db.session.commit()
 
-    asset_url_prefix = url_for("read_routes.book_asset", filename=filename, asset_path="")
+    asset_url_prefix = url_for(
+        "read_routes.book_asset", filename=filename, asset_path=""
+    )
 
     try:
         return Response(
@@ -166,7 +169,7 @@ def stream_book_content(
 
 @read_blueprint.route("/book_asset/<filename>/<path:asset_path>")
 def book_asset(filename, asset_path):
-    """Serve a single file (image, font, etc) from inside an EPUB with long-lived caching."""
+    """Serve a file (image, font, etc) from inside an EPUB with long-lived caching."""
     book = get_book_or_404(filename)
     if not user_can_access_book(book):
         abort(403, description="Forbidden")
