@@ -46,7 +46,7 @@
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/ego-alt/library.git
+   git clone git@github.com:ego-alt/library.git
    cd library
    ```
 
@@ -77,8 +77,9 @@
 
 ## Home stack (with dashboard)
 
-Served at `/library/` behind the [dashboard](../dashboard) nginx proxy. In that
-mode, set:
+Served at `/library/` behind the [dashboard](../dashboard) nginx proxy, gated by
+its `auth_request` and wired into `../dashboard/docker-compose.yml` (internal
+port `5001`). In that mode, set:
 
 ```bash
 AUTH_PROXY_HEADER=X-Forwarded-User
@@ -94,6 +95,10 @@ After adding a user in dashboard, sync shadow accounts:
 ```bash
 cd ../dashboard && uv run python scripts/sync_household_users.py
 ```
+
+> Code is baked into the image at build time. After pulling changes, rebuild:
+> `docker compose build library && docker compose up -d library`. A bare
+> `up -d` reuses the old image.
 
 See `dashboard/README.md` for compose and user sync.
 
