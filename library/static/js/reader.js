@@ -824,6 +824,35 @@ document.addEventListener('click', (e) => {
     }
 });
 
+// <== SCROLL MODE: horizontal swipe → section nav ==>
+// Paginated mode has the tap-zones above; scroll mode has no natural touch
+// gesture for moving between sections, so map a horizontal swipe to prev/next.
+// Vertical-dominant gestures fall through to normal scrolling, and an active
+// text selection suppresses nav so the selection menu stays usable.
+const SWIPE_MIN_PX = 70;        // ignore short drags
+let _swipeStartX = null, _swipeStartY = null;
+document.addEventListener('touchstart', (e) => {
+    if (isPaginated() || e.touches.length !== 1) { _swipeStartX = null; return; }
+    // Ignore swipes that start on interactive chrome.
+    if (e.target.closest(
+        'button, a, input, textarea, .toc-menu, .top-controls, ' +
+        '.controls, .selection-menu, .search-overlay'
+    )) { _swipeStartX = null; return; }
+    _swipeStartX = e.touches[0].clientX;
+    _swipeStartY = e.touches[0].clientY;
+}, {passive: true});
+document.addEventListener('touchend', (e) => {
+    if (_swipeStartX === null) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - _swipeStartX;
+    const dy = t.clientY - _swipeStartY;
+    _swipeStartX = null;
+    // Require a clearly horizontal swipe past the threshold.
+    if (Math.abs(dx) < SWIPE_MIN_PX || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    if (window.getSelection().toString().trim()) return;
+    if (dx < 0) nextChapter(); else prevChapter();
+}, {passive: true});
+
 // Recompute pagination on resize. Debounced; preserves the user's relative
 // position in the chapter across the relayout.
 let _readerResizeTimer;
