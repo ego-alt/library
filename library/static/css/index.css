@@ -47,6 +47,13 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 .library {
     margin-bottom: var(--space-8);
 }
+/* Phones show 2 covers per row (col-6); Bootstrap's default 1.5rem gutter
+ * eats too much of that width, so tighten it below the sm breakpoint. */
+@media (max-width: 575.98px) {
+    .library {
+        --bs-gutter-x: 0.75rem;
+    }
+}
 .library img {
     position: absolute;
     top: 0;
@@ -78,6 +85,15 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 .book:hover .book-buttons {
     display: flex;
     gap: var(--space-2);
+}
+/* Touch devices have no hover, so the cover's download/metadata buttons would
+ * be unreachable. Surface them permanently in grid view. (Shelf spines are too
+ * narrow to carry the stacked buttons legibly, so they stay tap-to-read only.) */
+@media (hover: none) {
+    .book .book-buttons {
+        display: flex;
+        gap: var(--space-2);
+    }
 }
 .book-button {
     width: 32px;
@@ -681,6 +697,18 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 .layout-toggle.active:hover {
     color: var(--color-accent);
     opacity: 0.8;
+}
+/* Narrow screens: up to 6 icon buttons flank the centered title via absolutely-
+ * positioned groups. Shrink the icons, their spacing, and the title so they
+ * don't crowd (or overlap) each other on phones. */
+@media (max-width: 575.98px) {
+    .header-left button, .header-right button { margin-left: var(--space-1); }
+    .filter-button, .login-button, .upload-button,
+    .dark-mode-toggle, .view-toggle, .layout-toggle {
+        font-size: var(--text-base);
+        padding: var(--space-1);
+    }
+    .header-row h1 { font-size: var(--text-lg); }
 }
 .filter-sidebar {
     position: fixed;

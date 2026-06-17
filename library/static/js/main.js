@@ -134,7 +134,7 @@ function getBookTemplate(book) {
     const attrSafe = escapeHtml(book.filename);
     const coverSafe = escapeHtml(book.cover);
     return `
-        <div class="col-md-3 mb-3">
+        <div class="col-6 col-sm-4 col-md-3 mb-3">
             <div class="book">
                 ${lockBadge(book)}
                 <div class="book-buttons">

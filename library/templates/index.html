@@ -93,7 +93,7 @@
         </div>
         <div class="row library" id="library">
             {% for book in images %}
-                <div class="col-md-3 mb-3" data-length="{{ book.length }}">
+                <div class="col-6 col-sm-4 col-md-3 mb-3" data-length="{{ book.length }}">
                     <div class="book">
                         {% if book.access_level and book.access_level != 'standard' %}
                         <span class="book-lock" title="Admin only" aria-label="Admin only"><i class="fas fa-lock"></i></span>
