@@ -1,5 +1,5 @@
-/* Tokens + primitives live in tokens.css / primitives.css (loaded by template).
- * App-only token: reading-status tag badges. */
+/* Shared base (tokens + primitives) lives in structural.css; colours in
+ * tokens.css (both loaded by the template). App-only token below: tag badges. */
 :root {
     --tag-started: #D9B2A0;
     --tag-finished: #B2E0D9;
