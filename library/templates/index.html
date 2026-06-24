@@ -74,14 +74,18 @@
             </div>
             <h1 class="header-title m-0">Library</h1>
             <div class="header-right">
-                {% if current_user.is_authenticated %}
-                    <button class="login-button btn btn-ghost" onclick="handleLogout()">
-                        <i class="fas fa-door-closed"></i>
-                    </button>
-                {% else %}
-                    <button class="login-button btn btn-ghost" onclick="showLoginDialog()">
-                        <i class="fas fa-door-open"></i>
-                    </button>
+                {# Behind the dashboard proxy, login/logout is the dashboard's job
+                   (SSO) — only show local login/logout in standalone mode. #}
+                {% if not proxy_mode %}
+                    {% if current_user.is_authenticated %}
+                        <button class="login-button btn btn-ghost" onclick="handleLogout()">
+                            <i class="fas fa-door-closed"></i>
+                        </button>
+                    {% else %}
+                        <button class="login-button btn btn-ghost" onclick="showLoginDialog()">
+                            <i class="fas fa-door-open"></i>
+                        </button>
+                    {% endif %}
                 {% endif %}
                 <button class="upload-button btn btn-ghost" onclick="document.getElementById('fileUploadInput').click();">
                     <i class="fas fa-upload"></i>

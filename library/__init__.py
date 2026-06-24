@@ -92,6 +92,14 @@ def create_app(config_overrides: dict | None = None):
     def load_user_from_request(_request):
         return load_user_from_proxy_header()
 
+    @app.context_processor
+    def inject_proxy_mode():
+        # Behind the dashboard proxy, login/logout is the dashboard's job (SSO),
+        # so the template hides its local login/logout in proxy mode.
+        from .proxy_auth import is_proxy_mode
+
+        return {"proxy_mode": is_proxy_mode()}
+
     app.register_blueprint(auth_blueprint)
     app.register_blueprint(index_blueprint)
     app.register_blueprint(metadata_blueprint)
