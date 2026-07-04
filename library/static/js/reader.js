@@ -696,18 +696,17 @@ function adjustFontSize(delta) {
     if (isPaginated()) relayoutPreservingPosition();
 }
 
-// Update scroll event listener to handle both functions
 window.addEventListener('scroll', () => {
     updateProgressBar();
     saveBookmark();
-    showBottomControls();
 });
 
+const HOVER_CAPABLE = window.matchMedia('(hover: hover)').matches;
 
-// <== AUTO-HIDE BOTTOM CONTROLS ==>
-// Bottom bar fades out after a few seconds of mouse/touch inactivity, so it
-// doesn't sit on top of the last line you're reading. Any mouse movement,
-// touch, hover near the bottom edge, or chapter change brings it back.
+// <== AUTO-HIDE BOTTOM CONTROLS (desktop) ==>
+// On desktop the bottom bar is a transient hover affordance: mouse activity
+// reveals it, then it fades after a few seconds. On touch devices both bars
+// move together, governed by scroll and tap (BARS section) — no timer.
 const CONTROLS_AUTOHIDE_MS = 2500;
 let _controlsAutoHideTimer = null;
 
@@ -715,7 +714,7 @@ function showBottomControls() {
     const c = document.querySelector('.controls');
     if (!c) return;
     c.classList.remove('controls--hidden');
-    scheduleControlsAutoHide();
+    if (HOVER_CAPABLE) scheduleControlsAutoHide();
 }
 
 function scheduleControlsAutoHide() {
@@ -740,7 +739,7 @@ function isChromeVisible() {
 // Hover-capable devices only: phone taps synthesize mousemove, which would
 // undo tap-to-hide. Keydown/touch are not triggers — page turns would flash
 // the bar; touch goes through the tap handler instead.
-if (window.matchMedia('(hover: hover)').matches) {
+if (HOVER_CAPABLE) {
     document.addEventListener('mousemove', showBottomControls, {passive: true});
 }
 // Hovering near the bottom edge of the viewport reveals the bar even when
@@ -826,15 +825,14 @@ document.addEventListener('touchend', (e) => {
     if (dx < 0) nextChapter(); else prevChapter();
 }, {passive: true});
 
-// <== TOP BAR: hide on scroll, tap to summon ==>
+// <== BARS: hide on scroll down, show near the top, tap to toggle ==>
 let _lastScrollY = window.scrollY;
 window.addEventListener('scroll', () => {
-    const topBar = document.querySelector('.top-controls');
     const y = window.scrollY;
     if (y > _lastScrollY && y > 100) {
-        topBar.classList.remove('visible');
+        applyChrome(false);
     } else if (y < 50) {
-        topBar.classList.add('visible');
+        applyChrome(true);
     }
     _lastScrollY = y;
 }, {passive: true});
