@@ -29,8 +29,7 @@ p {
 #chapter-content h3,
 #chapter-content h4,
 #chapter-content h5,
-#chapter-content h6,
-#book-title {
+#chapter-content h6 {
     color: var(--color-text-secondary);
 }
 a {
@@ -235,6 +234,11 @@ a {
 .toc-menu h5 {
     color: var(--color-text-primary);
 }
+.toc-author {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    margin-bottom: var(--space-3);
+}
 ::selection {
     background-color: var(--highlight-color);
     color: inherit;
@@ -400,13 +404,6 @@ html.paginated, html.paginated body {
     height: 100%;
     overflow: hidden;
     position: relative;
-}
-/* Title/author render above the column flow in scroll mode; in paginate
-   mode the title bar is implicit in the controls, so hide them to avoid
-   the first page being mostly blank. */
-.paginated #book-title,
-.paginated #book-author {
-    display: none;
 }
 .paginated #chapter-content {
     height: 100%;

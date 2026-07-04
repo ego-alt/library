@@ -194,7 +194,7 @@ function toggleReadingMode() {
 
     if (isPaginated()) {
         // Clear stray scroll position so the page columns line up cleanly.
-        window.scrollTo(0, 0);
+        jumpScroll(0);
         requestAnimationFrame(() => relayoutPreservingPosition(fraction));
     } else {
         // Reset column scroll so going back into paginate mode later isn't
@@ -202,8 +202,7 @@ function toggleReadingMode() {
         const content = document.getElementById('chapter-content');
         if (content) content.scrollLeft = 0;
         requestAnimationFrame(() => {
-            const target = fraction * document.documentElement.scrollHeight;
-            window.scrollTo({top: target, behavior: 'instant'});
+            jumpScroll(fraction * document.documentElement.scrollHeight);
             updateProgressBar();
             updateChapterNumberLabel();
         });
@@ -482,10 +481,7 @@ window.addEventListener('DOMContentLoaded', () => {
                                     if (isPaginated()) {
                                         relayoutPreservingPosition(currentPagePosition);
                                     } else {
-                                        window.scrollTo({
-                                            top: currentPagePosition * document.documentElement.scrollHeight,
-                                            behavior: 'instant'
-                                        });
+                                        jumpScroll(currentPagePosition * document.documentElement.scrollHeight);
                                     }
                                 });
                             }
@@ -514,6 +510,7 @@ window.addEventListener('DOMContentLoaded', () => {
 });
 
 function displayBookMetadata() {
+    document.title = currentBook.title;
     document.getElementById('book-title').textContent = currentBook.title;
     document.getElementById('book-author').textContent = `by ${currentBook.author}`;
 
@@ -614,7 +611,7 @@ function nextChapter() {
             currentPageIndex = 0;
             applyPageTransform(false);
         } else {
-            window.scrollTo({top: 0, behavior: 'instant'});
+            jumpScroll(0);
         }
         updateProgressBar();
         updateChapterNumberLabel();
@@ -640,7 +637,7 @@ function prevChapter() {
             currentPageIndex = Math.max(0, totalPages - 1);
             applyPageTransform(false);
         } else {
-            window.scrollTo({top: document.body.scrollHeight, behavior: 'instant'});
+            jumpScroll(document.body.scrollHeight);
         }
         updateProgressBar();
         updateChapterNumberLabel();
@@ -671,16 +668,13 @@ function jumpToChapter(index, sectionId) {
             const target = document.getElementById(sectionId);
             if (target) {
                 const offset = currentFontSize * 2;
-                window.scrollTo({
-                    top: window.pageYOffset + target.getBoundingClientRect().top - offset,
-                    behavior: 'instant',
-                });
+                jumpScroll(window.pageYOffset + target.getBoundingClientRect().top - offset);
             } else {
-                window.scrollTo({top: 0, behavior: 'instant'});
+                jumpScroll(0);
             }
         });
     } else {
-        window.scrollTo({top: 0, behavior: 'instant'});
+        jumpScroll(0);
     }
 
     updateProgressBar();
@@ -734,6 +728,15 @@ function applyChrome(show) {
 
 function isChromeVisible() {
     return document.querySelector('.top-controls').classList.contains('visible');
+}
+
+// Programmatic jumps (bookmark restore, chapter/TOC nav, mode switch) must
+// not read as scroll gestures to the bar policy — the bars would show or
+// hide depending on which direction the jump happened to go.
+let _ignoreScroll = false;
+function jumpScroll(top) {
+    _ignoreScroll = true;
+    window.scrollTo({top, behavior: 'instant'});
 }
 
 // Hover-capable devices only: phone taps synthesize mousemove, which would
@@ -831,6 +834,7 @@ document.addEventListener('touchend', (e) => {
 let _lastScrollY = window.scrollY;
 window.addEventListener('scroll', () => {
     const y = window.scrollY;
+    if (_ignoreScroll) { _ignoreScroll = false; _lastScrollY = y; return; }
     if (y > _lastScrollY && y > 100) {
         applyChrome(false);
     } else if (y < 50) {
