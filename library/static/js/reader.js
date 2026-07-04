@@ -83,6 +83,15 @@ function layoutPaginatedChapter() {
     applyPageTransform(false);
 }
 
+// Recompute the paginated layout and land back on the same content.
+function relayoutPreservingPosition(fraction = currentPositionFraction()) {
+    layoutPaginatedChapter();
+    currentPageIndex = Math.round(fraction * Math.max(0, totalPages - 1));
+    applyPageTransform(false);
+    updateProgressBar();
+    updateChapterNumberLabel();
+}
+
 const PAGE_FLIP_MS = 140;
 let _pageFlipRaf = null;
 
@@ -186,13 +195,7 @@ function toggleReadingMode() {
     if (isPaginated()) {
         // Clear stray scroll position so the page columns line up cleanly.
         window.scrollTo(0, 0);
-        requestAnimationFrame(() => {
-            layoutPaginatedChapter();
-            currentPageIndex = Math.round(fraction * Math.max(0, totalPages - 1));
-            applyPageTransform(false);
-            updateProgressBar();
-            updateChapterNumberLabel();
-        });
+        requestAnimationFrame(() => relayoutPreservingPosition(fraction));
     } else {
         // Reset column scroll so going back into paginate mode later isn't
         // sticky if user had it half-scrolled.
@@ -477,13 +480,7 @@ window.addEventListener('DOMContentLoaded', () => {
                                 // Wait for next paint to ensure content is rendered
                                 requestAnimationFrame(() => {
                                     if (isPaginated()) {
-                                        layoutPaginatedChapter();
-                                        currentPageIndex = Math.round(
-                                            currentPagePosition * Math.max(0, totalPages - 1)
-                                        );
-                                        applyPageTransform(false);
-                                        updateProgressBar();
-                                        updateChapterNumberLabel();
+                                        relayoutPreservingPosition(currentPagePosition);
                                     } else {
                                         window.scrollTo({
                                             top: currentPagePosition * document.documentElement.scrollHeight,
@@ -575,12 +572,7 @@ function updateProgressBar() {
 function saveBookmark() {
     if (!lastSaveTimeout) {
         lastSaveTimeout = setTimeout(() => {
-            let position;
-            if (isPaginated()) {
-                position = totalPages > 1 ? currentPageIndex / (totalPages - 1) : 0;
-            } else {
-                position = window.scrollY / document.documentElement.scrollHeight;
-            }
+            const position = currentPositionFraction();
 
             fetch(appUrl(`/bookmark/${filename}`), {
                 method: 'POST',
@@ -602,38 +594,16 @@ function displayChapter() {
     const content = allChapters[currentChapterNum].content;
     document.getElementById('chapter-content').innerHTML = content;
 
+    // Set bars before layout (paginated geometry depends on them): scroll mode
+    // re-shows both each chapter; paginated keeps the current state.
+    applyChrome(!isPaginated() || isChromeVisible());
+
     if (isPaginated()) {
         currentPageIndex = 0;
         layoutPaginatedChapter();
     }
     updateChapterNumberLabel();
-
-    // Initialize progress bar position
     updateProgressBar();
-
-    // Show controls on chapter load
-    const controls = document.querySelector('.top-controls');
-    controls.classList.add('visible');
-    showBottomControls();
-
-    // Add scroll listener
-    let lastScrollY = window.scrollY;
-    const scrollHandler = () => {
-        const currentScrollY = window.scrollY;
-        if (currentScrollY > lastScrollY && currentScrollY > 100) {
-            // Scrolling down and past 100px - hide controls
-            controls.classList.remove('visible');
-        } else if (currentScrollY < 50) {
-            // Near the top - show controls
-            controls.classList.add('visible');
-        }
-        lastScrollY = currentScrollY;
-    };
-
-    // Remove previous scroll listener if it exists
-    window.removeEventListener('scroll', scrollHandler);
-    // Add new scroll listener
-    window.addEventListener('scroll', scrollHandler);
 }
 
 function nextChapter() {
@@ -723,16 +693,7 @@ function adjustFontSize(delta) {
     currentFontSize = Math.max(12, Math.min(24, currentFontSize + delta));
     document.documentElement.style.setProperty('--reader-font-size', currentFontSize + 'px');
     localStorage.setItem('readerFontSize', currentFontSize);
-    if (isPaginated()) {
-        // Capture the position fraction so we land near the same content
-        // after the relayout, then recompute totalPages.
-        const fraction = currentPositionFraction();
-        layoutPaginatedChapter();
-        currentPageIndex = Math.round(fraction * Math.max(0, totalPages - 1));
-        applyPageTransform(false);
-        updateProgressBar();
-        updateChapterNumberLabel();
-    }
+    if (isPaginated()) relayoutPreservingPosition();
 }
 
 // Update scroll event listener to handle both functions
@@ -765,10 +726,23 @@ function scheduleControlsAutoHide() {
     }, CONTROLS_AUTOHIDE_MS);
 }
 
-// Reveal on mouse / touch activity. Keydown is *not* a trigger because in
-// paginated mode every page turn would flash the bar.
-document.addEventListener('mousemove', showBottomControls, {passive: true});
-document.addEventListener('touchstart', showBottomControls, {passive: true});
+// Show/hide both bars together.
+function applyChrome(show) {
+    document.querySelector('.top-controls').classList.toggle('visible', show);
+    if (show) showBottomControls();
+    else document.querySelector('.controls')?.classList.add('controls--hidden');
+}
+
+function isChromeVisible() {
+    return document.querySelector('.top-controls').classList.contains('visible');
+}
+
+// Hover-capable devices only: phone taps synthesize mousemove, which would
+// undo tap-to-hide. Keydown/touch are not triggers — page turns would flash
+// the bar; touch goes through the tap handler instead.
+if (window.matchMedia('(hover: hover)').matches) {
+    document.addEventListener('mousemove', showBottomControls, {passive: true});
+}
 // Hovering near the bottom edge of the viewport reveals the bar even when
 // the user isn't moving the mouse — CSS sibling selector can't reach the
 // controls from here, so handle it in JS.
@@ -804,16 +778,18 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
+// Interactive chrome that page-level clicks, taps, and swipes ignore.
+const CHROME_SELECTOR =
+    'button, a, input, textarea, .toc-menu, .top-controls, .controls, ' +
+    '.selection-menu, .search-overlay, .temp-highlight';
+
 // Click left third of the reader to go back a page, right third forward.
 // Middle third is a no-op so text selection still works freely.
 document.addEventListener('click', (e) => {
     if (!isPaginated()) return;
     // Don't trigger when clicking interactive chrome or the user has text
     // selected (probably trying to use the selection menu).
-    if (e.target.closest(
-        'button, a, input, textarea, .toc-menu, .top-controls, .controls, ' +
-        '.selection-menu, .search-overlay, .temp-highlight'
-    )) return;
+    if (e.target.closest(CHROME_SELECTOR)) return;
     if (window.getSelection().toString().trim()) return;
 
     const w = window.innerWidth;
@@ -834,10 +810,7 @@ let _swipeStartX = null, _swipeStartY = null;
 document.addEventListener('touchstart', (e) => {
     if (isPaginated() || e.touches.length !== 1) { _swipeStartX = null; return; }
     // Ignore swipes that start on interactive chrome.
-    if (e.target.closest(
-        'button, a, input, textarea, .toc-menu, .top-controls, ' +
-        '.controls, .selection-menu, .search-overlay'
-    )) { _swipeStartX = null; return; }
+    if (e.target.closest(CHROME_SELECTOR)) { _swipeStartX = null; return; }
     _swipeStartX = e.touches[0].clientX;
     _swipeStartY = e.touches[0].clientY;
 }, {passive: true});
@@ -853,20 +826,56 @@ document.addEventListener('touchend', (e) => {
     if (dx < 0) nextChapter(); else prevChapter();
 }, {passive: true});
 
+// <== TOP BAR: hide on scroll, tap to summon ==>
+let _lastScrollY = window.scrollY;
+window.addEventListener('scroll', () => {
+    const topBar = document.querySelector('.top-controls');
+    const y = window.scrollY;
+    if (y > _lastScrollY && y > 100) {
+        topBar.classList.remove('visible');
+    } else if (y < 50) {
+        topBar.classList.add('visible');
+    }
+    _lastScrollY = y;
+}, {passive: true});
+
+// A clean tap toggles both bars (no hover on phones to summon them back).
+// In paginated mode the side zones stay page-turn only, and toggling
+// relayouts, since the bars' reserved padding shapes the page.
+const TAP_MAX_PX = 10, TAP_MAX_MS = 350;
+let _tapStart = null;
+document.addEventListener('touchstart', (e) => {
+    _tapStart = e.touches.length === 1
+        ? {x: e.touches[0].clientX, y: e.touches[0].clientY, t: e.timeStamp}
+        : null;
+}, {passive: true});
+document.addEventListener('touchend', (e) => {
+    if (!_tapStart) return;
+    const start = _tapStart;
+    _tapStart = null;
+    const touch = e.changedTouches[0];
+    if (Math.abs(touch.clientX - start.x) > TAP_MAX_PX ||
+        Math.abs(touch.clientY - start.y) > TAP_MAX_PX ||
+        e.timeStamp - start.t > TAP_MAX_MS) return;
+    if (e.target.closest(CHROME_SELECTOR)) return;
+    // A tap that dismisses something open shouldn't also toggle the bars.
+    if (document.getElementById('toc-menu')?.classList.contains('visible')) return;
+    if (document.querySelector('.search-overlay')?.classList.contains('active')) return;
+    if (window.getSelection().toString().trim()) return;
+    if (isPaginated() &&
+        (touch.clientX < window.innerWidth * 0.35 || touch.clientX > window.innerWidth * 0.65)) return;
+
+    applyChrome(!isChromeVisible());
+    if (isPaginated()) relayoutPreservingPosition();
+}, {passive: true});
+
 // Recompute pagination on resize. Debounced; preserves the user's relative
 // position in the chapter across the relayout.
 let _readerResizeTimer;
 window.addEventListener('resize', () => {
     if (!isPaginated()) return;
     clearTimeout(_readerResizeTimer);
-    _readerResizeTimer = setTimeout(() => {
-        const fraction = currentPositionFraction();
-        layoutPaginatedChapter();
-        currentPageIndex = Math.round(fraction * Math.max(0, totalPages - 1));
-        applyPageTransform(false);
-        updateProgressBar();
-        updateChapterNumberLabel();
-    }, 150);
+    _readerResizeTimer = setTimeout(relayoutPreservingPosition, 150);
 });
 
 // Reflect the persisted mode in the toggle button as soon as the DOM is ready,

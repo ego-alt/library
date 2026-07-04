@@ -388,6 +388,13 @@ html.paginated, html.paginated body {
     box-sizing: border-box;
     margin: 0 auto;
     overflow: hidden;
+    /* No padding animation here — layout code measures the page synchronously
+       on bar toggle. */
+    transition: none;
+}
+/* Bars retreated (tap-toggled): reclaim their reserved space for the page. */
+.paginated .top-controls:not(.visible) + .container .reader-container {
+    padding: 24px 30px 28px;
 }
 .paginated #reader-content {
     height: 100%;
