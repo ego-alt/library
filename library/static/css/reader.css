@@ -414,13 +414,10 @@ html.paginated, html.paginated body {
     column-width: var(--col-w);
     column-gap: var(--col-gap, 40px);
     column-fill: auto;
-    overflow-x: scroll;
+    /* hidden, not scroll: page turns set scrollLeft from JS; free panning
+       would strand the columns between pages. */
+    overflow-x: hidden;
     overflow-y: hidden;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-}
-.paginated #chapter-content::-webkit-scrollbar {
-    display: none;
 }
 /* Keep figures and large elements from straddling a page break. */
 .paginated #chapter-content img,
