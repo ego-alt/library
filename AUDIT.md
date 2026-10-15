@@ -497,3 +497,20 @@ Also: every icon-only button has an `aria-label` (library and reader), and grid 
 Close runners-up: unify the button and label styles (3.1–3.4, small); disable
 swipe-to-change-section in scroll mode (5, small); feedback while uploading (8.4,
 small); server-side checks on metadata and rename (4.6, 4.7, small). **All done.**
+
+---
+
+## Found while building the MCP server (2026-10-15)
+
+See `dashboard/mcp/AUDIT.md` for the full audit.
+
+- **Restricted books leaked on the per-book endpoints (security). Done.**
+  - What was affected: metadata (read and write), bookmark, mark-finished,
+    cover and cover upload. All of them resolved any book by filename with no
+    access check, so a standard user could read or change a restricted book.
+  - Fix: they now answer 404 for it, like the listings
+    (`get_accessible_book_or_404`).
+- **Author-only lookups never matched. Done.** `/books?author=…` with no title
+  scored at most 0.3, under the 0.6 cutoff. With no title, the author now
+  carries the whole score.
+- **Open:** removing a tag from its last book leaves the tag in `/tags`.
