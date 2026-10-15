@@ -1512,17 +1512,6 @@ async function handleLogin(event) {
     }
 }
 
-async function handleLogout() {
-    try {
-        const response = await fetch(appUrl('/auth/logout'));
-        if (response.ok) {
-            location.reload();
-        }
-    } catch (error) {
-        console.error('Logout error:', error);
-    }
-}
-
 // Close dialog when clicking outside or on close button
 $('.close-login, .login-overlay').on('click', function(e) {
     if (e.target === this) {

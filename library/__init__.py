@@ -109,8 +109,8 @@ def create_app(config_overrides: dict | None = None):
 
     @app.context_processor
     def inject_proxy_mode():
-        # Behind the dashboard proxy, login/logout is the dashboard's job (SSO),
-        # so the template hides its local login/logout in proxy mode.
+        # Behind the dashboard proxy, signing in is the dashboard's job (SSO),
+        # so the template hides its local Sign in button in proxy mode.
         from .proxy_auth import is_proxy_mode
 
         return {"proxy_mode": is_proxy_mode()}

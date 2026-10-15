@@ -50,18 +50,13 @@
             </div>
             <h1 class="header-title m-0">Library</h1>
             <div class="header-right">
-                {# Behind the dashboard proxy, login/logout is the dashboard's job
-                   (SSO) — only show local login/logout in standalone mode. #}
-                {% if not proxy_mode %}
-                    {% if current_user.is_authenticated %}
-                        <button class="login-button btn btn-ghost" onclick="handleLogout()" aria-label="Sign out" title="Sign out">
-                            <i class="fas fa-right-from-bracket" aria-hidden="true"></i>
-                        </button>
-                    {% else %}
-                        <button class="login-button btn btn-ghost" onclick="showLoginDialog()" aria-label="Sign in" title="Sign in">
-                            <i class="fas fa-right-to-bracket" aria-hidden="true"></i>
-                        </button>
-                    {% endif %}
+                {# Standalone only: a Sign in button when signed out. There's no
+                   sign-out button (kept light, like tapes); behind the dashboard
+                   proxy, signing in and out is the dashboard's job. #}
+                {% if not proxy_mode and not current_user.is_authenticated %}
+                    <button class="login-button btn btn-ghost" onclick="showLoginDialog()" aria-label="Sign in" title="Sign in">
+                        <i class="fas fa-right-to-bracket" aria-hidden="true"></i>
+                    </button>
                 {% endif %}
                 {% if current_user.is_authenticated %}
                 <button class="upload-button btn btn-ghost" onclick="document.getElementById('fileUploadInput').click();" aria-label="Add a book" title="Add a book">
