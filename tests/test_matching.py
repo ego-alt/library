@@ -1,4 +1,4 @@
-from library.matching import rank_matches, score_book
+from library.matching import DEFAULT_MATCH_THRESHOLD, rank_matches, score_book
 
 
 class _Book:
@@ -62,3 +62,9 @@ def test_rank_matches_respects_limit():
     books = [_Book("Dune", "Frank Herbert", f"{i}.epub") for i in range(10)]
     ranked = rank_matches("Dune", "Frank Herbert", books, threshold=0.6, limit=3)
     assert len(ranked) == 3
+
+
+def test_author_only_query_scores_on_author():
+    assert score_book("", "herbert", "Dune", "Frank Herbert") >= DEFAULT_MATCH_THRESHOLD
+    assert score_book("", "Herbert, Frank", "Dune", "Frank Herbert") == 1.0
+    assert score_book("", "Rowling", "Dune", "Frank Herbert") < DEFAULT_MATCH_THRESHOLD

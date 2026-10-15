@@ -41,6 +41,10 @@ def _token_set_ratio(a, b):
 
 def score_book(query_title, query_author, book_title, book_author):
     """Similarity in [0, 1] between a scanned book and a library book."""
+    if not _tokens(query_title):
+        # Author-only lookup ("what do I have by Herbert?"): the author is all
+        # there is to go on, so it carries the whole score.
+        return _token_set_ratio(query_author, book_author)
     title = _token_set_ratio(query_title, book_title)
     # Only let the author move the score when both sides actually have one.
     if _tokens(query_author) and _tokens(book_author):
