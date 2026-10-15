@@ -44,7 +44,7 @@ Each finding below now ends with a **Status** line. Every one is done except:
 - `POST /book_metadata` ignores title, author and genre from non-admins.
 - `/upload_book` returns an `upload_id` instead of a filename.
 - `/tags` no longer lists reading statuses.
-- `view=mine` is still accepted (it now means "reading").
+- Removed in a follow-up cleanup: `/define_word` and `/translate_text` (use `/explain`), the per-field `/load_more` filters (use `q`), `view=mine`, and reading status inside `tags`. `MIGRATION.md` lists every API change.
 
 ---
 
@@ -58,7 +58,7 @@ serves that. These parts don't, or they compete with each other.
 - **Where:** `index.html` `#viewToggle`; `main.js` `applyFilters`; `metadata.py` `PROGRESS_TAG_VALUES`
 - **Why:** You have to learn three controls for one idea. Progress states posing as tags are confusing: you can type "Finished" as a tag, and removing that chip quietly resets the book's reading status.
 - **Fix:** Merge them into one status control. Replace the bookmark toggle with a small segmented control (*All · Reading · Finished*) at the top of the library. Remove the status values from the tag input completely, and keep tags for your own labels only.
-- **Status:** Done. The bookmark toggle and four-field filter drawer are gone. The library now has one search box (each word must match title, author, genre or one of your tags) and an *All · Unread · Reading · Finished* control, remembered per device; the old `view=mine` links still work. Status is no longer a tag: the details panel has its own *Unread · Reading · Finished* control, `/tags` suggests only your own tags, and old clients that send status inside tags are still honoured. Per-view empty states ("Nothing on the go", "Nothing finished yet"…). Also fixed: a book with several tags could be listed twice. Verified in Chrome; tests added.
+- **Status:** Done. The bookmark toggle and four-field filter drawer are gone. The library now has one search box (each word must match title, author, genre or one of your tags) and an *All · Unread · Reading · Finished* control, remembered per device (a saved "mine" preference maps to *Reading*). Status is no longer a tag: the details panel has its own *Unread · Reading · Finished* control and `/tags` suggests only your own tags. Per-view empty states ("Nothing on the go", "Nothing finished yet"…). Also fixed: a book with several tags could be listed twice. Verified in Chrome; tests added.
 
 **1.2 Genre is a second, weaker tag system**
 - **What:** Genre is one free-text string with its own filter field. Tags are many and per-user.
@@ -93,7 +93,7 @@ serves that. These parts don't, or they compete with each other.
 - **Where:** `reader.js` selection menu
 - **Why:** You asked for simple AI that improves reading. Three icons you have to guess at is not simple.
 - **Fix:** Merge them into one "Explain" action. Its prompt should define a single word, translate foreign text, or gloss a passage depending on what's selected. Keep Ask as the second action. Give both text labels.
-- **Status:** Done. The selection menu is now two labelled buttons, **Ask** and **Explain**, and shows on desktop too (it used to be touch-only; mouse users could only reach the AI through shortcuts). Explain is one call (`POST /explain`) whose prompt defines a single word, translates foreign text, or glosses a passage, depending on the selection; after an answer the box offers "Ask a follow-up…". Shortcuts: **A** ask, **E** explain (the old **D**/**L** still work). The old `/define_word` and `/translate_text` endpoints remain for compatibility. Verified in Chrome on desktop and phone, with a stubbed answer because there's no API key here.
+- **Status:** Done. The selection menu is now two labelled buttons, **Ask** and **Explain**, and shows on desktop too (it used to be touch-only; mouse users could only reach the AI through shortcuts). Explain is one call (`POST /explain`) whose prompt defines a single word, translates foreign text, or glosses a passage, depending on the selection; after an answer the box offers "Ask a follow-up…". Shortcuts: **A** ask, **E** explain (the old **D**/**L** still work). The old `/define_word` and `/translate_text` endpoints were removed afterwards (nothing else in the stack called them). Verified in Chrome on desktop and phone, with a stubbed answer because there's no API key here.
 
 **1.7 Keep the access-level control, but keep it quiet**
 - **What:** The "Admin only" checkbox and lock badge are a household feature.
@@ -470,7 +470,7 @@ Also: every icon-only button has an `aria-label` (library and reader), and grid 
   - Scroll mode: `←`/`→` turn by one screen, like paginated mode.
   - Library: `/` focus search, `U` add a book, `Esc` close any panel.
   - `?` shows a small shortcut sheet.
-- **Status:** Done. Reader: with text selected, **A** asks, **D** defines, **L** translates. No modifier, so the browser's ⌘D and ⌘L work again (verified: ⌘L isn't intercepted). **T** contents, **+/−** text size, **N** night mode, **Esc** closes the AI box, TOC or help, **?** shows a shortcut sheet. In scroll mode ←/→ move a screen. Library: **/** focuses search, **U** adds a book, **Esc** closes the details panel or sign-in. README updated. Deviation: Esc doesn't leave the book, because that felt too easy to hit by accident; the back arrow does that.
+- **Status:** Done. Reader: with text selected, **A** asks and **E** explains (D and L still work as aliases; see 1.6). No modifier, so the browser's ⌘D and ⌘L work again (verified: ⌘L isn't intercepted). **T** contents, **+/−** text size, **N** night mode, **Esc** closes the AI box, TOC or help, **?** shows a shortcut sheet. In scroll mode ←/→ move a screen. Library: **/** focuses search, **U** adds a book, **Esc** closes the details panel or sign-in. README updated. Deviation: Esc doesn't leave the book, because that felt too easy to hit by accident; the back arrow does that.
 
 **8.6 Focus handling in panels**
 - **What:** The details and sign-in panels don't trap focus, so Tab moves behind them. Focus doesn't return to the cover you opened from when the panel closes.
