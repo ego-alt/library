@@ -30,12 +30,16 @@ def test_load_book_streams_metadata_then_chapters(client, book):
         assert "index" in ch
 
 
-def test_load_book_creates_bookmark_for_logged_in_user(standard_client, book, standard_user):
+def test_opening_a_book_does_not_mark_it_started(standard_client, book, standard_user):
+    """Peeking at a book shouldn't put it in "Reading"."""
     standard_client.get(f"/load_book/{book.filename}")
-    bm = Bookmark.query.filter_by(user_id=standard_user.id, book_id=book.id).first()
-    assert bm is not None
-    # Opening a book transitions UNREAD -> IN_PROGRESS
-    assert bm.status == BookProgressChoice.IN_PROGRESS
+    assert Bookmark.query.filter_by(user_id=standard_user.id, book_id=book.id).first() is None
+
+
+def test_saving_the_opening_position_does_not_mark_started(standard_client, book, standard_user):
+    standard_client.post(f"/bookmark/{book.filename}", json={"chapter_index": 0, "position": 0})
+    bm = Bookmark.query.filter_by(user_id=standard_user.id, book_id=book.id).one()
+    assert bm.status == BookProgressChoice.UNREAD
 
 
 def test_load_book_404_for_unknown_book(client):
@@ -75,15 +79,10 @@ def test_bookmark_get_returns_zero_when_missing(standard_client, book):
     assert r.get_json() == {"chapter_index": 0, "position": 0}
 
 
-def test_bookmark_anonymous_returns_200_with_message(client, book):
-    # Anonymous users shouldn't crash; the route returns a soft 200 message
-    r = client.post(f"/bookmark/{book.filename}", json={})
-    assert r.status_code == 200
-    assert "Authentication" in r.get_json()["message"]
-
-
-# --- /tag_finished --------------------------------------------------------------
-
+def test_bookmark_anonymous_returns_401(client, book):
+    r = client.get(f"/bookmark/{book.filename}")
+    assert r.status_code == 401
+    assert "Sign in" in r.get_json()["error"]
 
 def test_tag_finished_marks_bookmark(standard_client, book, standard_user):
     r = standard_client.post(f"/tag_finished/{book.filename}")
@@ -170,3 +169,64 @@ def test_book_asset_allows_admin_for_restricted(admin_client, book):
     _restrict(book)
     r = admin_client.get(f"/book_asset/{book.filename}/OEBPS/cover.png")
     assert r.status_code == 200
+
+
+# --- whole-book progress + offline-friendly reader -------------------------------
+
+
+def test_load_book_metadata_includes_chapter_sizes(client, book):
+    import json
+
+    first = client.get(f"/load_book/{book.filename}").data.split(b"\n")[0]
+    meta = json.loads(first)
+    assert len(meta["chapter_sizes"]) == meta["spine_length"]
+    assert all(size > 0 for size in meta["chapter_sizes"])
+
+
+def test_read_book_exposes_book_version(client, book):
+    r = client.get(f"/read/{book.filename}")
+    assert b"window.BOOK_VERSION" in r.data
+    assert b"<title>Test Book</title>" in r.data
+
+
+def test_bookmark_post_marks_unread_book_in_progress(
+    standard_client, book, standard_user
+):
+    """The reader may open a book from its offline copy without hitting
+    load_book, so saving a position must also mark the book as started."""
+    from library.choices import BookProgressChoice
+    from library.models import Bookmark
+
+    standard_client.post(
+        f"/bookmark/{book.filename}", json={"chapter_index": 1, "position": 0.5}
+    )
+    bm = Bookmark.query.filter_by(user_id=standard_user.id, book_id=book.id).one()
+    assert bm.status == BookProgressChoice.IN_PROGRESS
+
+
+def test_bookmark_post_keeps_finished_status(standard_client, book, standard_user):
+    from library.choices import BookProgressChoice
+    from library.models import Bookmark, db
+
+    db.session.add(Bookmark(
+        user_id=standard_user.id, book_id=book.id,
+        status=BookProgressChoice.FINISHED,
+    ))
+    db.session.commit()
+    standard_client.post(
+        f"/bookmark/{book.filename}", json={"chapter_index": 0, "position": 0.1}
+    )
+    bm = Bookmark.query.filter_by(user_id=standard_user.id, book_id=book.id).one()
+    assert bm.status == BookProgressChoice.FINISHED
+
+
+def test_missing_book_page_is_html_for_browsers(client):
+    r = client.get("/read/nope.epub", headers={"Accept": "text/html,application/xhtml+xml"})
+    assert r.status_code == 404
+    assert b"This book isn't in the library" in r.data
+
+
+def test_missing_book_is_json_for_api_calls(client):
+    r = client.get("/read/nope.epub", headers={"Accept": "*/*"})
+    assert r.status_code == 404
+    assert r.get_json() == {"error": "Book not found"}

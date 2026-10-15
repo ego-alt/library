@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <script>
         (function() {
         if (localStorage.getItem('darkMode') === 'enabled') {
@@ -18,59 +18,35 @@
         window.currentUserRole = "{{ current_user.role.value if current_user.is_authenticated else '' }}";
         window.initialView = "{{ current_view|default('all') }}";
         window.totalBooks = {{ total_books|default(0) }};
+        window.initialBookCount = {{ images|length }};
     </script>
     <title>Library</title>
     <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="manifest" href="{{ url_for('pwa.manifest') }}">
+    <meta name="theme-color" content="#FFF1E5" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#282828" media="(prefers-color-scheme: dark)">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Library">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400..700&display=swap" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/base.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/structural.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/tokens.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/index.css') }}" rel="stylesheet">
 </head>
 <body>
-    <div class="filter-overlay" id="filterOverlay"></div>
-    <div class="filter-sidebar" id="filterSidebar">
-        <div class="filter-group">
-            <label for="filterTitle">Title</label>
-            <input class="input" type="text" id="filterTitle" placeholder="Filter by title...">
-        </div>
-        <div class="filter-group">
-            <label for="filterAuthor">Author</label>
-            <input class="input" type="text" id="filterAuthor" placeholder="Filter by author...">
-        </div>
-        <div class="filter-group">
-            <label for="filterGenre">Genre</label>
-            <input class="input" type="text" id="filterGenre" placeholder="Filter by genre...">
-        </div>
-        <div class="filter-group">
-            <label for="filterTags">Tags</label>
-            <div class="tag-input-container">
-                <div class="tags-container" id="filter-tags-container"></div>
-                <input class="input" type="text" id="filterTags" placeholder="Unread, Finished...">
-                <style>
-                    #filterTags::placeholder {font-style: italic;}
-                </style>
-            </div>
-        </div>
-    </div>
-
     <div class="container">
         <div class="header-row my-4">
             <div class="header-left">
-                <button class="dark-mode-toggle btn btn-ghost" onclick="toggleDarkMode()">
-                    <i id="dark-mode-icon" class="fas fa-moon"></i>
+                <button class="dark-mode-toggle btn btn-ghost" onclick="toggleDarkMode()" aria-label="Night mode" title="Night mode">
+                    <i id="dark-mode-icon" class="fas fa-moon" aria-hidden="true"></i>
                 </button>
-                <button class="layout-toggle btn btn-ghost" id="layoutToggle" onclick="toggleLayout()" aria-pressed="false" title="Switch to bookshelf view">
-                    <i id="layout-toggle-icon" class="fas fa-grip-vertical"></i>
+                <button class="layout-toggle btn btn-ghost" id="layoutToggle" onclick="toggleLayout()" aria-pressed="false" aria-label="Bookshelf view" title="Switch to bookshelf view">
+                    <i id="layout-toggle-icon" class="fas fa-grip-vertical" aria-hidden="true"></i>
                 </button>
-                {% if current_user.is_authenticated %}
-                <button class="view-toggle btn btn-ghost" id="viewToggle" onclick="toggleView()" aria-pressed="false" title="Show only books you've started reading">
-                    <i class="far fa-bookmark"></i>
-                </button>
-                {% endif %}
             </div>
             <h1 class="header-title m-0">Library</h1>
             <div class="header-right">
@@ -78,55 +54,93 @@
                    (SSO) — only show local login/logout in standalone mode. #}
                 {% if not proxy_mode %}
                     {% if current_user.is_authenticated %}
-                        <button class="login-button btn btn-ghost" onclick="handleLogout()">
-                            <i class="fas fa-door-closed"></i>
+                        <button class="login-button btn btn-ghost" onclick="handleLogout()" aria-label="Sign out" title="Sign out">
+                            <i class="fas fa-right-from-bracket" aria-hidden="true"></i>
                         </button>
                     {% else %}
-                        <button class="login-button btn btn-ghost" onclick="showLoginDialog()">
-                            <i class="fas fa-door-open"></i>
+                        <button class="login-button btn btn-ghost" onclick="showLoginDialog()" aria-label="Sign in" title="Sign in">
+                            <i class="fas fa-right-to-bracket" aria-hidden="true"></i>
                         </button>
                     {% endif %}
                 {% endif %}
-                <button class="upload-button btn btn-ghost" onclick="document.getElementById('fileUploadInput').click();">
-                    <i class="fas fa-upload"></i>
+                {% if current_user.is_authenticated %}
+                <button class="upload-button btn btn-ghost" onclick="document.getElementById('fileUploadInput').click();" aria-label="Add a book" title="Add a book">
+                    <i class="fas fa-plus" aria-hidden="true"></i>
                 </button>
-                <button class="filter-button btn btn-ghost">
-                    <i class="fas fa-filter"></i>
-                </button>
+                {% endif %}
             </div>
+        </div>
+        {% if continue_books %}
+        <section class="continue-reading" id="continueReading" aria-labelledby="continueReadingLabel">
+            <h2 class="continue-reading__label" id="continueReadingLabel">Continue reading</h2>
+            <div class="continue-reading__list">
+                {% for book in continue_books %}
+                {% set pct = (book.progress * 100)|round(0, 'floor')|int %}
+                <a class="continue-card" href="{{ url_for('read_routes.read_book', filename=book.filename) }}" data-filename="{{ book.filename }}">
+                    <img class="continue-card__cover" src="{{ book.cover }}" alt="" loading="lazy">
+                    <span class="continue-card__text">
+                        <span class="continue-card__title">{{ book.title }}</span>
+                        <span class="continue-card__author">{{ book.author }}</span>
+                        <span class="continue-card__progress">
+                            <span class="continue-card__bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ pct }}" aria-label="{{ pct }}% read"><span style="width: {{ pct }}%"></span></span>
+                            <span class="continue-card__pct">{{ pct }}%</span>
+                        </span>
+                    </span>
+                </a>
+                {% endfor %}
+            </div>
+        </section>
+        {% endif %}
+        <div class="library-toolbar">
+            <div class="library-search">
+                <i class="fas fa-magnifying-glass" aria-hidden="true"></i>
+                <input type="search" id="librarySearch" class="library-search__input"
+                       placeholder="Search titles, authors, tags" aria-label="Search the library"
+                       autocomplete="off" enterkeyhint="search">
+            </div>
+            {% if current_user.is_authenticated %}
+            <div class="status-filter" role="radiogroup" aria-label="Reading status">
+                <button type="button" role="radio" data-view="all" aria-checked="true">All</button>
+                <button type="button" role="radio" data-view="unread" aria-checked="false">Unread</button>
+                <button type="button" role="radio" data-view="reading" aria-checked="false">Reading</button>
+                <button type="button" role="radio" data-view="finished" aria-checked="false">Finished</button>
+            </div>
+            {% endif %}
         </div>
         <div class="row library" id="library">
             {% for book in images %}
-                <div class="col-6 col-sm-4 col-md-3 mb-3" data-length="{{ book.length }}">
+                {% set label = book.title ~ (' by ' ~ book.author if book.author else '') %}
+                <div class="col-6 col-sm-4 col-md-3 mb-3" data-length="{{ book.length }}" data-title="{{ book.title }}" data-author="{{ book.author }}">
                     <div class="book">
                         {% if book.access_level and book.access_level != 'standard' %}
-                        <span class="book-lock" title="Admin only" aria-label="Admin only"><i class="fas fa-lock"></i></span>
+                        <span class="book-lock" title="Private — only admins can see this" aria-label="Private"><i class="fas fa-lock" aria-hidden="true"></i></span>
                         {% endif %}
+                        <a href="{{ url_for('read_routes.read_book', filename=book.filename) }}" aria-label="Read {{ label }}">
+                            <img src="{{ book.cover }}" alt="{{ label }}" loading="lazy">
+                        </a>
                         <div class="book-buttons">
-                            <button class="book-button">
-                                <a href="{{ url_for('index_routes.download', filename=book.filename) }}" download>
-                                    <i class="fas fa-download"></i>
-                                </a>
-                            </button>
-                            <button class="book-button" data-action="show-metadata" data-filename="{{book.filename}}">
-                                <i class="fas fa-ellipsis-h"></i>
+                            <button class="book-button" data-action="show-metadata" data-filename="{{book.filename}}" aria-label="Details" title="Details">
+                                <i class="fas fa-ellipsis-h" aria-hidden="true"></i>
                             </button>
                         </div>
-                        <a href="{{ url_for('read_routes.read_book', filename=book.filename) }}">
-                            <img src="{{ book.cover }}" alt="cover" loading="lazy">
-                        </a>
                     </div>
                 </div>
             {% endfor %}
         </div>
-        <div id="emptyState" class="text-center py-5" style="display: none;">
-            <h3 class="text-muted">No books match your filters</h3>
-            <p class="text-muted">Try adjusting your search criteria</p>
+        <div id="emptyState" class="empty-state" style="display: none;">
+            <h3>Your shelves are empty</h3>
+            <p>Add an EPUB to begin.</p>
+            <button type="button" class="btn btn-primary empty-action" hidden
+                    onclick="document.getElementById('fileUploadInput').click();">Add a book</button>
         </div>
     </div>
 
+    <div class="offline-banner" id="offlineBanner" role="status" hidden>
+        You're offline. Saved books still open.
+    </div>
+
     <!-- Toast container; populated by showToast() in main.js -->
-    <div id="toastContainer" class="toast-container" aria-live="polite" aria-atomic="false"></div>
+    <div id="toastContainer" class="notice-stack" aria-live="polite" aria-atomic="false"></div>
 
     <div class="metadata-overlay" id="metadataOverlay" role="dialog" aria-modal="true" aria-labelledby="metadata-title">
         <div class="metadata-content">
@@ -138,10 +152,10 @@
     </div>
 
     <!-- Add login overlay -->
-    <div class="login-overlay" id="loginOverlay">
+    <div class="login-overlay" id="loginOverlay" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
         <div class="login-content">
-            <button class="close-login btn btn-ghost">&times;</button>
-            <h3>Login</h3>
+            <button class="close-login btn btn-ghost" aria-label="Close">&times;</button>
+            <h3 id="loginTitle">Sign in</h3>
             <div id="loginError" class="alert alert-danger" style="display: none;"></div>
             <form id="loginForm" onsubmit="handleLogin(event)">
                 <div class="login-field">
@@ -157,13 +171,18 @@
                         <input type="checkbox" name="remember"> Remember me
                     </label>
                 </div>
-                <button type="submit" class="login-submit btn btn-primary">Login</button>
+                <button type="submit" class="login-submit btn btn-primary">Sign in</button>
             </form>
         </div>
     </div>
 
     <!-- Hidden file input for file uploads -->
-    <input type="file" id="fileUploadInput" style="display: none;" onchange="handleFileUpload(this.files)">
+    <input type="file" id="fileUploadInput" style="display: none;" multiple
+           accept=".epub,application/epub+zip" onchange="handleFileUpload(this.files)">
+
+    <div class="drop-zone" id="dropZone" hidden>
+        <p>Drop EPUBs to add them to the library</p>
+    </div>
 
     <!-- Hidden input for cover image uploads -->
     <input type="file" id="coverUploadInput" style="display: none;" onchange="handleCoverUpload(this.files)">
@@ -171,5 +190,6 @@
     <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
     <script src="{{ url_for('static', filename='js/darkmode.js') }}"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/pwa.js') }}"></script>
 </body>
 </html>

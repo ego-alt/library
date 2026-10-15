@@ -1,4 +1,5 @@
 import os
+from datetime import timedelta
 
 from flask import (
     Blueprint,
@@ -9,21 +10,26 @@ from flask import (
     render_template,
     request,
     send_from_directory,
-    url_for,
 )
 from flask_login import current_user
 
 from ..choices import AccessLevelChoice, BookProgressChoice, UserRoleChoice
 from ..matching import DEFAULT_MATCH_THRESHOLD, rank_matches
-from ..models import Book, Bookmark, Tag, book_tags, db
+from ..models import Book, Bookmark, Tag, _utcnow, book_tags, db
 from ..utils import (
+    book_progress,
     cover_mimetype,
+    display_author,
     epub_text_size,
+    fallback_cover_svg,
     guess_cover_mimetype_from_bytes,
+    make_thumbnail,
     read_epub_cover,
 )
 from ._helpers import (
+    chapter_sizes,
     commit_or_rollback,
+    cover_url,
     get_book_or_404,
     json_admin_required,
     json_login_required,
@@ -32,24 +38,42 @@ from ._helpers import (
 
 index_blueprint = Blueprint("index_routes", __name__)
 
-BOOKS_PER_LOAD = 8
+# Books per request: three to four rows of the grid at desktop width.
+BOOKS_PER_LOAD = 24
+CONTINUE_READING_LIMIT = 3
 
 
+# Library views, by reading status.
 VIEW_ALL = "all"
-VIEW_MINE = "mine"
+VIEW_UNREAD = "unread"
+VIEW_READING = "reading"
+VIEW_FINISHED = "finished"
+VIEWS = (VIEW_ALL, VIEW_UNREAD, VIEW_READING, VIEW_FINISHED)
+# Views ordered by when you last read, most recent first.
+_LAST_READ_VIEWS = (VIEW_READING, VIEW_FINISHED)
 
 
 def _normalize_view(view):
-    if view == VIEW_MINE and not current_user.is_authenticated:
+    if view != VIEW_ALL and not current_user.is_authenticated:
         return VIEW_ALL
     return view
 
 
+def _tag_match(name_clause):
+    """Books carrying one of the current user's tags whose name matches."""
+    return Book.id.in_(
+        db.select(book_tags.c.book_id)
+        .join(Tag, Tag.id == book_tags.c.tag_id)
+        .where(book_tags.c.user_id == current_user.id, name_clause)
+    )
+
+
 def _filtered_book_query(filters=None, view=VIEW_ALL):
-    """Build the base Book query with access, view, and filter WHERE clauses
-    applied. Returns None when the request can't possibly match (e.g. tag
-    filter requested by an anonymous user)."""
-    query = Book.query
+    """Build the base Book query with access, view and search applied.
+
+    filters["q"] is the library's search box: every word must appear in the
+    title, author, genre, or one of your tags."""
+    query = Book.query.filter(Book.deleted_at.is_(None))
 
     if (
         not current_user.is_authenticated
@@ -60,55 +84,33 @@ def _filtered_book_query(filters=None, view=VIEW_ALL):
     if current_user.is_authenticated:
         query = query.outerjoin(
             Book.bookmarks.and_(Bookmark.user_id == current_user.id)
-        ).outerjoin(Book.tags.and_(Tag.user_id == current_user.id))
+        )
 
-    if view == VIEW_MINE:
-        query = query.filter(Bookmark.status.in_([
-            BookProgressChoice.IN_PROGRESS,
-            BookProgressChoice.FINISHED,
-        ]))
+    status_for_view = {
+        VIEW_READING: [BookProgressChoice.IN_PROGRESS],
+        VIEW_FINISHED: [BookProgressChoice.FINISHED],
+    }
+    if view in status_for_view:
+        query = query.filter(Bookmark.status.in_(status_for_view[view]))
+    elif view == VIEW_UNREAD:
+        query = query.filter(db.or_(
+            Bookmark.id.is_(None), Bookmark.status == BookProgressChoice.UNREAD
+        ))
 
-    if filters:
-        for attr, column in (
-            ("title", Book.title),
-            ("author", Book.author),
-            ("genre", Book.genre),
-        ):
-            if value := filters.get(attr):
-                for word in value.split():
-                    query = query.filter(column.ilike(f"%{word}%"))
+    if not filters:
+        return query
 
-        if tags := filters.get("tags"):
-            if not current_user.is_authenticated:
-                return None
-
-            tags = [tag.strip() for tag in tags.split(",") if tag.strip()]
-            tag_filters = []
-            if BookProgressChoice.UNREAD.value in tags:
-                tag_filters.append(
-                    db.or_(
-                        Bookmark.id.is_(None),
-                        Bookmark.status == BookProgressChoice.UNREAD,
-                    )
-                )
-
-            progress_tags, other_tags = [], []
-            for tag in tags:
-                if tag in (
-                    BookProgressChoice.IN_PROGRESS.value,
-                    BookProgressChoice.FINISHED.value,
-                ):
-                    progress_tags.append(tag)
-                elif tag != BookProgressChoice.UNREAD.value:
-                    other_tags.append(tag)
-
-            if progress_tags:
-                tag_filters.append(Bookmark.status.in_(progress_tags))
-            if other_tags:
-                tag_filters.append(Tag.name.in_(other_tags))
-
-            if tag_filters:
-                query = query.filter(db.or_(*tag_filters))
+    if q := filters.get("q"):
+        for word in q.split():
+            pattern = f"%{word}%"
+            matches = [
+                Book.title.ilike(pattern),
+                Book.author.ilike(pattern),
+                Book.genre.ilike(pattern),
+            ]
+            if current_user.is_authenticated:
+                matches.append(_tag_match(Tag.name.ilike(pattern)))
+            query = query.filter(db.or_(*matches))
 
     return query
 
@@ -116,17 +118,15 @@ def _filtered_book_query(filters=None, view=VIEW_ALL):
 def get_covers(offset=0, limit=BOOKS_PER_LOAD, filters=None, view=VIEW_ALL):
     """Return the next batch of book covers.
 
-    view='all'  → every accessible book, newest first by created_at.
-    view='mine' → only books the user has started (IN_PROGRESS or FINISHED),
-                  ordered by last_read so the most recently opened is first.
-                  Falls back to 'all' for anonymous users.
+    view='all'      → every accessible book, newest first by created_at.
+    view='unread'   → books you haven't started, newest first.
+    view='reading' / 'finished' → by reading status, most recently read first.
+    Anything but 'all' falls back to 'all' for anonymous users.
     """
     view = _normalize_view(view)
     query = _filtered_book_query(filters, view)
-    if query is None:
-        return []
 
-    if view == VIEW_MINE:
+    if view in _LAST_READ_VIEWS:
         query = query.order_by(Bookmark.last_read.desc(), Book.created_at.desc())
     else:
         query = query.order_by(Book.created_at.desc())
@@ -134,7 +134,9 @@ def get_covers(offset=0, limit=BOOKS_PER_LOAD, filters=None, view=VIEW_ALL):
     return [
         {
             "filename": book.filename,
-            "cover": url_for("index_routes.cover", filename=book.filename),
+            "title": book.title,
+            "author": display_author(book.author),
+            "cover": cover_url(book, width=400),
             "length": _book_text_size(book),
             "access_level": book.access_level,
         }
@@ -168,15 +170,44 @@ def count_books(filters=None, view=VIEW_ALL):
     Used to cap the number of loading skeletons rendered on the home page."""
     view = _normalize_view(view)
     query = _filtered_book_query(filters, view)
-    if query is None:
-        return 0
-    # distinct() so the count isn't inflated by multi-tag join duplication.
-    return query.distinct().count()
+    return query.count()
+
+
+def continue_reading(limit=CONTINUE_READING_LIMIT):
+    """The current user's in-progress books, most recently read first, each
+    with whole-book progress. Empty for anonymous users."""
+    if not current_user.is_authenticated:
+        return []
+    query = (
+        Book.query.join(Bookmark, db.and_(
+            Bookmark.book_id == Book.id, Bookmark.user_id == current_user.id
+        ))
+        .filter(Book.deleted_at.is_(None))
+        .filter(Bookmark.status == BookProgressChoice.IN_PROGRESS)
+    )
+    if current_user.role == UserRoleChoice.STANDARD:
+        query = query.filter(Book.access_level == AccessLevelChoice.STANDARD.value)
+    rows = (
+        query.add_columns(Bookmark.chapter_index, Bookmark.position)
+        .order_by(Bookmark.last_read.desc())
+        .limit(limit)
+        .all()
+    )
+    return [
+        {
+            "filename": book.filename,
+            "title": book.title,
+            "author": display_author(book.author),
+            "cover": cover_url(book, width=120),
+            "progress": round(book_progress(chapter_sizes(book), chapter, position), 4),
+        }
+        for book, chapter, position in rows
+    ]
 
 
 def _requested_view():
     view = request.args.get("view", VIEW_ALL)
-    return view if view in (VIEW_ALL, VIEW_MINE) else VIEW_ALL
+    return view if view in VIEWS else VIEW_ALL
 
 
 @index_blueprint.route("/")
@@ -186,20 +217,19 @@ def index():
     images = get_covers(0, BOOKS_PER_LOAD, view=view)
     total = count_books(view=view)
     return render_template(
-        "index.html", images=images, current_view=view, total_books=total
+        "index.html",
+        page_size=BOOKS_PER_LOAD,
+        images=images,
+        current_view=view,
+        total_books=total,
+        continue_books=continue_reading(),
     )
 
 
 @index_blueprint.route("/load_more/<int:offset>", methods=["GET"])
 def load_more(offset):
-    filters = {
-        "title": request.args.get("title"),
-        "author": request.args.get("author"),
-        "genre": request.args.get("genre"),
-        "tags": request.args.get("tags"),
-    }
-    # Remove empty filters
-    filters = {k: v for k, v in filters.items() if v}
+    q = (request.args.get("q") or "").strip()
+    filters = {"q": q} if q else {}
     view = _requested_view()
     images = get_covers(offset, BOOKS_PER_LOAD, filters, view=view)
     response = jsonify(images)
@@ -208,14 +238,26 @@ def load_more(offset):
     return response
 
 
+# Thumbnail widths the grid and Continue reading ask for. Requests snap to one
+# of these so the disk cache stays bounded.
+THUMB_WIDTHS = (120, 400)
+
+
+def _snap_width(width):
+    if not width:
+        return None
+    return next((w for w in THUMB_WIDTHS if width <= w), THUMB_WIDTHS[-1])
+
+
 @index_blueprint.route("/cover/<filename>")
 def cover(filename):
-    """Serve a book's cover with long-lived caching keyed on file mtime.
+    """Serve a book's cover, or a ?w=120|400 WebP thumbnail of it.
 
-    Two layers of caching:
-      1. Server-side: cover bytes memoized in flask-caching keyed on
-         (book_id, mtime). Avoids re-extracting from the zip on every request.
+    Caching:
+      1. Server-side: full cover bytes memoized in flask-caching; thumbnails
+         written to instance/thumbs/ keyed on (book id, mtime, width).
       2. Client-side: ETag-based 304 response, plus Cache-Control: 1 year.
+    A book whose EPUB has no usable cover gets a generated typographic one.
     """
     book = get_book_or_404(filename)
     epub_path = os.path.join(current_app.config["BOOK_DIR"], book.filename)
@@ -223,7 +265,8 @@ def cover(filename):
         abort(404, description="Cover not found")
 
     mtime = int(os.path.getmtime(epub_path))
-    etag = f"{book.id}-{mtime}"
+    width = _snap_width(request.args.get("w", type=int))
+    etag = f"{book.id}-{mtime}-{width or 'full'}"
     if request.if_none_match.contains(etag):
         return "", 304
 
@@ -234,17 +277,58 @@ def cover(filename):
     cache_key = f"cover:{book.id}:{mtime}"
     cover_bytes = cache.get(cache_key)
     if cover_bytes is None:
-        cover_bytes = read_epub_cover(epub_path, book.cover_path)
+        try:
+            cover_bytes = read_epub_cover(epub_path, book.cover_path)
+        except Exception as e:
+            current_app.logger.info(f"No usable cover in {book.filename}: {e}")
+            cover_bytes = fallback_cover_svg(book.title, display_author(book.author))
         cache.set(cache_key, cover_bytes, timeout=86400)
 
-    response = make_response(cover_bytes)
-    response.headers["Content-Type"] = (
+    mimetype = (
         guess_cover_mimetype_from_bytes(cover_bytes)
         or cover_mimetype(book.cover_path or "")
     )
+    if width and mimetype != "image/svg+xml":
+        thumb = _cached_thumbnail(book, mtime, width, cover_bytes)
+        if thumb is not None:
+            cover_bytes, mimetype = thumb, "image/webp"
+
+    response = make_response(cover_bytes)
+    response.headers["Content-Type"] = mimetype
     response.headers["Cache-Control"] = "public, max-age=31536000"
     response.set_etag(etag)
     return response
+
+
+def _cached_thumbnail(book, mtime, width, cover_bytes):
+    """WebP thumbnail from instance/thumbs/, generating it on first request.
+    Returns None if the image can't be decoded (the caller serves the original)."""
+    thumb_dir = current_app.config["THUMB_DIR"]
+    path = os.path.join(thumb_dir, f"{book.id}-{mtime}-{width}.webp")
+    try:
+        with open(path, "rb") as f:
+            return f.read()
+    except OSError:
+        pass
+    try:
+        thumb = make_thumbnail(cover_bytes, width)
+    except Exception as e:
+        current_app.logger.warning(f"Could not thumbnail cover of {book.filename}: {e}")
+        return None
+    try:
+        os.makedirs(thumb_dir, exist_ok=True)
+        # Drop thumbnails of older versions of this book's cover.
+        for old in os.listdir(thumb_dir):
+            current = f"{book.id}-{mtime}-"
+            if old.startswith(f"{book.id}-") and not old.startswith(current):
+                os.remove(os.path.join(thumb_dir, old))
+        tmp = f"{path}.tmp"
+        with open(tmp, "wb") as f:
+            f.write(thumb)
+        os.replace(tmp, path)
+    except OSError as e:
+        current_app.logger.warning(f"Could not cache thumbnail {path}: {e}")
+    return thumb
 
 
 @index_blueprint.route("/download/<filename>")
@@ -263,27 +347,54 @@ def download(filename):
 @index_blueprint.route("/book/<filename>", methods=["DELETE"])
 @json_admin_required
 def delete_book(filename):
-    """Permanently remove a book — DB row, join-table rows, and the EPUB file."""
+    """Move a book to the trash. The row and EPUB stay put so the delete can be
+    undone (POST /book/<filename>/restore); purge_trash() removes them for good
+    after TRASH_RETENTION_DAYS."""
     book = get_book_or_404(filename)
-    epub_path = os.path.join(current_app.config["BOOK_DIR"], book.filename)
-
     with commit_or_rollback():
-        # Defensively clear book_tags rows: existing DBs don't have ON DELETE
-        # CASCADE on the join table, so the orphan rows would be left behind.
-        db.session.execute(
-            book_tags.delete().where(book_tags.c.book_id == book.id)
-        )
-        db.session.delete(book)
+        book.deleted_at = _utcnow()
+    purge_trash()
+    return jsonify({"message": "Moved to trash", "title": book.title})
 
-    if os.path.exists(epub_path):
-        try:
-            os.remove(epub_path)
-        except OSError as e:
-            current_app.logger.warning(
-                f"Removed DB row but failed to unlink {epub_path}: {e}"
+
+@index_blueprint.route("/book/<filename>/restore", methods=["POST"])
+@json_admin_required
+def restore_book(filename):
+    """Undo a delete."""
+    book = get_book_or_404(filename, include_deleted=True)
+    with commit_or_rollback():
+        book.deleted_at = None
+    return jsonify({"message": "Restored", "title": book.title})
+
+
+def purge_trash(retention_days=None):
+    """Permanently remove books that have been in the trash longer than the
+    retention window — DB row, join-table rows, and the EPUB file. Returns
+    the number purged."""
+    if retention_days is None:
+        retention_days = current_app.config.get("TRASH_RETENTION_DAYS", 30)
+    # SQLite hands back naive datetimes, so compare against a naive UTC cutoff.
+    cutoff = (_utcnow() - timedelta(days=retention_days)).replace(tzinfo=None)
+    expired = Book.query.filter(
+        Book.deleted_at.isnot(None), Book.deleted_at < cutoff
+    ).all()
+    for book in expired:
+        epub_path = os.path.join(current_app.config["BOOK_DIR"], book.filename)
+        with commit_or_rollback():
+            # Defensively clear book_tags rows: existing DBs don't have ON DELETE
+            # CASCADE on the join table, so the orphan rows would be left behind.
+            db.session.execute(
+                book_tags.delete().where(book_tags.c.book_id == book.id)
             )
-
-    return jsonify({"message": "Book deleted"})
+            db.session.delete(book)
+        if os.path.exists(epub_path):
+            try:
+                os.remove(epub_path)
+            except OSError as e:
+                current_app.logger.warning(
+                    f"Purged DB row but failed to unlink {epub_path}: {e}"
+                )
+    return len(expired)
 
 
 @index_blueprint.route("/books", methods=["GET"])
@@ -299,7 +410,7 @@ def search_books():
     if not title and not author:
         return jsonify({"error": "title or author is required"}), 400
 
-    query = Book.query
+    query = Book.query.filter(Book.deleted_at.is_(None))
     if current_user.role == UserRoleChoice.STANDARD:
         query = query.filter(Book.access_level == AccessLevelChoice.STANDARD.value)
 

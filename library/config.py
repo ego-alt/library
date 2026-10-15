@@ -28,10 +28,17 @@ class Config:
     # Book directory
     BOOK_DIR = os.getenv("BOOK_DIR", os.path.join(BASE_DIR, "books"))
 
+    # Generated cover thumbnails (safe to delete; rebuilt on demand)
+    THUMB_DIR = os.path.join(DATA_DIR, "thumbs")
+
     # Fuzzy match cutoff (0–1) for the /books title+author lookup the book-scanner
     # app uses to ask "do I already own this?". Lower = more lenient. Tunable per
     # deployment without a code change.
     LIBRARY_MATCH_THRESHOLD = float(os.getenv("LIBRARY_MATCH_THRESHOLD", "0.6"))
+
+    # Deleted books sit in the trash (undoable) for this many days before the
+    # row and EPUB are removed for good.
+    TRASH_RETENTION_DAYS = int(os.getenv("TRASH_RETENTION_DAYS", "30"))
 
     # When set (e.g. "X-Forwarded-User"), trust the dashboard nginx header instead of
     # Flask-Login sessions. Unset for standalone dev / step-4 routing tests.

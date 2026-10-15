@@ -20,6 +20,11 @@
     --color-success: #2D8F5B;
     --color-shadow: rgba(0, 0, 0, 0.2);
     --color-highlight-soft: rgba(0, 0, 0, 0.05);
+    /* App-specific: reading highlights, image scrims, the bookshelf. */
+    --color-text-selection: rgb(225, 204, 171);
+    --color-scrim: rgba(0, 0, 0, 0.55);
+    --wood: #8b6f47;
+    --wood-edge: #6f5638;
 }
 /* Dark mode unified with calendar's Gruvbox-dark palette. Light mode keeps
  * library's soft-academia identity; the two apps converge at night. */
@@ -40,4 +45,8 @@
     --color-success: #98971a;
     --color-shadow: rgba(0, 0, 0, 0.3);
     --color-highlight-soft: rgba(235, 219, 178, 0.05);
+    --color-text-selection: rgba(58, 109, 154, 0.6);
+    --color-scrim: rgba(0, 0, 0, 0.6);
+    --wood: #4a3a26;
+    --wood-edge: #2f2418;
 }

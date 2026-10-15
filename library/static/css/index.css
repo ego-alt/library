@@ -1,10 +1,5 @@
 /* Shared base (tokens + primitives) lives in structural.css; colours in
- * tokens.css (both loaded by the template). App-only token below: tag badges. */
-:root {
-    --tag-started: #D9B2A0;
-    --tag-finished: #B2E0D9;
-    --tag-unread: #A0B2D9;
-}
+ * tokens.css (both loaded by the template). */
 html, body {
     background-color: var(--color-bg-base);
 }
@@ -33,10 +28,6 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     position: absolute;
     right: 0;
 }
-.header-center {
-    flex-grow: 1;
-    text-align: center;
-}
 .header-left button, .header-right button {
     margin-left: var(--space-3);
 }
@@ -49,7 +40,7 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 }
 /* Phones show 2 covers per row (col-6); Bootstrap's default 1.5rem gutter
  * eats too much of that width, so tighten it below the sm breakpoint. */
-@media (max-width: 575.98px) {
+@media (max-width: 640px) {
     .library {
         --bs-gutter-x: 0.75rem;
     }
@@ -75,24 +66,35 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 .book:hover img {
     transform: scale(1.05);
 }
+/* Hidden with opacity, not display, so the button stays keyboard-focusable
+   (and focus can return to it when the details panel closes). */
 .book-buttons {
     position: absolute;
     top: var(--space-2);
     right: var(--space-2);
-    display: none;
-    z-index: 10;
-}
-.book:hover .book-buttons {
     display: flex;
     gap: var(--space-2);
+    z-index: 10;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--dur-fast) ease;
 }
+.book:hover .book-buttons,
+.book:focus-within .book-buttons {
+    opacity: 1;
+    pointer-events: auto;
+}
+/* The cover link fills the card, so it has a real hit area and focus ring. */
+.book > a { position: absolute; inset: 0; display: block; border-radius: inherit; }
+.book > a:focus-visible { outline: 3px solid var(--color-accent); outline-offset: -3px; }
+.book > a:focus-visible img { transform: scale(1.05); }
 /* Touch devices have no hover, so the cover's download/metadata buttons would
  * be unreachable. Surface them permanently in grid view. (Shelf spines are too
  * narrow to carry the stacked buttons legibly, so they stay tap-to-read only.) */
 @media (hover: none) {
     .book .book-buttons {
-        display: flex;
-        gap: var(--space-2);
+        opacity: 1;
+        pointer-events: auto;
     }
 }
 .book-button {
@@ -169,8 +171,6 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
        (repaintShelfPlanks) so they span the page even on partial last rows.
        Plank height is shared with JS via the SHELF_PLANK_H constant. */
     --plank-h: 14px;
-    --wood: #8b6f47;
-    --wood-edge: #6f5638;
     position: relative;
     display: flex;
     flex-wrap: wrap;
@@ -179,10 +179,6 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     column-gap: 0;
     padding: 20px 0 0;
     margin-bottom: 30px;
-}
-.dark-mode .library-shelf {
-    --wood: #4a3a26;
-    --wood-edge: #2f2418;
 }
 .shelf-slot {
     position: relative;
@@ -243,8 +239,10 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     gap: 4px;
     z-index: 2;
 }
-.book-spine:hover .book-buttons {
-    display: flex;
+.book-spine:hover .book-buttons,
+.book-spine:focus-within .book-buttons {
+    opacity: 1;
+    pointer-events: auto;
 }
 .book-button--spine {
     width: 24px;
@@ -270,9 +268,9 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 /* ============================================================
    Toast notifications — non-blocking replacement for alert()
    ============================================================ */
-.toast-container {
+.notice-stack {
     position: fixed;
-    bottom: var(--space-5);
+    bottom: calc(var(--space-5) + env(safe-area-inset-bottom, 0px));
     right: var(--space-5);
     z-index: 1100;
     display: flex;
@@ -281,7 +279,7 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     pointer-events: none;
     max-width: calc(100vw - 2 * var(--space-5));
 }
-.toast {
+.notice {
     background: var(--color-text-secondary);
     color: var(--color-bg-base);
     padding: var(--space-3) var(--space-4);
@@ -296,21 +294,21 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     transform: translateX(var(--space-5));
     transition: opacity 0.2s ease, transform 0.2s ease;
 }
-.toast--shown {
+.notice--shown {
     opacity: 1;
     transform: translateX(0);
 }
-.toast--success { background: var(--color-success); }
-.toast--error   { background: var(--color-danger); }
-.toast--info    { background: var(--color-text-primary); }
-@media (max-width: 600px) {
-    .toast-container {
+.notice--success { background: var(--color-success); }
+.notice--error   { background: var(--color-danger); }
+.notice--info    { background: var(--color-text-primary); }
+@media (max-width: 640px) {
+    .notice-stack {
         right: var(--space-3);
         left: var(--space-3);
         bottom: var(--space-3);
         align-items: stretch;
     }
-    .toast { max-width: none; }
+    .notice { max-width: none; }
 }
 .metadata-overlay {
     display: none;
@@ -359,6 +357,12 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     color: var(--color-text-secondary);
     margin: 0;
     letter-spacing: -0.01em;
+}
+.meta-title-input {
+    display: block;
+    resize: none;
+    overflow: hidden;
+    font-family: inherit;
 }
 .meta-title-input,
 .meta-author-input {
@@ -419,7 +423,7 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     align-items: center;
     justify-content: center;
     gap: var(--space-2);
-    background: rgba(0, 0, 0, 0.55);
+    background: var(--color-scrim);
     color: #fff;
     border: none;
     cursor: pointer;
@@ -459,7 +463,7 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 .meta-value {
     background: var(--color-bg-inset);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-sm);
     padding: var(--space-2) var(--space-3);
     font-size: var(--text-sm);
     color: var(--color-text-secondary);
@@ -473,16 +477,11 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     border-color: var(--toc-item-highlight, var(--color-text-primary));
     box-shadow: 0 0 0 3px var(--color-highlight-soft);
 }
-.meta-input--mono {
-    font-family: var(--font-mono);
-    font-size: var(--text-sm);
-}
 .meta-value {
     color: var(--color-text-muted);
     display: flex;
     align-items: center;
 }
-.meta-field--muted .meta-label { opacity: 0.7; }
 /* Access toggle: checkbox + inline label on one row, not the stacked default. */
 .meta-checkbox-field {
     flex-direction: row;
@@ -514,19 +513,23 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 }
 
 /* --- Buttons (preserve legacy class names so JS keeps working) --- */
-.save-button {
+/* One primary button for the whole app: dark ink on paper (light mode),
+   parchment on charcoal (night). Overrides the shared accent fill, which
+   reads as a link colour against this palette. */
+.btn-primary {
     background: var(--color-text-secondary);
+    border-color: var(--color-text-secondary);
     color: var(--color-bg-base);
-    border: 1px solid transparent;
-    padding: var(--space-2) var(--space-4);
-    border-radius: var(--radius-md);
     font-size: var(--text-sm);
     font-weight: 600;
-    cursor: pointer;
-    transition: background-color 0.15s ease, transform 0.05s ease;
+    padding: var(--space-2) var(--space-4);
 }
-.save-button:hover { background: var(--color-text-primary); }
-.save-button:active { transform: translateY(1px); }
+.btn-primary:hover:not(:disabled) {
+    background: var(--color-text-primary);
+    border-color: var(--color-text-primary);
+    color: var(--color-bg-base);
+}
+.btn-primary:active:not(:disabled) { transform: translateY(1px); }
 .delete-book-button {
     background: transparent;
     color: var(--color-danger);
@@ -549,7 +552,8 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 .delete-book-button:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* --- Close button --- */
-.close-metadata {
+.close-metadata,
+.close-login {
     position: absolute;
     top: var(--space-3);
     right: var(--space-3);
@@ -568,15 +572,41 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     border-radius: var(--radius-pill);
     z-index: 1;
 }
-.close-metadata:hover {
+.close-metadata:hover,
+.close-login:hover {
     transform: rotate(90deg);
     background: var(--color-highlight-soft);
     color: var(--color-text-primary);
 }
 
-/* --- Responsive: stack the cover above fields on narrow viewports --- */
-@media (max-width: 600px) {
-    .metadata-content { padding: var(--space-5); }
+/* --- Phones: the panel becomes a bottom sheet, cover above fields, with the
+   actions pinned to the bottom so Save is always reachable --- */
+@media (max-width: 640px) {
+    .metadata-overlay { align-items: flex-end; }
+    .metadata-content {
+        width: 100%;
+        max-width: none;
+        max-height: 92dvh;
+        border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+        padding: var(--space-5) var(--space-4) 0;
+        animation: sheetUp 0.25s var(--ease-emphasized);
+    }
+    .meta-footer {
+        position: sticky;
+        bottom: 0;
+        background: var(--color-bg-base);
+        margin: var(--space-5) calc(-1 * var(--space-4)) 0;
+        padding: var(--space-3) var(--space-4) calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
+    }
+}
+@keyframes sheetUp {
+    from { transform: translateY(100%); }
+    to   { transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .metadata-content { animation: none; }
+}
+@media (max-width: 640px) {
     .meta-body {
         grid-template-columns: 1fr;
         gap: var(--space-5);
@@ -585,14 +615,14 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
         max-width: 200px;
         margin: 0 auto;
     }
-    .meta-footer { flex-direction: column-reverse; align-items: stretch; }
-    .meta-footer-actions { justify-content: space-between; }
-    .meta-footer-info { text-align: center; }
+    .meta-footer { flex-direction: row; align-items: center; }
+    .meta-footer-actions { justify-content: flex-end; }
+    .meta-footer-info { text-align: left; white-space: nowrap; }
 }
 .tag-input-container {
     background: var(--color-bg-inset);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-sm);
     padding: var(--space-1) var(--space-2);
     display: flex;
     flex-wrap: wrap;
@@ -669,15 +699,7 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     align-items: center;
     position: relative;
 }
-.header-buttons {
-    position: absolute;
-    right: 0;
-    top: 50%;
-    transform: translateY(-50%);
-    display: flex;
-    gap: var(--space-2);
-}
-.filter-button, .login-button, .upload-button, .dark-mode-toggle, .view-toggle, .layout-toggle {
+.login-button, .upload-button, .dark-mode-toggle, .layout-toggle {
     background: none;
     border: none;
     font-size: var(--text-lg);
@@ -686,14 +708,12 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     cursor: pointer;
     transition: color 0.2s;
 }
-.filter-button:hover, .login-button:hover, .upload-button:hover, .dark-mode-toggle:hover, .view-toggle:hover, .layout-toggle:hover {
+.login-button:hover, .upload-button:hover, .dark-mode-toggle:hover, .layout-toggle:hover {
     color: var(--color-text-secondary);
 }
-.view-toggle.active,
 .layout-toggle.active {
     color: var(--color-accent);
 }
-.view-toggle.active:hover,
 .layout-toggle.active:hover {
     color: var(--color-accent);
     opacity: 0.8;
@@ -701,61 +721,14 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 /* Narrow screens: up to 6 icon buttons flank the centered title via absolutely-
  * positioned groups. Shrink the icons, their spacing, and the title so they
  * don't crowd (or overlap) each other on phones. */
-@media (max-width: 575.98px) {
+@media (max-width: 640px) {
     .header-left button, .header-right button { margin-left: var(--space-1); }
-    .filter-button, .login-button, .upload-button,
-    .dark-mode-toggle, .view-toggle, .layout-toggle {
+    .login-button, .upload-button,
+    .dark-mode-toggle, .layout-toggle {
         font-size: var(--text-base);
         padding: var(--space-1);
     }
     .header-row h1 { font-size: var(--text-lg); }
-}
-.filter-sidebar {
-    position: fixed;
-    right: -300px;
-    top: 0;
-    width: 300px;
-    height: 100%;
-    background: var(--color-bg-base);
-    box-shadow: -2px 0 8px var(--color-shadow);
-    padding: var(--space-5);
-    transition: right 0.3s ease;
-    z-index: 999;
-    overflow-y: auto;
-}
-.filter-sidebar.active {
-    right: 0;
-}
-.filter-sidebar h3 {
-    margin-bottom: var(--space-5);
-    padding-bottom: var(--space-3);
-    border-bottom: 1px solid var(--color-border);
-}
-.filter-group {
-    margin-bottom: var(--space-5);
-}
-.filter-group label {
-    display: block;
-    margin-bottom: var(--space-2);
-    color: var(--color-text-primary);
-    font-weight: 600;
-}
-.filter-group input {
-    width: 100%;
-    padding: var(--space-2);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
-    background: var(--color-bg-inset);
-}
-.filter-overlay {
-    display: none;
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: var(--color-bg-overlay);
-    z-index: 998;
 }
 .login-overlay {
     display: none;
@@ -791,15 +764,26 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 
 .login-field label {
     display: block;
-    margin-bottom: var(--space-2);
+    margin-bottom: var(--space-1);
+    color: var(--color-text-muted);
+    font-weight: 600;
+    font-size: var(--text-sm);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+.login-field.checkbox label {
+    text-transform: none;
+    letter-spacing: normal;
+    font-weight: 400;
     color: var(--color-text-primary);
-    font-weight: 500;
+    margin: 0;
 }
 .login-field input:not([type="checkbox"]) {
     width: 100%;
     padding: var(--space-3);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-sm);
+    color: var(--color-text-primary);
     background: var(--color-bg-inset);
 }
 .login-field.checkbox {
@@ -809,52 +793,10 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 }
 .login-submit {
     width: 100%;
-    padding: var(--space-3);
-    background: var(--color-text-secondary);
-    color: var(--color-bg-base);
-    border: none;
-    border-radius: var(--radius-md);
-    font-size: var(--text-lg);
-    cursor: pointer;
-    transition: background-color 0.2s;
-}
-.login-submit:hover {
-    background: var(--color-text-primary);
-}
-.close-login {
-    position: absolute;
-    top: var(--space-4);
-    right: var(--space-4);
-    background: none;
-    border: none;
-    font-size: var(--text-lg);
-    cursor: pointer;
-    color: var(--color-text-primary);
-    width: 30px;
-    height: 30px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: var(--radius-pill);
-    transition: background-color 0.2s;
-}
-.close-login:hover {
-    background: var(--color-highlight-soft);
+    min-height: 44px;
 }
 #loginError {
     margin-bottom: var(--space-5);
-}
-.started-tag {
-    background: var(--tag-started);
-    color: black;
-}
-.finished-tag {
-    background: var(--tag-finished);
-    color: black;
-}
-.unread-tag {
-    background: var(--tag-unread);
-    color: black;
 }
 .dark-mode .book img {
     filter: brightness(0.6);
@@ -864,4 +806,333 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 .dark-mode input,
 .dark-mode textarea {
     color: var(--color-text-secondary);
+}
+/* ============================================================
+   Continue reading — the books you're in the middle of, newest
+   first, one tap from launch to where you left off
+   ============================================================ */
+.continue-reading {
+    margin-bottom: var(--space-8);
+}
+.continue-reading__label {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin: 0 0 var(--space-3);
+}
+.continue-reading__list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: var(--space-3);
+}
+.continue-card {
+    display: flex;
+    gap: var(--space-3);
+    align-items: center;
+    padding: var(--space-3);
+    background: var(--color-bg-inset);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    color: inherit;
+    text-decoration: none;
+    min-width: 0;
+    transition: box-shadow var(--dur-base) ease, border-color var(--dur-base) ease;
+}
+.continue-card:hover,
+.continue-card:focus-visible {
+    color: inherit;
+    border-color: var(--color-text-muted);
+    box-shadow: 0 2px 8px var(--color-shadow);
+}
+.continue-card:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+.continue-card__cover {
+    flex: 0 0 auto;
+    width: 52px;
+    aspect-ratio: 2 / 3;
+    object-fit: cover;
+    border-radius: var(--radius-sm);
+    box-shadow: 0 1px 4px var(--color-shadow);
+    background: var(--color-highlight-soft);
+}
+.dark-mode .continue-card__cover { filter: brightness(0.8); }
+.continue-card__text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+    flex: 1;
+}
+.continue-card__title {
+    color: var(--color-text-secondary);
+    font-weight: 600;
+    line-height: 1.3;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+}
+.continue-card__author {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.continue-card__progress {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-top: var(--space-1);
+}
+.continue-card__bar {
+    flex: 1;
+    height: 3px;
+    border-radius: var(--radius-pill);
+    background: var(--color-border);
+    overflow: hidden;
+}
+.continue-card__bar > span {
+    display: block;
+    height: 100%;
+    background: var(--color-accent);
+    border-radius: inherit;
+}
+.continue-card__pct {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    font-variant-numeric: tabular-nums;
+    min-width: 3.5ch;
+    text-align: right;
+}
+@media (max-width: 640px) {
+    .continue-reading { margin-bottom: var(--space-5); }
+    .continue-reading__list { grid-template-columns: 1fr; gap: var(--space-2); }
+}
+
+/* Toast action (e.g. Undo after delete) */
+.notice {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+}
+.notice > span { flex: 1; }
+.notice__action {
+    flex: 0 0 auto;
+    background: none;
+    border: none;
+    padding: var(--space-1) var(--space-2);
+    margin: calc(-1 * var(--space-1)) calc(-1 * var(--space-2)) calc(-1 * var(--space-1)) 0;
+    min-height: 32px;
+    color: inherit;
+    font: inherit;
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+}
+.notice__action:hover { background: rgba(255, 255, 255, 0.15); }
+.notice__action:focus-visible { outline: 2px solid currentColor; outline-offset: 1px; }
+
+/* ============================================================
+   Offline — banner, and books not saved on this device
+   ============================================================ */
+.offline-banner {
+    position: fixed;
+    left: 50%;
+    bottom: calc(var(--space-5) + env(safe-area-inset-bottom, 0px));
+    transform: translateX(-50%);
+    z-index: 1050;
+    max-width: calc(100vw - 2 * var(--space-5));
+    padding: var(--space-2) var(--space-4);
+    border-radius: var(--radius-pill);
+    background: var(--color-text-secondary);
+    color: var(--color-bg-base);
+    font-size: var(--text-sm);
+    text-align: center;
+    white-space: nowrap;
+    box-shadow: 0 4px 12px var(--color-shadow);
+}
+.is-unavailable {
+    opacity: 0.4;
+    filter: grayscale(0.8);
+}
+.is-unavailable:hover { opacity: 0.55; }
+
+/* ============================================================
+   Library toolbar — one search box + reading-status control
+   ============================================================ */
+.library-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+    margin-bottom: var(--space-5);
+}
+.library-search {
+    position: relative;
+    flex: 1 1 260px;
+    max-width: 420px;
+}
+.library-search > i {
+    position: absolute;
+    left: var(--space-3);
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    pointer-events: none;
+}
+.library-search__input {
+    width: 100%;
+    height: 40px;
+    padding: 0 var(--space-3) 0 calc(var(--space-3) + 22px);
+    background: var(--color-bg-inset);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-pill);
+    color: var(--color-text-primary);
+    font: inherit;
+    font-size: var(--text-base);
+    transition: border-color var(--dur-base) ease;
+}
+.library-search__input::placeholder { color: var(--color-text-muted); }
+.library-search__input:focus { outline: none; border-color: var(--color-accent); }
+
+/* Segmented radio group, used for the library view and the details panel. */
+.status-filter {
+    display: inline-flex;
+    padding: 3px;
+    gap: 2px;
+    background: var(--color-bg-inset);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-pill);
+}
+.status-filter button {
+    border: none;
+    background: transparent;
+    color: var(--color-text-muted);
+    font: inherit;
+    font-size: var(--text-sm);
+    font-weight: 500;
+    padding: 0 var(--space-3);
+    min-height: 32px;
+    border-radius: var(--radius-pill);
+    cursor: pointer;
+    transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease;
+}
+.status-filter button:hover { color: var(--color-text-primary); }
+.status-filter button[aria-checked="true"] {
+    background: var(--color-text-secondary);
+    color: var(--color-bg-base);
+}
+.status-filter button:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }
+.meta-status { align-self: flex-start; }
+@media (max-width: 640px) {
+    .library-search { max-width: none; flex-basis: 100%; }
+    .library .status-filter, .library-toolbar .status-filter { width: 100%; }
+    .library-toolbar .status-filter button { flex: 1; min-height: 40px; }
+}
+
+.empty-state {
+    text-align: center;
+    padding: var(--space-8) var(--space-4);
+    color: var(--color-text-muted);
+}
+.empty-state h3 { font-size: var(--text-lg); color: var(--color-text-secondary); margin-bottom: var(--space-2); }
+.empty-state .btn { margin-top: var(--space-3); }
+
+/* ============================================================
+   Notch / home bar (viewport-fit=cover) and touch sizes
+   ============================================================ */
+.container {
+    padding-left: max(calc(var(--bs-gutter-x, 1.5rem) * 0.5), env(safe-area-inset-left, 0px));
+    padding-right: max(calc(var(--bs-gutter-x, 1.5rem) * 0.5), env(safe-area-inset-right, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.header-row { padding-top: env(safe-area-inset-top, 0px); }
+/* Header icons stay small but get a 44px hit area. */
+.header-left .btn, .header-right .btn {
+    min-width: 44px;
+    min-height: 44px;
+}
+@media (max-width: 640px) {
+    .header-left button, .header-right button { margin-left: 0; }
+    /* 16px stops iOS zooming the page when an input is focused. */
+    .meta-input, .meta-author-input, .tag-input-container input,
+    .login-field input:not([type="checkbox"]) {
+        font-size: var(--text-base);
+    }
+    .meta-author-input { font-size: var(--text-base); }
+    .book-button { width: 40px; height: 40px; }
+    .tag .remove-tag { padding: var(--space-1) var(--space-2); margin: calc(-1 * var(--space-1)) calc(-1 * var(--space-2)) calc(-1 * var(--space-1)) 0; }
+}
+
+.meta-download {
+    font-size: var(--text-sm);
+    padding: var(--space-2) var(--space-3);
+    color: var(--color-text-secondary);
+    text-decoration: none;
+}
+.meta-download:hover { color: var(--color-text-primary); }
+@media (max-width: 640px) {
+    .meta-download span { display: none; }  /* icon-only in the sheet footer */
+    .meta-download { min-width: 44px; min-height: 44px; }
+}
+
+/* Adding books: drop target and the brief highlight on a newly added card */
+.drop-zone {
+    position: fixed;
+    inset: var(--space-4);
+    z-index: 1300;
+    display: grid;
+    place-items: center;
+    border: 2px dashed var(--color-accent);
+    border-radius: var(--radius-lg);
+    background: var(--color-bg-overlay);
+    color: #fff;
+    font-size: var(--text-lg);
+    pointer-events: none;
+}
+.is-new .book,
+.is-new .book-spine {
+    animation: newBook 1.6s var(--ease-emphasized);
+}
+@keyframes newBook {
+    0%   { box-shadow: 0 0 0 0 var(--color-accent); transform: scale(0.96); }
+    30%  { box-shadow: 0 0 0 6px var(--color-accent); transform: scale(1); }
+    100% { box-shadow: 0 2px 6px var(--color-shadow); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .is-new .book, .is-new .book-spine { animation: none; outline: 3px solid var(--color-accent); }
+}
+
+/* "You have unsaved changes" bar inside the details panel footer */
+.meta-footer { flex-wrap: wrap; }
+.discard-bar {
+    flex: 1 0 100%;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    background: var(--color-highlight-soft);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    font-size: var(--text-sm);
+    color: var(--color-text-secondary);
+}
+.discard-bar span { flex: 1 1 12rem; }
+.discard-bar .btn { font-size: var(--text-sm); }
+
+#library.is-refreshing { opacity: 0.45; transition: opacity var(--dur-base) ease; pointer-events: none; }
+
+/* Long-press opens details on touch; stop iOS selecting text or showing the
+   link preview under the finger. */
+#library .book, #library .book-spine, .continue-card {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
 }

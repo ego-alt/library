@@ -397,3 +397,64 @@ def test_process_chapter_rewrites_internal_links(epub_path):
     assert "javascript:void" in result["content"]
     assert "ch2.xhtml" in result["content"]
     assert "scene" in result["content"]
+
+
+# --- whole-book progress ---------------------------------------------------------
+
+
+def test_book_progress_weights_chapters_by_size():
+    from library.utils import book_progress
+
+    sizes = [100, 300, 600]
+    assert book_progress(sizes, 0, 0.0) == 0.0
+    assert book_progress(sizes, 1, 0.0) == 0.1
+    assert book_progress(sizes, 1, 0.5) == 0.25
+    assert book_progress(sizes, 2, 1.0) == 1.0
+
+
+def test_book_progress_clamps_bad_input():
+    from library.utils import book_progress
+
+    assert book_progress([], 3, 0.5) == 0.0
+    assert book_progress([0, 0], 1, 0.5) == 0.0
+    assert book_progress([100, 100], 9, 2.0) == 1.0
+    assert book_progress([100, 100], -1, -1.0) == 0.0
+
+
+def test_spine_chapter_sizes_matches_structure(tmp_path):
+    from library.utils import get_epub_structure, spine_chapter_sizes
+    from tests._epub_builder import build_epub3
+
+    path = tmp_path / "b.epub"
+    path.write_bytes(build_epub3())
+    assert spine_chapter_sizes(str(path)) == get_epub_structure(str(path))[
+        "chapter_sizes"
+    ]
+
+
+# --- author display ----------------------------------------------------------------
+
+
+def test_display_author_flips_catalogue_order():
+    from library.utils import display_author
+
+    assert display_author("Judt, Tony") == "Tony Judt"
+    assert display_author("Bevins,  Vincent") == "Vincent Bevins"
+    assert display_author("Le Guin, Ursula K.") == "Ursula K. Le Guin"
+
+
+def test_display_author_leaves_other_shapes_alone():
+    from library.utils import display_author
+
+    assert display_author("Walter Isaacson") == "Walter Isaacson"
+    assert display_author("Strunk, William, White, E. B.") == "Strunk, William, White, E. B."
+    assert display_author("Gaiman, Neil & Pratchett, Terry") == "Gaiman, Neil & Pratchett, Terry"
+    assert display_author("King, Jr.") == "King, Jr."
+
+
+def test_display_author_handles_missing():
+    from library.utils import display_author
+
+    assert display_author("") == "Unknown author"
+    assert display_author(None) == "Unknown author"
+    assert display_author("Unknown Author") == "Unknown author"

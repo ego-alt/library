@@ -1,11 +1,13 @@
+import os
 from contextlib import contextmanager
 from functools import wraps
 
-from flask import abort, jsonify
+from flask import abort, current_app, jsonify, url_for
 from flask_login import current_user
 
 from ..choices import AccessLevelChoice, UserRoleChoice
 from ..models import Book, db
+from ..utils import spine_chapter_sizes
 
 
 def json_login_required(view):
@@ -14,7 +16,7 @@ def json_login_required(view):
     @wraps(view)
     def wrapper(*args, **kwargs):
         if not current_user.is_authenticated:
-            return jsonify({"error": "Authentication required"}), 401
+            return jsonify({"error": "Sign in to do that."}), 401
         return view(*args, **kwargs)
 
     return wrapper
@@ -26,20 +28,71 @@ def json_admin_required(view):
     @wraps(view)
     def wrapper(*args, **kwargs):
         if not current_user.is_authenticated:
-            return jsonify({"error": "Authentication required"}), 401
+            return jsonify({"error": "Sign in to do that."}), 401
         if current_user.role != UserRoleChoice.ADMIN:
-            return jsonify({"error": "Admin role required"}), 403
+            return jsonify({"error": "Only an admin can do that."}), 403
         return view(*args, **kwargs)
 
     return wrapper
 
 
-def get_book_or_404(filename: str) -> Book:
-    """Resolve a book by filename or abort with a JSON 404."""
-    book = Book.query.filter_by(filename=filename).first()
+def get_book_or_404(filename: str, include_deleted: bool = False) -> Book:
+    """Resolve a book by filename or abort with a JSON 404. Books in the trash
+    (soft-deleted) count as missing unless `include_deleted` is set."""
+    query = Book.query.filter_by(filename=filename)
+    if not include_deleted:
+        query = query.filter(Book.deleted_at.is_(None))
+    book = query.first()
     if not book:
         abort(404, description="Book not found")
     return book
+
+
+def book_mtime(book: Book) -> int | None:
+    """The EPUB's mtime as an int, or None if the file is missing. Changes
+    whenever the file is rewritten (e.g. a new cover), so it doubles as a
+    version for cache-busting URLs."""
+    try:
+        path = os.path.join(current_app.config["BOOK_DIR"], book.filename)
+        return int(os.path.getmtime(path))
+    except OSError:
+        return None
+
+
+def cover_url(book: Book, width: int | None = None) -> str:
+    """Versioned cover URL, optionally a `width`-px thumbnail. /cover is cached
+    for a year, so the ?v= must change when the cover does, or browsers keep
+    showing the old one."""
+    params = {}
+    mtime = book_mtime(book)
+    if mtime is not None:
+        params["v"] = mtime
+    if width:
+        params["w"] = width
+    return url_for("index_routes.cover", filename=book.filename, **params)
+
+
+def chapter_sizes(book: Book) -> list[int]:
+    """Cached per-chapter weights for whole-book progress (see
+    utils.book_progress), keyed on (book id, file mtime)."""
+    mtime = book_mtime(book)
+    if mtime is None:
+        return []
+
+    # Local import to avoid circular import via library/__init__.py.
+    from .. import cache
+
+    key = f"chapter_sizes:{book.id}:{mtime}"
+    sizes = cache.get(key)
+    if sizes is None:
+        try:
+            path = os.path.join(current_app.config["BOOK_DIR"], book.filename)
+            sizes = spine_chapter_sizes(path)
+        except Exception as e:
+            current_app.logger.warning(f"Could not read spine of {book.filename}: {e}")
+            sizes = []
+        cache.set(key, sizes, timeout=86400)
+    return sizes
 
 
 def user_can_access_book(book: Book) -> bool:

@@ -82,23 +82,8 @@ a {
 .controls .btn {
     min-width: 75px;
     padding: var(--space-1) var(--space-2);
-    color: var(--toc-item-highlight);
 }
-.btn-outline-primary {
-    border-color: var(--toc-item-highlight);
-    color: var(--toc-item-highlight);
-}
-.btn-outline-primary:hover {
-    border-color: var(--toc-item-highlight);
-    background: var(--toc-item-highlight);
-    color: #fff;
-    box-shadow: none;
-}
-.btn-outline-primary:focus, .btn-outline-primary:active {
-    outline: none;
-    box-shadow: none;
-}
-.btn-primary, .btn-secondary, .btn-outline-secondary {
+.btn-primary, .btn-secondary {
     padding: var(--space-2) var(--space-3);
     font-size: var(--text-sm);
 }
@@ -146,6 +131,7 @@ a {
     left: -300px;
     width: 300px;
     height: calc(100vh - 60px);
+    height: calc(100dvh - 60px);
     background: var(--color-bg-base);
     box-shadow: 2px 0 8px var(--color-shadow);
     transition: left 0.3s ease, top 0.3s ease, height 0.3s ease;
@@ -155,6 +141,10 @@ a {
 }
 .toc-menu.visible {
     left: 0;
+}
+/* Off-screen, the drawer's shadow would still bleed in at the left edge. */
+.toc-menu:not(.visible) {
+    box-shadow: none;
 }
 .toc-list {
     list-style: none;
@@ -205,6 +195,7 @@ a {
 .top-controls:not(.visible) + .container + .toc-menu {
     top: 0;
     height: 100vh;
+    height: 100dvh;
 }
 .progress-bar-container {
     position: absolute;
@@ -240,11 +231,7 @@ a {
     margin-bottom: var(--space-3);
 }
 ::selection {
-    background-color: var(--highlight-color);
-    color: inherit;
-}
-.dark-mode ::selection {
-    background-color: var(--highlight-color-dark);
+    background-color: var(--color-text-selection);
     color: inherit;
 }
 .selection-menu {
@@ -262,8 +249,11 @@ a {
     display: flex;
 }
 .selection-menu button {
-    width: 36px;
     height: 36px;
+    padding: 0 var(--space-3);
+    gap: var(--space-2);
+    font-size: var(--text-sm);
+    font-weight: 500;
     border: none;
     background: none;
     border-radius: var(--radius-sm);
@@ -278,12 +268,6 @@ a {
 }
 .dark-mode .selection-menu button:hover {
     background: var(--color-highlight-soft);
-}
-.highlighted-text {
-    background-color: var(--highlight-color);
-}
-.dark-mode .highlighted-text {
-    background-color: var(--highlight-color-dark);
 }
 .search-overlay {
     display: none;
@@ -302,16 +286,7 @@ a {
     overflow: hidden;
     transition: width 0.3s ease-out;
 }
-.drag-handle {
-    position: absolute;
-    top: 0;
-    right: 0;
-    width: 20px;
-    height: 20px;
-    cursor: move;
-    z-index: 1001;
-}
-@media (min-width: 768px) {
+@media (min-width: 641px) {
     .search-container.expanded {
         width: 600px;
     }
@@ -351,7 +326,7 @@ a {
     line-height: 1.5;
 }
 .temp-highlight {
-    background-color: rgba(225, 204, 171);
+    background-color: var(--color-text-selection);
     display: inline;
     box-decoration-break: clone;
     -webkit-box-decoration-break: clone;
@@ -360,15 +335,29 @@ a {
     padding-right: 0.25em;
     margin-right: -0.25em;
 }
-.dark-mode .temp-highlight {
-    background-color: rgba(58, 109, 154, 0.6);
-}
 .thinking-animation {
     color: var(--color-text-primary);
     font-size: var(--text-sm);
     padding: var(--space-1) var(--space-4) var(--space-3);
     opacity: 0.7;
 }
+/* One quiet loading pattern: the word plus an ellipsis that fills in. */
+.thinking-animation::after {
+    content: '…';
+    display: inline-block;
+    width: 1.2em;
+    overflow: hidden;
+    vertical-align: bottom;
+    animation: ellipsis 1.2s steps(4, end) infinite;
+}
+@keyframes ellipsis {
+    from { width: 0; }
+    to   { width: 1.2em; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .thinking-animation::after { animation: none; }
+}
+.search-response--error { color: var(--color-text-muted); font-style: italic; }
 
 /* ============================================================
    Paginated reading mode — chapter HTML flows into column-width
@@ -376,19 +365,27 @@ a {
    on <html> (set by the inline head script) so the layout is
    established before the first paint.
    ============================================================ */
+/* dvh: on phones 100vh is taller than the visible area (it ignores the
+   browser's toolbar), which hid the last lines of each page. */
 html.paginated, html.paginated body {
     overflow: hidden;
     height: 100vh;
+    height: 100dvh;
 }
 .paginated .container {
     padding: 0;
     max-width: 100vw;
     height: 100vh;
+    height: 100dvh;
 }
 .paginated .reader-container {
     max-width: min(var(--reader-max-w, 820px), 100vw);
     height: 100vh;
-    padding: 72px 30px 60px;
+    height: 100dvh;
+    padding: calc(72px + env(safe-area-inset-top, 0px))
+             calc(30px + env(safe-area-inset-right, 0px))
+             calc(60px + env(safe-area-inset-bottom, 0px))
+             calc(30px + env(safe-area-inset-left, 0px));
     box-sizing: border-box;
     margin: 0 auto;
     overflow: hidden;
@@ -398,7 +395,10 @@ html.paginated, html.paginated body {
 }
 /* Bars retreated (tap-toggled): reclaim their reserved space for the page. */
 .paginated .top-controls:not(.visible) + .container .reader-container {
-    padding: 24px 30px 28px;
+    padding: calc(24px + env(safe-area-inset-top, 0px))
+             calc(30px + env(safe-area-inset-right, 0px))
+             calc(28px + env(safe-area-inset-bottom, 0px))
+             calc(30px + env(safe-area-inset-left, 0px));
 }
 .paginated #reader-content {
     height: 100%;
@@ -429,4 +429,180 @@ html.paginated, html.paginated body {
     max-height: calc(var(--page-h, 600px) - 40px);
     width: auto;
     object-fit: contain;
+}
+/* Section title + whole-book %, truncated so a long chapter title never
+   pushes the prev/next buttons off a phone screen. */
+#chapter-number {
+    display: flex;
+    min-width: 0;
+    max-width: min(28rem, calc(100vw - 180px));
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+.chapter-number__title { overflow: hidden; text-overflow: ellipsis; }
+.chapter-number__pct { flex: 0 0 auto; }
+
+/* Shown when a book can't be opened (missing, damaged, or offline and not
+   saved on this device). */
+.reader-message {
+    max-width: 32rem;
+    margin: var(--space-8) auto;
+    text-align: center;
+    color: var(--color-text-primary);
+}
+.reader-message p { margin-bottom: var(--space-4); }
+.reader-message__actions {
+    display: flex;
+    gap: var(--space-2);
+    justify-content: center;
+    flex-wrap: wrap;
+}
+.paginated .reader-message { column-span: all; }
+
+/* ============================================================
+   Phones: full-screen contents, AI answers in a bottom sheet
+   ============================================================ */
+@media (max-width: 640px) {
+    .toc-menu {
+        width: 100vw;
+        left: -100vw;
+        padding-bottom: calc(var(--space-5) + env(safe-area-inset-bottom, 0px));
+    }
+    .search-overlay {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        top: auto;
+    }
+    .search-container,
+    .search-container.expanded {
+        width: 100%;
+        border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+        box-shadow: 0 -4px 16px var(--color-shadow);
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    .search-input-container { padding: var(--space-3); }
+    .search-input { font-size: var(--text-base); padding: var(--space-2) var(--space-3); }
+    .search-response-container.active { max-height: 45dvh; }
+    .search-response { font-size: var(--text-base); }
+}
+
+/* "Finished <title>?" offer, shown once near the end of a book. */
+.finish-offer {
+    position: absolute;
+    bottom: calc(100% + var(--space-2));
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    width: max-content;
+    max-width: calc(100vw - 2 * var(--space-4));
+    padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+    background: var(--controls-background);
+    color: var(--color-text-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    box-shadow: 0 4px 12px var(--color-shadow);
+    font-size: var(--text-sm);
+}
+.finish-offer > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.finish-offer .btn { min-width: 0; white-space: nowrap; }
+.finish-offer__dismiss {
+    border: none;
+    background: none;
+    color: var(--color-text-muted);
+    font-size: var(--text-lg);
+    line-height: 1;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-pill);
+    cursor: pointer;
+}
+.finish-offer__dismiss:hover { background: var(--color-highlight-soft); }
+
+/* ============================================================
+   Notch / home bar (viewport-fit=cover) and touch-sized controls
+   ============================================================ */
+.top-controls {
+    padding-top: calc(var(--space-3) + env(safe-area-inset-top, 0px));
+    padding-left: calc(var(--space-3) + env(safe-area-inset-left, 0px));
+    padding-right: calc(var(--space-3) + env(safe-area-inset-right, 0px));
+}
+.top-controls:not(.visible) {
+    top: calc(-60px - env(safe-area-inset-top, 0px));
+}
+.controls {
+    padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
+}
+.top-controls.visible + .container .reader-container,
+.top-trigger:hover + .top-controls + .container .reader-container,
+.top-controls:hover + .container .reader-container {
+    padding-top: calc(70px + env(safe-area-inset-top, 0px));
+}
+.toc-menu { top: calc(60px + env(safe-area-inset-top, 0px)); }
+.reader-container {
+    padding-left: calc(var(--space-5) + env(safe-area-inset-left, 0px));
+    padding-right: calc(var(--space-5) + env(safe-area-inset-right, 0px));
+    padding-bottom: calc(var(--space-8) + env(safe-area-inset-bottom, 0px));
+}
+@media (pointer: coarse), (max-width: 640px) {
+    .top-controls .btn,
+    .controls .btn {
+        min-height: 44px;
+        min-width: 44px;
+    }
+    .controls { gap: var(--space-3); }
+    .top-controls:not(.visible) { top: calc(-72px - env(safe-area-inset-top, 0px)); }
+    .toc-menu { top: calc(72px + env(safe-area-inset-top, 0px)); }
+    .toc-item { padding-block: var(--space-3); }
+    .selection-menu button { height: 44px; }
+}
+
+/* "?" keyboard shortcut sheet */
+.shortcut-help {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 1200;
+    background: var(--controls-background);
+    color: var(--color-text-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    box-shadow: 0 8px 24px var(--color-shadow);
+    padding: var(--space-4) var(--space-5);
+    font-size: var(--text-sm);
+}
+.shortcut-help dl {
+    display: grid;
+    grid-template-columns: auto auto;
+    gap: var(--space-2) var(--space-5);
+    margin: 0;
+}
+.shortcut-help dt { text-align: right; font-weight: 400; white-space: nowrap; }
+.shortcut-help dd { margin: 0; }
+.shortcut-help kbd {
+    font-family: var(--font-mono);
+    font-size: 0.8em;
+    padding: 1px 6px;
+    border: 1px solid var(--color-border);
+    border-bottom-width: 2px;
+    border-radius: var(--radius-sm);
+    background: var(--color-bg-base);
+    color: var(--color-text-primary);
+}
+
+/* Loading: a quiet ring in the theme's muted ink, not Bootstrap blue. */
+#loading-spinner .spinner-border {
+    color: var(--color-text-muted);
+    width: 2.5rem !important;
+    height: 2.5rem !important;
+    border-width: 0.2em;
+}
+#loading-spinner p {
+    color: var(--color-text-muted);
+    font-size: var(--text-base);
+    font-weight: 400;
 }

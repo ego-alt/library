@@ -5,7 +5,7 @@ import sqlite3
 import pytest
 from click.testing import CliRunner
 
-from library import BOOK_DIR_SENTINEL, create_app
+from library import create_app
 from library.commands import backup_db_command
 from library.models import Book, db
 
@@ -16,7 +16,6 @@ def file_backed_app(tmp_path, monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test")
     book_dir = tmp_path / "books"
     book_dir.mkdir()
-    (book_dir / BOOK_DIR_SENTINEL).touch()
     db_path = tmp_path / "library.db"
     app = create_app({
         "TESTING": True,
@@ -79,7 +78,6 @@ def test_backup_db_refuses_in_memory_database(tmp_path, monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test")
     book_dir = tmp_path / "books"
     book_dir.mkdir()
-    (book_dir / BOOK_DIR_SENTINEL).touch()
     app = create_app({
         "TESTING": True,
         "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
@@ -107,3 +105,19 @@ def test_backup_db_ignores_unrelated_files_when_rotating(file_backed_app, tmp_pa
 
     assert (dest / "README").exists()
     assert (dest / "library-2024.db").exists()
+
+
+def test_purge_trash_command_removes_expired_books(file_backed_app):
+    from datetime import datetime, timedelta
+
+    from library.commands import purge_trash_command
+
+    app, _ = file_backed_app
+    with app.app_context():
+        book = Book.query.one()
+        book.deleted_at = datetime.utcnow() - timedelta(days=45)
+        db.session.commit()
+    result = app.test_cli_runner().invoke(purge_trash_command)
+    assert "Purged 1 book(s)" in result.output
+    with app.app_context():
+        assert Book.query.count() == 0

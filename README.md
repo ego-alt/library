@@ -2,45 +2,45 @@
 
 ## Overview
 
-![alt text](images/home_page.png)
+![The library: Continue reading, search, status filter and the cover grid](images/home_page.png)
 
-![alt text](images/metadata_dark.png)
+![A book's details in night mode: status, genre, tags, download](images/metadata_dark.png)
 
-![alt text](images/epub_reader.png)
+![The reader, showing the chapter name and progress through the book](images/epub_reader.png)
 
-![alt text](images/epub_reader_dark.png)
+![The reader in night mode](images/epub_reader_dark.png)
+
+![On a phone: the library, the details sheet and the reader](images/mobile.png)
 
 ## Features
 
-- **Book Management**
-  - Upload and process EPUBs, with automatic parsing of metadata.
-  - Customize book covers by uploading a new jpg or png.
-  - Download books directly from the library.
-  - Set access levels according to authentication and user roles.
-  - Batch import functionality for multiple books.
-- **EPUB Reader**
-  - Seamless navigation and progress tracking which remembers where you've read up to.
-  - Toggle dark mode and adjust font size to customise your reading experience.
-  - Content streaming ensures lightning-fast delivery, even for massive epubs.
-  - Mobile-friendly layout with intuitive controls.
-  - Support for table of contents navigation.
-  - Switch between scroll and paginated layouts; on wide screens, paginated mode shows a two-page spread like an open book.
-  - `←` / `→` / `Space` flip pages in paginated mode; `Shift` + `←` / `→` jumps sections in either mode.
-- **Library Views**
-  - Cover grid (default), ordered by most recently added or last read.
-  - Bookshelf view that renders each book as a spine on a wooden shelf — spine thickness scales with the book's length.
-- **Filtering & Search**
-  - Filter books by title, author, genre, or custom tags.
-  - Track reading status with automatically generated tags for Unread, In Progress, and Finished books.
-  - Advanced search with support for multiple criteria.
-- **Dark Mode**
-  - Toggle between light and dark themes effortlessly.
-  - Persistent theme preference across sessions.
-- **AI-Powered Reading Assistant**
-  - Ask questions on highlighted text for deeper comprehension.
-  - Get instant word definitions tailored to the current passage.
-  - Translate selected text to English with context-aware accuracy.
-  - Keyboard shortcuts for quick access on desktop (`Ctrl/Cmd + K`for questions, `D` for definitions, `L` for translations).
+- **Library**
+  - Cover grid or a bookshelf of spines (spine thickness scales with the book's length).
+  - **Continue reading** row: the books you're in the middle of, most recent first, with how far through each one you are.
+  - One search box that matches titles, authors, genres and your tags.
+  - Reading status — *Unread*, *Reading*, *Finished* — as a filter on the library and a control on each book.
+  - Your own tags per book, with autocomplete.
+  - Covers served as small WebP thumbnails; books without a cover get a typographic one.
+- **Adding and managing books**
+  - Add EPUBs with the **+** button or by dropping files onto the page; several at once is fine.
+  - A single book opens a review panel (title, author, genre, tags) before it's added; nothing lands in the library until you confirm.
+  - Change a book's cover, title, author and genre (admins), or mark a book private so only admins see it.
+  - Delete moves a book to the trash with **Undo**; the trash empties itself after 30 days.
+  - Download the EPUB from a book's details.
+- **Reader**
+  - Scroll or paginated layouts; on wide screens, paginated mode shows a two-page spread.
+  - Remembers your place per book, on the device and (signed in) across devices.
+  - Shows the chapter you're in and your progress through the whole book.
+  - Night mode and text size, contents panel, and an offer to mark the book finished near the end.
+- **Reading assistant (AI)**
+  - Select text, then **Ask** a question about it or **Explain** it: a word gets a definition in context, foreign text a translation, a passage a short gloss.
+  - Needs `ANTHROPIC_API_KEY` and a signed-in user.
+- **Phones and offline**
+  - Built for phones: bottom sheets, large tap targets, safe areas for notches; press and hold a book for its details.
+  - Installable as an app (web manifest) and usable offline: the last 12 books you opened, plus covers, are kept on the device.
+- **Keyboard (desktop)**
+  - Library: `/` search, `U` add a book, `Esc` close a panel.
+  - Reader: `←` / `→` page (or screen, in scroll mode), `Shift` + `←` / `→` section, `T` contents, `+` / `-` text size, `N` night mode, `A` ask and `E` explain (with text selected), `Esc` close, `?` all shortcuts.
 
 ## Installation
 
@@ -51,8 +51,9 @@
    ```
 
 2. **Configure environment variables**:
-   Create a `.env` file in the project root:
+   Create a `.env` file in the project root (see `.env.example` for all options):
    ```bash
+   SECRET_KEY=a_long_random_string
    ANTHROPIC_API_KEY=your_api_key_here
    BOOK_DIR=/path/to/your/books
    ```
@@ -72,8 +73,30 @@
    Ensure you have Python (3.10+) and `uv` installed:
    ```bash
    uv sync
+   uv run flask db upgrade
    uv run flask run --port=8002
    ```
+
+### Upgrading
+
+After pulling, apply database migrations and (for Docker) rebuild the image:
+
+```bash
+uv run flask db upgrade          # or inside the container
+docker compose build && docker compose up -d
+```
+
+See `MIGRATION.md` for release-specific notes.
+
+### Files the app writes
+
+Besides the database, the app keeps a few things it can always rebuild:
+
+- `instance/thumbs/` — cover thumbnails
+- `instance/cache/` — cached cover bytes and book sizes
+- `BOOK_DIR/.incoming/` — uploads waiting for you to confirm them (unconfirmed ones are removed after a day)
+
+All of these are safe to delete.
 
 ## Home stack (with dashboard)
 
@@ -104,24 +127,12 @@ See `dashboard/README.md` for compose and user sync.
 
 ## Usage
 
-- **Access the application**: Open your web browser and go to `http://127.0.0.1:8002`.
-- **Upload Books**: 
-  - Use the upload button in the top navigation bar.
-  - Batch upload: Drag and drop multiple files in the upload area.
-- **Manage Your Collection**: 
-  - Download or view book details via the overlay buttons on each book cover. 
-  - Organize books with custom tags.
-  - Edit metadata including title, author, and cover image.
-- **Filtering**: 
-  - Use the sidebar to search by title, author, or genre. 
-  - Filter by reading status (Unread, In Progress, Finished) or custom tags.
-  - Combine multiple filters for precise results.
-- **Read Books**: 
-  - Click any book cover to read it directly within the browser -- no downloads necessary.
-  - Use arrow keys to navigate between chapters.
-  - Access the table of contents through the sidebar menu.
-- **Bookmarking**: 
-  - Reading position saves automatically while logged in and syncs across devices.
+- **Open it**: go to `http://127.0.0.1:8002` (or `/library/` behind the dashboard).
+- **Add books**: press **+** or drop EPUB files on the library. One file opens a review panel; several are added straight away using each EPUB's own metadata. EPUBs need a table of contents (EPUB 3 nav or EPUB 2 NCX). For a whole folder at once, use `flask import-books` (below).
+- **Find a book**: type in the search box, or switch between *All*, *Unread*, *Reading* and *Finished*.
+- **Book details**: the **⋯** button on a cover (or press and hold on a phone) opens status, tags, genre, cover and Download; admins can also edit title and author, make a book private, or delete it.
+- **Read**: tap a cover or a *Continue reading* card. Your place is saved as you read.
+- **Offline**: books you've opened recently keep working without a connection; others are dimmed until you're back online.
 
 ## Commands
 
@@ -140,6 +151,14 @@ The application includes several CLI commands for managing books:
 - **Create User**: Create a new user account.
   ```bash
   uv run flask create-user <username> <password> --role <role>
+  ```
+
+- **Empty the trash**: Permanently remove books deleted more than `--days` ago
+  (default `TRASH_RETENTION_DAYS`, 30), including their EPUB files. This also
+  runs automatically whenever a book is deleted, so scheduling it is optional.
+  ```bash
+  uv run flask purge-trash
+  uv run flask purge-trash --days 0   # empty the trash now
   ```
 
 - **Backup DB**: Take an online SQLite snapshot of the library DB. Safe with
