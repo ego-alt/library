@@ -42,13 +42,13 @@ def test_anthropic_sdk_error_is_wrapped_as_llm_error():
         caller._call_api(system="s", user_content="u")
 
 
-def test_define_word_passes_word_and_context():
+def test_explain_passes_text_and_context():
     caller = LLMCaller()
     fake_client = MagicMock()
     fake_client.messages.create.return_value = _fake_message("a definition")
     caller._client = fake_client
 
-    result = caller.define_word("ephemeral", "lasting briefly")
+    result = caller.explain("ephemeral", "lasting briefly")
     assert result == "a definition"
     sent = fake_client.messages.create.call_args.kwargs
     assert "ephemeral" in sent["messages"][0]["content"]
@@ -77,21 +77,21 @@ def test_ai_reports_missing_api_key_plainly(standard_client, monkeypatch):
     def no_key(*a, **kw):
         raise LLMError("ANTHROPIC_API_KEY is not set")
 
-    monkeypatch.setattr(reader_module.llm_caller, "define_word", no_key)
-    r = standard_client.post("/define_word", json={"word": "x", "context": "y"})
+    monkeypatch.setattr(reader_module.llm_caller, "explain", no_key)
+    r = standard_client.post("/explain", json={"text": "x", "context": "y"})
     assert r.status_code == 503
     assert r.get_json()["error"] == "AI help isn't set up on this library."
 
 
-def test_define_word_returns_502_when_llm_fails(standard_client, monkeypatch):
+def test_explain_returns_502_when_llm_fails(standard_client, monkeypatch):
     from library.routes import reader as reader_module
 
     monkeypatch.setattr(
         reader_module.llm_caller,
-        "define_word",
+        "explain",
         lambda *a, **kw: (_ for _ in ()).throw(LLMError("nope")),
     )
-    r = standard_client.post("/define_word", json={"word": "x", "context": "y"})
+    r = standard_client.post("/explain", json={"text": "x", "context": "y"})
     assert r.status_code == 502
 
 
@@ -104,8 +104,7 @@ def test_ai_endpoints_require_sign_in(client):
     """Signed-out visitors can't spend the library's API credit."""
     for path, body in (
         ("/ask_question", {"context": "c", "question": "q"}),
-        ("/define_word", {"word": "w", "context": "c"}),
-        ("/translate_text", {"text": "t", "context": "c"}),
+        ("/explain", {"text": "t", "context": "c"}),
     ):
         r = client.post(path, json=body)
         assert r.status_code == 401

@@ -15,12 +15,6 @@ from ._helpers import (
 
 metadata_blueprint = Blueprint("metadata_routes", __name__)
 
-PROGRESS_TAG_VALUES = {
-    BookProgressChoice.IN_PROGRESS.value,
-    BookProgressChoice.FINISHED.value,
-}
-
-
 def _book_status(book_id: int, user_id: int) -> str:
     bookmark = Bookmark.query.filter_by(book_id=book_id, user_id=user_id).first()
     return (bookmark.status if bookmark else BookProgressChoice.UNREAD).value
@@ -45,11 +39,9 @@ def _list_book_tags(book_id: int, user_id: int) -> list[str]:
     return user_tag_names
 
 
-def _set_bookmark_status(book_id: int, user_id: int, status_value: str | None):
-    """Set the bookmark's status from a tag value, defaulting to UNREAD."""
-    new_status = (
-        BookProgressChoice(status_value) if status_value else BookProgressChoice.UNREAD
-    )
+def _set_bookmark_status(book_id: int, user_id: int, status_value: str):
+    """Set the user's reading status for a book."""
+    new_status = BookProgressChoice(status_value)
     bookmark = Bookmark.query.filter_by(book_id=book_id, user_id=user_id).first()
 
     if bookmark is None:
@@ -89,19 +81,12 @@ def book_metadata(filename):
         ):
             book.access_level = data["access_level"]
 
-        # Status comes in its own field. Older clients sent it mixed into
-        # tags; still honour that, but only when "status" is absent.
-        incoming = data.get("tags", [])
-        custom_tag_names = [
-            t for t in incoming
-            if t not in PROGRESS_TAG_VALUES and t != BookProgressChoice.UNREAD.value
-        ]
-        if "status" in data:
-            status_value = data["status"]
-            if status_value not in {c.value for c in BookProgressChoice}:
-                return jsonify({"error": "Unknown reading status"}), 400
-        else:
-            status_value = next((t for t in incoming if t in PROGRESS_TAG_VALUES), None)
+        custom_tag_names = [t.strip() for t in data.get("tags", []) if t.strip()]
+        status_value = data.get("status")
+        if status_value is not None and status_value not in {
+            c.value for c in BookProgressChoice
+        }:
+            return jsonify({"error": "Unknown reading status"}), 400
 
         try:
             with commit_or_rollback():
@@ -129,7 +114,8 @@ def book_metadata(filename):
                             user_id=current_user.id,
                         )
                     )
-                _set_bookmark_status(book.id, current_user.id, status_value)
+                if status_value is not None:
+                    _set_bookmark_status(book.id, current_user.id, status_value)
             return jsonify({"message": "Saved"})
         except Exception as e:
             current_app.logger.error(f"Failed to save metadata for {filename}: {e}")

@@ -43,16 +43,14 @@ BOOKS_PER_LOAD = 24
 CONTINUE_READING_LIMIT = 3
 
 
-# Library views, by reading status. "mine" is the old name for started books
-# (reading or finished) and is still accepted from older clients/bookmarks.
+# Library views, by reading status.
 VIEW_ALL = "all"
 VIEW_UNREAD = "unread"
 VIEW_READING = "reading"
 VIEW_FINISHED = "finished"
-VIEW_MINE = "mine"
-VIEWS = (VIEW_ALL, VIEW_UNREAD, VIEW_READING, VIEW_FINISHED, VIEW_MINE)
+VIEWS = (VIEW_ALL, VIEW_UNREAD, VIEW_READING, VIEW_FINISHED)
 # Views ordered by when you last read, most recent first.
-_LAST_READ_VIEWS = (VIEW_READING, VIEW_FINISHED, VIEW_MINE)
+_LAST_READ_VIEWS = (VIEW_READING, VIEW_FINISHED)
 
 
 def _normalize_view(view):
@@ -71,13 +69,10 @@ def _tag_match(name_clause):
 
 
 def _filtered_book_query(filters=None, view=VIEW_ALL):
-    """Build the base Book query with access, view, and filter WHERE clauses
-    applied. Returns None when the request can't possibly match (e.g. tag
-    filter requested by an anonymous user).
+    """Build the base Book query with access, view and search applied.
 
     filters["q"] is the library's search box: every word must appear in the
-    title, author, genre, or one of your tags. title/author/genre/tags are
-    the older per-field filters, still accepted by the API."""
+    title, author, genre, or one of your tags."""
     query = Book.query.filter(Book.deleted_at.is_(None))
 
     if (
@@ -94,7 +89,6 @@ def _filtered_book_query(filters=None, view=VIEW_ALL):
     status_for_view = {
         VIEW_READING: [BookProgressChoice.IN_PROGRESS],
         VIEW_FINISHED: [BookProgressChoice.FINISHED],
-        VIEW_MINE: [BookProgressChoice.IN_PROGRESS, BookProgressChoice.FINISHED],
     }
     if view in status_for_view:
         query = query.filter(Bookmark.status.in_(status_for_view[view]))
@@ -118,47 +112,6 @@ def _filtered_book_query(filters=None, view=VIEW_ALL):
                 matches.append(_tag_match(Tag.name.ilike(pattern)))
             query = query.filter(db.or_(*matches))
 
-    for attr, column in (
-        ("title", Book.title),
-        ("author", Book.author),
-        ("genre", Book.genre),
-    ):
-        if value := filters.get(attr):
-            for word in value.split():
-                query = query.filter(column.ilike(f"%{word}%"))
-
-    if tags := filters.get("tags"):
-        if not current_user.is_authenticated:
-            return None
-
-        tags = [tag.strip() for tag in tags.split(",") if tag.strip()]
-        tag_filters = []
-        if BookProgressChoice.UNREAD.value in tags:
-            tag_filters.append(
-                db.or_(
-                    Bookmark.id.is_(None),
-                    Bookmark.status == BookProgressChoice.UNREAD,
-                )
-            )
-
-        progress_tags, other_tags = [], []
-        for tag in tags:
-            if tag in (
-                BookProgressChoice.IN_PROGRESS.value,
-                BookProgressChoice.FINISHED.value,
-            ):
-                progress_tags.append(tag)
-            elif tag != BookProgressChoice.UNREAD.value:
-                other_tags.append(tag)
-
-        if progress_tags:
-            tag_filters.append(Bookmark.status.in_(progress_tags))
-        if other_tags:
-            tag_filters.append(_tag_match(Tag.name.in_(other_tags)))
-
-        if tag_filters:
-            query = query.filter(db.or_(*tag_filters))
-
     return query
 
 
@@ -167,14 +120,11 @@ def get_covers(offset=0, limit=BOOKS_PER_LOAD, filters=None, view=VIEW_ALL):
 
     view='all'      → every accessible book, newest first by created_at.
     view='unread'   → books you haven't started, newest first.
-    view='reading' / 'finished' / 'mine' (both) → by reading status, most
-                      recently read first.
+    view='reading' / 'finished' → by reading status, most recently read first.
     Anything but 'all' falls back to 'all' for anonymous users.
     """
     view = _normalize_view(view)
     query = _filtered_book_query(filters, view)
-    if query is None:
-        return []
 
     if view in _LAST_READ_VIEWS:
         query = query.order_by(Bookmark.last_read.desc(), Book.created_at.desc())
@@ -220,8 +170,6 @@ def count_books(filters=None, view=VIEW_ALL):
     Used to cap the number of loading skeletons rendered on the home page."""
     view = _normalize_view(view)
     query = _filtered_book_query(filters, view)
-    if query is None:
-        return 0
     return query.count()
 
 
@@ -259,8 +207,6 @@ def continue_reading(limit=CONTINUE_READING_LIMIT):
 
 def _requested_view():
     view = request.args.get("view", VIEW_ALL)
-    if view == VIEW_MINE:
-        return VIEW_READING
     return view if view in VIEWS else VIEW_ALL
 
 
@@ -282,15 +228,8 @@ def index():
 
 @index_blueprint.route("/load_more/<int:offset>", methods=["GET"])
 def load_more(offset):
-    filters = {
-        "q": request.args.get("q"),
-        "title": request.args.get("title"),
-        "author": request.args.get("author"),
-        "genre": request.args.get("genre"),
-        "tags": request.args.get("tags"),
-    }
-    # Remove empty filters
-    filters = {k: v for k, v in filters.items() if v}
+    q = (request.args.get("q") or "").strip()
+    filters = {"q": q} if q else {}
     view = _requested_view()
     images = get_covers(offset, BOOKS_PER_LOAD, filters, view=view)
     response = jsonify(images)

@@ -44,46 +44,19 @@ def test_post_metadata_creates_user_tags(standard_client, book, standard_user):
     assert {t.name for t in tags} == {"scifi", "favorite"}
 
 
-def test_post_metadata_status_tag_writes_bookmark(standard_client, book, standard_user):
-    r = standard_client.post(
-        f"/book_metadata/{book.filename}",
-        json={"title": book.title, "author": book.author, "genre": "", "tags": ["Finished"]},
-    )
-    assert r.status_code == 200
-    bookmark = Bookmark.query.filter_by(
-        user_id=standard_user.id, book_id=book.id
-    ).first()
-    assert bookmark is not None
+def test_saving_without_status_leaves_it_alone(standard_client, book, standard_user):
+    standard_client.post(f"/book_metadata/{book.filename}", json={"status": "Finished"})
+    standard_client.post(f"/book_metadata/{book.filename}", json={"tags": ["x"]})
+    bookmark = Bookmark.query.filter_by(user_id=standard_user.id, book_id=book.id).one()
     assert bookmark.status == BookProgressChoice.FINISHED
 
-
-def test_post_metadata_status_tag_clears_to_unread(standard_client, book, standard_user):
-    # First mark Finished
+def test_status_names_in_tags_are_plain_tags(standard_client, book):
+    """Status has its own field; a tag that happens to say "Finished" is a tag."""
     standard_client.post(
-        f"/book_metadata/{book.filename}",
-        json={"title": book.title, "author": book.author, "genre": "", "tags": ["Finished"]},
-    )
-    # Then submit with no progress tag — should reset to UNREAD
-    standard_client.post(
-        f"/book_metadata/{book.filename}",
-        json={"title": book.title, "author": book.author, "genre": "", "tags": []},
-    )
-    bookmark = Bookmark.query.filter_by(
-        user_id=standard_user.id, book_id=book.id
-    ).first()
-    assert bookmark.status == BookProgressChoice.UNREAD
-
-
-def test_legacy_status_in_tags_sets_status_not_a_tag(standard_client, book, standard_user):
-    """Older clients mixed the status into tags; it lands in "status" now."""
-    standard_client.post(
-        f"/book_metadata/{book.filename}",
-        json={"title": book.title, "author": book.author, "genre": "", "tags": ["In Progress", "scifi"]},
-    )
+        f"/book_metadata/{book.filename}", json={"tags": ["Finished", "scifi"]})
     payload = standard_client.get(f"/book_metadata/{book.filename}").get_json()
-    assert payload["tags"] == ["scifi"]
-    assert payload["status"] == "In Progress"
-
+    assert payload["tags"] == ["Finished", "scifi"]
+    assert payload["status"] == "Unread"
 
 def test_status_field_sets_reading_status(standard_client, book):
     r = standard_client.post(

@@ -51,24 +51,6 @@ class LLMCaller:
 
         return self._call_api(system=system, user_content=user_content)
 
-    def define_word(self, word: str, context: str) -> str:
-        system = (
-            "You are a helpful dictionary assistant. When given a word and its context, "
-            "provide a clear, extremely concise definition that matches how the word is used in the context. "
-        )
-        user_content = f"Word: {word}\nContext: {context}\n\nDefinition: "
-
-        return self._call_api(system=system, user_content=user_content, max_tokens=300)
-
-    def translate_text(self, text: str, context: str) -> str:
-        system = (
-            "You are a helpful translation assistant. When given text and its context, "
-            "translate the text to English. Only return the translation."
-        )
-        user_content = f"Text: {text}\nContext: {context}\n\nTranslation: "
-
-        return self._call_api(system=system, user_content=user_content, max_tokens=300)
-
     def explain(self, text: str, context: str) -> str:
         """One action for "what does this mean?": defines a word, translates
         foreign text, or glosses a passage, depending on what was selected."""

@@ -557,7 +557,7 @@ window.addEventListener('DOMContentLoaded', async () => {
                     break;
                 case 'chapter':
                     currentChapter = data;
-                    chapterNum = currentChapter.index;
+                    const chapterNum = currentChapter.index;
                     hrefChapterMapping[currentChapter.href] = chapterNum;
 
                     // Ungrey every TOC entry pointing at this spine index, and
@@ -1271,8 +1271,6 @@ function initializeOverlay(tempHighlight, mode = 'question') {
             });
             break;
         case 'explanation':
-        case 'definition':
-        case 'translation':
             input.placeholder = 'Ask a follow-up…';
             requestAnimationFrame(() => {
                 overlay.classList.add('active', 'define-mode');
@@ -1303,12 +1301,12 @@ function handleTextRequest(selectedString, tempHighlight, endpoint, loadingMessa
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
-            [endpoint.includes('define_word') ? 'word' : 'text']: selectedString,
+            text: selectedString,
             context: context
         })
     })
     .then(response => response.json().catch(() => ({})))
-    .then(data => showAiResult(data.explanation || data.translation || data.definition, data.error))
+    .then(data => showAiResult(data.explanation, data.error))
     .catch(error => {
         console.error(`Error processing request:`, error);
         showAiResult(null, "Couldn't reach the library. Check your connection.");
@@ -1328,12 +1326,4 @@ function showAiResult(text, error) {
 
 function handleExplainRequest(selectedString, tempHighlight) {
     handleTextRequest(selectedString, tempHighlight, appUrl('/explain'), 'Thinking');
-}
-
-function handleDefinitionRequest(selectedString, tempHighlight) {
-    handleTextRequest(selectedString, tempHighlight, appUrl('/define_word'), 'Looking it up');
-}
-
-function handleTranslationRequest(selectedString, tempHighlight) {
-    handleTextRequest(selectedString, tempHighlight, appUrl('/translate_text'), 'Translating');
 }

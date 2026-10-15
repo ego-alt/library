@@ -273,20 +273,6 @@ def ask_question():
     return _llm_response("answer", llm_caller.ask_question, context, question)
 
 
-@read_blueprint.route("/define_word", methods=["POST"])
-@json_login_required
-def define_word():
-    """Handle word definition requests."""
-    data = request.get_json()
-    word = data.get("word", "")
-    context = data.get("context", "")
-
-    if not word or not context:
-        return jsonify({"error": "Select a word to define."}), 400
-
-    return _llm_response("definition", llm_caller.define_word, word, context)
-
-
 @read_blueprint.route("/explain", methods=["POST"])
 @json_login_required
 def explain():
@@ -297,15 +283,3 @@ def explain():
     if not text:
         return jsonify({"error": "Select some text to explain."}), 400
     return _llm_response("explanation", llm_caller.explain, text, context)
-
-
-@read_blueprint.route("/translate_text", methods=["POST"])
-@json_login_required
-def translate_text():
-    data = request.json
-    text = data.get("text", "")
-    context = data.get("context", "")
-    if not text.strip():
-        return jsonify({"error": "Select some text to translate."}), 400
-
-    return _llm_response("translation", llm_caller.translate_text, text, context)

@@ -44,10 +44,10 @@ def test_load_more_includes_restricted_for_admin(admin_client, book):
     assert items[0]["access_level"] == "restricted"
 
 
-def test_load_more_filters_by_title(client, book):
-    r = client.get("/load_more/0?title=Test")
+def test_load_more_searches_with_q(client, book):
+    r = client.get("/load_more/0?q=Test")
     assert len(r.get_json()) == 1
-    r = client.get("/load_more/0?title=Nonexistent")
+    r = client.get("/load_more/0?q=Nonexistent")
     assert r.get_json() == []
 
 
@@ -55,7 +55,7 @@ def test_load_more_includes_total_count_header(client, book):
     """Frontend uses X-Total-Count to cap how many skeletons to show."""
     r = client.get("/load_more/0")
     assert r.headers["X-Total-Count"] == "1"
-    r = client.get("/load_more/0?title=Nonexistent")
+    r = client.get("/load_more/0?q=Nonexistent")
     assert r.headers["X-Total-Count"] == "0"
 
 
@@ -65,7 +65,7 @@ def test_index_template_exposes_total_books(client, book):
     assert b"window.totalBooks = 1" in r.data
 
 
-# --- view=mine vs view=all ------------------------------------------------------
+# --- reading-status views ---------------------------------------------------------
 
 
 def test_view_all_returns_unstarted_books(client, book):
@@ -74,13 +74,13 @@ def test_view_all_returns_unstarted_books(client, book):
     assert len(r.get_json()) == 1
 
 
-def test_view_mine_excludes_unstarted_books(standard_client, book):
-    """A logged-in user with no started books gets nothing in 'my' view."""
-    r = standard_client.get("/load_more/0?view=mine")
+def test_view_reading_excludes_unstarted_books(standard_client, book):
+    """A logged-in user with no started books gets nothing in 'reading'."""
+    r = standard_client.get("/load_more/0?view=reading")
     assert r.get_json() == []
 
 
-def test_view_mine_includes_in_progress_books(standard_client, book):
+def test_view_reading_includes_in_progress_books(standard_client, book):
     from library.choices import BookProgressChoice
     from library.models import Bookmark, db
 
@@ -93,14 +93,13 @@ def test_view_mine_includes_in_progress_books(standard_client, book):
     db.session.add(bm)
     db.session.commit()
 
-    r = standard_client.get("/load_more/0?view=mine")
+    r = standard_client.get("/load_more/0?view=reading")
     items = r.get_json()
     assert len(items) == 1
     assert items[0]["filename"] == book.filename
 
 
-def test_view_mine_falls_back_to_all_for_anonymous(client, book):
-    # Anonymous users have no library; the route degrades to 'all'
+def test_unknown_view_falls_back_to_all(client, book):
     r = client.get("/load_more/0?view=mine")
     assert len(r.get_json()) == 1
 
@@ -168,7 +167,7 @@ def test_view_mine_orders_by_last_read_desc(standard_client, app, book_dir):
                             last_read=now))
     db.session.commit()
 
-    r = standard_client.get("/load_more/0?view=mine")
+    r = standard_client.get("/load_more/0?view=reading")
     filenames = [item["filename"] for item in r.get_json()]
     assert filenames[0] == "b.epub"
     assert filenames[1] == "a.epub"
