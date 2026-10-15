@@ -9,7 +9,9 @@ Upgrade steps:
    ```bash
    docker compose build library && docker compose up -d library
    ```
-2. **Run the migrations.** `b7e2c9d4f1a3` adds `books.deleted_at` (the trash).
+2. **Run the migrations** (automatic behind the dashboard: the library
+   container now runs `flask db upgrade` on start). `b7e2c9d4f1a3` adds
+   `books.deleted_at` (the trash).
    `a1b2c3d4e5f6` now skips dropping `users.email` when the column is already
    gone, so databases created without it upgrade cleanly.
    ```bash

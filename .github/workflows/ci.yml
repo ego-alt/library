@@ -1,0 +1,35 @@
+# Runs on every push to master and on pull requests. The Pi's deploy timer
+# (dashboard/scripts/deploy.sh) only ships commits whose CI passed.
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.10"   # matches the Dockerfile's base image
+          enable-cache: true
+      - name: Install dependencies
+        run: uv sync --frozen --all-groups
+      - name: Tests
+        run: uv run pytest -q
+      # Advisory until the existing warnings are cleaned up: shows issues
+      # inline on the PR without failing the build.
+      - name: Lint (advisory)
+        continue-on-error: true
+        run: uvx ruff@0.9.5 check . --output-format github

@@ -79,10 +79,12 @@
 
 ### Upgrading
 
-After pulling, apply database migrations and (for Docker) rebuild the image:
+Behind the dashboard, the container runs `flask db upgrade` every time it
+starts, and the Pi's deploy timer rebuilds it when new commits pass CI (see the
+dashboard README, "Deploying"). Running standalone, after pulling:
 
 ```bash
-uv run flask db upgrade          # or inside the container
+uv run flask db upgrade
 docker compose build && docker compose up -d
 ```
 
@@ -119,9 +121,11 @@ After adding a user in dashboard, sync shadow accounts:
 cd ../dashboard && uv run python scripts/sync_household_users.py
 ```
 
-> Code is baked into the image at build time. After pulling changes, rebuild:
-> `docker compose build library && docker compose up -d library`. A bare
-> `up -d` reuses the old image.
+> On the Pi, merged commits that pass CI deploy themselves within about five
+> minutes (see the dashboard README, "Deploying"). To deploy by hand: code is
+> baked into the image at build time, so after pulling run
+> `docker compose build library && docker compose up -d library`. A bare `up -d`
+> reuses the old image.
 
 See `dashboard/README.md` for compose and user sync.
 
