@@ -30,6 +30,7 @@ from ._helpers import (
     chapter_sizes,
     commit_or_rollback,
     cover_url,
+    get_accessible_book_or_404,
     get_book_or_404,
     json_admin_required,
     json_login_required,
@@ -259,7 +260,7 @@ def cover(filename):
       2. Client-side: ETag-based 304 response, plus Cache-Control: 1 year.
     A book whose EPUB has no usable cover gets a generated typographic one.
     """
-    book = get_book_or_404(filename)
+    book = get_accessible_book_or_404(filename)
     epub_path = os.path.join(current_app.config["BOOK_DIR"], book.filename)
     if not os.path.exists(epub_path):
         abort(404, description="Cover not found")

@@ -9,7 +9,7 @@ from ..utils import display_author, update_epub_cover
 from ._helpers import (
     commit_or_rollback,
     cover_url,
-    get_book_or_404,
+    get_accessible_book_or_404,
     json_login_required,
 )
 
@@ -57,7 +57,7 @@ def _set_bookmark_status(book_id: int, user_id: int, status_value: str):
 @metadata_blueprint.route("/book_metadata/<filename>", methods=["GET", "POST"])
 def book_metadata(filename):
     """Get or update book metadata."""
-    book = get_book_or_404(filename)
+    book = get_accessible_book_or_404(filename)
 
     if request.method == "POST":
         if not current_user.is_authenticated:
@@ -169,7 +169,7 @@ def update_cover():
         return jsonify({"error": "Choose an image to use as the cover."}), 400
 
     cover_file = request.files["cover"]
-    book = get_book_or_404(request.form["filename"])
+    book = get_accessible_book_or_404(request.form["filename"])
     epub_file_path = os.path.join(current_app.config["BOOK_DIR"], book.filename)
 
     try:

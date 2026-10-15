@@ -29,6 +29,7 @@ from ..utils import (
 from ._helpers import (
     book_mtime,
     commit_or_rollback,
+    get_accessible_book_or_404,
     get_book_or_404,
     json_login_required,
     user_can_access_book,
@@ -204,7 +205,7 @@ def bookmark(filename):
     if not current_user.is_authenticated:
         return jsonify({"error": "Sign in to save your place across devices."}), 401
 
-    book = get_book_or_404(filename)
+    book = get_accessible_book_or_404(filename)
 
     if request.method == "POST":
         data = request.get_json()
@@ -243,7 +244,7 @@ def bookmark(filename):
 @json_login_required
 def tag_finished(filename):
     """Tag the book as finished."""
-    book = get_book_or_404(filename)
+    book = get_accessible_book_or_404(filename)
 
     bookmark = Bookmark.query.filter_by(
         user_id=current_user.id, book_id=book.id

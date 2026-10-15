@@ -103,6 +103,15 @@ def user_can_access_book(book: Book) -> bool:
     return current_user.is_authenticated and current_user.role == UserRoleChoice.ADMIN
 
 
+def get_accessible_book_or_404(filename: str) -> Book:
+    """``get_book_or_404`` for the current user: a book they may not access is
+    reported as missing, so its existence doesn't leak either."""
+    book = get_book_or_404(filename)
+    if not user_can_access_book(book):
+        abort(404, description="Book not found")
+    return book
+
+
 @contextmanager
 def commit_or_rollback():
     """Commit on success, roll back and re-raise on failure."""

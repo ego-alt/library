@@ -1,4 +1,7 @@
+import io
 import json
+
+import pytest
 
 from library.choices import BookProgressChoice
 from library.models import Bookmark, db
@@ -230,3 +233,39 @@ def test_missing_book_is_json_for_api_calls(client):
     r = client.get("/read/nope.epub", headers={"Accept": "*/*"})
     assert r.status_code == 404
     assert r.get_json() == {"error": "Book not found"}
+
+
+# The per-book JSON endpoints hide restricted books from non-admins entirely
+# (404, not 403), so a filename can't be probed for.
+RESTRICTED_JSON_ENDPOINTS = [
+    ("get", "/book_metadata/{f}"),
+    ("post", "/book_metadata/{f}"),
+    ("get", "/bookmark/{f}"),
+    ("post", "/bookmark/{f}"),
+    ("post", "/tag_finished/{f}"),
+    ("get", "/cover/{f}"),
+]
+
+
+@pytest.mark.parametrize("method,path", RESTRICTED_JSON_ENDPOINTS)
+def test_restricted_book_hidden_from_standard(standard_client, book, method, path):
+    _restrict(book)
+    r = getattr(standard_client, method)(path.format(f=book.filename), json={"tags": ["x"]})
+    assert r.status_code == 404
+
+
+@pytest.mark.parametrize("method,path", RESTRICTED_JSON_ENDPOINTS)
+def test_restricted_book_open_to_admin(admin_client, book, method, path):
+    _restrict(book)
+    r = getattr(admin_client, method)(path.format(f=book.filename), json={"tags": ["x"]})
+    assert r.status_code == 200
+
+
+def test_restricted_cover_upload_hidden_from_standard(standard_client, book):
+    _restrict(book)
+    r = standard_client.post(
+        "/update_cover",
+        data={"filename": book.filename, "cover": (io.BytesIO(b"png"), "c.png")},
+        content_type="multipart/form-data",
+    )
+    assert r.status_code == 404
