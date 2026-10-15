@@ -25,7 +25,7 @@
   - Mobile-friendly layout with intuitive controls.
   - Support for table of contents navigation.
   - Switch between scroll and paginated layouts; on wide screens, paginated mode shows a two-page spread like an open book.
-  - `←` / `→` / `Space` flip pages in paginated mode; `Shift` + `←` / `→` jumps sections in either mode.
+  - `←` / `→` / `Space` flip pages in paginated mode (in scroll mode `←` / `→` move a screen); `Shift` + `←` / `→` jumps sections in either mode.
 - **Library Views**
   - Cover grid (default), ordered by most recently added or last read.
   - Bookshelf view that renders each book as a spine on a wooden shelf — spine thickness scales with the book's length.
@@ -40,7 +40,7 @@
   - Ask questions on highlighted text for deeper comprehension.
   - Get instant word definitions tailored to the current passage.
   - Translate selected text to English with context-aware accuracy.
-  - Keyboard shortcuts for quick access on desktop (`Ctrl/Cmd + K`for questions, `D` for definitions, `L` for translations).
+  - Keyboard shortcuts on desktop: with text selected, `A` asks a question and `E` explains it (defines a word, translates foreign text, or glosses a passage). `T` opens the contents, `+`/`-` change the text size, `N` toggles night mode, `Esc` closes panels, `?` lists every shortcut.
 
 ## Installation
 

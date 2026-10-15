@@ -1,13 +1,14 @@
 import os
 
-from flask import Blueprint, current_app, jsonify, request, url_for
+from flask import Blueprint, current_app, jsonify, request
 from flask_login import current_user
 
 from ..choices import AccessLevelChoice, UserRoleChoice
 from ..models import Bookmark, BookProgressChoice, Tag, book_tags, db
-from ..utils import update_epub_cover
+from ..utils import display_author, update_epub_cover
 from ._helpers import (
     commit_or_rollback,
+    cover_url,
     get_book_or_404,
     json_login_required,
 )
@@ -20,9 +21,14 @@ PROGRESS_TAG_VALUES = {
 }
 
 
+def _book_status(book_id: int, user_id: int) -> str:
+    bookmark = Bookmark.query.filter_by(book_id=book_id, user_id=user_id).first()
+    return (bookmark.status if bookmark else BookProgressChoice.UNREAD).value
+
+
 def _list_book_tags(book_id: int, user_id: int) -> list[str]:
-    """Return all tag names a user has on a book, including the bookmark
-    status when it isn't the default UNREAD."""
+    """Return the custom tag names a user has on a book. Reading status is
+    separate (see _book_status)."""
     user_tag_names = [
         name
         for (name,) in db.session.query(Tag.name)
@@ -36,13 +42,7 @@ def _list_book_tags(book_id: int, user_id: int) -> list[str]:
         )
         .all()
     ]
-
-    bookmark = Bookmark.query.filter_by(book_id=book_id, user_id=user_id).first()
-    progress = []
-    if bookmark and bookmark.status != BookProgressChoice.UNREAD:
-        progress.append(bookmark.status.value)
-
-    return progress + user_tag_names
+    return user_tag_names
 
 
 def _set_bookmark_status(book_id: int, user_id: int, status_value: str | None):
@@ -72,9 +72,13 @@ def book_metadata(filename):
             return jsonify({"error": "Authentication required"}), 401
 
         data = request.get_json()
-        book.title = data.get("title", book.title)
-        book.author = data.get("author", book.author)
-        book.genre = data.get("genre", book.genre)
+        # Title, author and genre are shared by everyone, so only admins edit
+        # them. Anyone signed in sets their own tags and reading status.
+        if current_user.role == UserRoleChoice.ADMIN:
+            book.title = (data.get("title") or book.title).strip()[:200]
+            book.author = (data.get("author") or book.author).strip()[:200]
+            if "genre" in data:
+                book.genre = (data.get("genre") or "").strip()[:100] or None
 
         # Access level is admin-only to change. Non-admins (and unknown values)
         # leave it untouched — the toggle isn't rendered for them either.
@@ -85,9 +89,19 @@ def book_metadata(filename):
         ):
             book.access_level = data["access_level"]
 
+        # Status comes in its own field. Older clients sent it mixed into
+        # tags; still honour that, but only when "status" is absent.
         incoming = data.get("tags", [])
-        status_tag = next((t for t in incoming if t in PROGRESS_TAG_VALUES), None)
-        custom_tag_names = [t for t in incoming if t not in PROGRESS_TAG_VALUES]
+        custom_tag_names = [
+            t for t in incoming
+            if t not in PROGRESS_TAG_VALUES and t != BookProgressChoice.UNREAD.value
+        ]
+        if "status" in data:
+            status_value = data["status"]
+            if status_value not in {c.value for c in BookProgressChoice}:
+                return jsonify({"error": "Unknown reading status"}), 400
+        else:
+            status_value = next((t for t in incoming if t in PROGRESS_TAG_VALUES), None)
 
         try:
             with commit_or_rollback():
@@ -115,25 +129,29 @@ def book_metadata(filename):
                             user_id=current_user.id,
                         )
                     )
-                _set_bookmark_status(book.id, current_user.id, status_tag)
-            return jsonify({"message": "Metadata updated successfully"})
+                _set_bookmark_status(book.id, current_user.id, status_value)
+            return jsonify({"message": "Saved"})
         except Exception as e:
-            return jsonify({"error": str(e)}), 500
+            current_app.logger.error(f"Failed to save metadata for {filename}: {e}")
+            return jsonify({"error": "Couldn't save your changes. Try again."}), 500
 
     # GET request handling
     response = {
         "title": book.title,
         "author": book.author,
+        "author_display": display_author(book.author),
         "genre": book.genre,
         "created_at": book.created_at.strftime("%Y-%m-%d %H:%M:%S"),
         "tags": [],
+        "status": BookProgressChoice.UNREAD.value,
         "filename": book.filename,
-        "cover": url_for("index_routes.cover", filename=book.filename),
+        "cover": cover_url(book),
         "access_level": book.access_level,
     }
 
     if current_user.is_authenticated:
         response["tags"] = _list_book_tags(book.id, current_user.id)
+        response["status"] = _book_status(book.id, current_user.id)
 
     return jsonify(response)
 
@@ -141,8 +159,8 @@ def book_metadata(filename):
 @metadata_blueprint.route("/tags")
 @json_login_required
 def list_user_tags():
-    """Suggestions for tag autocomplete: progress-status values first, then the
-    current user's distinct custom tag names alphabetised."""
+    """Suggestions for tag autocomplete: the current user's distinct custom tag
+    names, alphabetised. (Reading status has its own control.)"""
     user_tags = [
         name
         for (name,) in db.session.query(Tag.name)
@@ -151,13 +169,7 @@ def list_user_tags():
         .order_by(Tag.name)
         .all()
     ]
-    status_tags = [c.value for c in BookProgressChoice]
-    seen, ordered = set(), []
-    for t in status_tags + user_tags:
-        if t not in seen:
-            seen.add(t)
-            ordered.append(t)
-    return jsonify(ordered)
+    return jsonify(user_tags)
 
 
 @metadata_blueprint.route("/update_cover", methods=["POST"])
@@ -168,7 +180,7 @@ def update_cover():
     and a form field 'filename' for locating the corresponding book.
     """
     if "cover" not in request.files or "filename" not in request.form:
-        return jsonify({"error": "Cover file and filename are required"}), 400
+        return jsonify({"error": "Choose an image to use as the cover."}), 400
 
     cover_file = request.files["cover"]
     book = get_book_or_404(request.form["filename"])
@@ -177,10 +189,13 @@ def update_cover():
     try:
         new_cover_bytes = cover_file.read()
         update_epub_cover(epub_file_path, new_cover_bytes)
-        # Cache-bust the cover URL by appending the new mtime
-        cover_url = url_for("index_routes.cover", filename=book.filename)
-        cover_url = f"{cover_url}?v={int(os.path.getmtime(epub_file_path))}"
-        return jsonify({"cover": cover_url})
+        # The versioned URL changes with the file's mtime, so callers can swap
+        # it into the grid and browsers fetch the new cover.
+        return jsonify({
+            "cover": cover_url(book),
+            "thumb": cover_url(book, width=400),
+            "thumb_small": cover_url(book, width=120),
+        })
     except Exception as e:
         current_app.logger.error(f"Error updating cover: {str(e)}")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "Couldn't change the cover. Try a JPG or PNG."}), 500

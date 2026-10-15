@@ -9,7 +9,7 @@ def test_get_metadata_returns_book_fields(client, book):
     assert payload["title"] == "Test Book"
     assert payload["author"] == "Test Author"
     assert payload["filename"] == book.filename
-    assert payload["cover"] == f"/cover/{book.filename}"
+    assert payload["cover"].startswith(f"/cover/{book.filename}?v=")
 
 
 def test_get_metadata_404_for_unknown_book(client):
@@ -22,8 +22,8 @@ def test_post_metadata_requires_auth(client, book):
     assert r.status_code == 401
 
 
-def test_post_metadata_updates_fields(standard_client, book):
-    r = standard_client.post(
+def test_post_metadata_updates_fields(admin_client, book):
+    r = admin_client.post(
         f"/book_metadata/{book.filename}",
         json={"title": "Renamed", "author": "Other", "genre": "fiction", "tags": []},
     )
@@ -74,15 +74,40 @@ def test_post_metadata_status_tag_clears_to_unread(standard_client, book, standa
     assert bookmark.status == BookProgressChoice.UNREAD
 
 
-def test_get_metadata_lists_progress_tag_for_authenticated(standard_client, book, standard_user):
+def test_legacy_status_in_tags_sets_status_not_a_tag(standard_client, book, standard_user):
+    """Older clients mixed the status into tags; it lands in "status" now."""
     standard_client.post(
         f"/book_metadata/{book.filename}",
         json={"title": book.title, "author": book.author, "genre": "", "tags": ["In Progress", "scifi"]},
     )
-    r = standard_client.get(f"/book_metadata/{book.filename}")
-    tags = r.get_json()["tags"]
-    assert "In Progress" in tags
-    assert "scifi" in tags
+    payload = standard_client.get(f"/book_metadata/{book.filename}").get_json()
+    assert payload["tags"] == ["scifi"]
+    assert payload["status"] == "In Progress"
+
+
+def test_status_field_sets_reading_status(standard_client, book):
+    r = standard_client.post(
+        f"/book_metadata/{book.filename}",
+        json={"title": book.title, "author": book.author, "tags": ["scifi"], "status": "Finished"},
+    )
+    assert r.status_code == 200
+    payload = standard_client.get(f"/book_metadata/{book.filename}").get_json()
+    assert payload["status"] == "Finished"
+    assert payload["tags"] == ["scifi"]
+
+    standard_client.post(
+        f"/book_metadata/{book.filename}",
+        json={"title": book.title, "author": book.author, "tags": [], "status": "Unread"},
+    )
+    assert standard_client.get(f"/book_metadata/{book.filename}").get_json()["status"] == "Unread"
+
+
+def test_unknown_status_is_rejected(standard_client, book):
+    r = standard_client.post(
+        f"/book_metadata/{book.filename}",
+        json={"title": book.title, "author": book.author, "status": "Abandoned"},
+    )
+    assert r.status_code == 400
 
 
 def test_anonymous_metadata_omits_tags(client, book):
@@ -152,13 +177,11 @@ def test_list_tags_requires_auth(client):
     assert r.status_code == 401
 
 
-def test_list_tags_returns_status_values_for_user_with_no_tags(standard_client):
+def test_list_tags_excludes_status_values(standard_client):
+    """Reading status has its own control, so it isn't suggested as a tag."""
     r = standard_client.get("/tags")
     assert r.status_code == 200
-    payload = r.get_json()
-    # Status values always present
-    for s in ("Unread", "In Progress", "Finished"):
-        assert s in payload
+    assert r.get_json() == []
 
 
 def test_list_tags_returns_user_custom_tags_alphabetised(standard_client, book):
@@ -189,3 +212,26 @@ def test_list_tags_does_not_leak_other_users_tags(standard_client):
 
     r = standard_client.get("/tags")
     assert "other-private" not in r.get_json()
+
+
+def test_standard_user_cannot_rename_shared_fields(standard_client, book):
+    """Title/author/genre are shared; only admins change them. Tags and
+    status still save for everyone."""
+    r = standard_client.post(f"/book_metadata/{book.filename}", json={
+        "title": "Hacked", "author": "Nobody", "genre": "x", "tags": ["mine"],
+        "status": "Finished",
+    })
+    assert r.status_code == 200
+    payload = standard_client.get(f"/book_metadata/{book.filename}").get_json()
+    assert payload["title"] == "Test Book"
+    assert payload["author"] == "Test Author"
+    assert payload["tags"] == ["mine"]
+    assert payload["status"] == "Finished"
+
+
+def test_admin_can_rename(admin_client, book):
+    admin_client.post(f"/book_metadata/{book.filename}", json={
+        "title": "  New Title ", "author": "New Author", "genre": ""})
+    payload = admin_client.get(f"/book_metadata/{book.filename}").get_json()
+    assert payload["title"] == "New Title"
+    assert payload["genre"] is None

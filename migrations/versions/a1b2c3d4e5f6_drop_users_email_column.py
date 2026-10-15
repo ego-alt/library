@@ -16,6 +16,11 @@ depends_on = None
 
 
 def upgrade():
+    # Some databases were created after the column was already gone from the
+    # model; only drop it where it exists.
+    columns = {c["name"] for c in sa.inspect(op.get_bind()).get_columns("users")}
+    if "email" not in columns:
+        return
     with op.batch_alter_table("users", schema=None) as batch_op:
         batch_op.drop_column("email")
 

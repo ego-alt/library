@@ -1,10 +1,14 @@
-let offset = 8;
+// How many books are already on the page (the server renders the first batch).
+let offset = window.initialBookCount || 0;
 let isLoading = false;
 let allImagesLoaded = false;
 let currentFilters = {};
-// View state — 'all' (every book, newest first) or 'mine' (only started, by last_read).
-// Server renders the initial batch using window.initialView; localStorage may override it.
-let currentView = window.initialView || 'all';
+// View state — reading status: 'all' (newest first), 'unread', 'reading' or
+// 'finished' (the last two by when you last read). Server renders the initial
+// batch using window.initialView; localStorage may override it.
+const VIEWS = ['all', 'unread', 'reading', 'finished'];
+function normalizeView(v) { return v === 'mine' ? 'reading' : (VIEWS.includes(v) ? v : 'all'); }
+let currentView = normalizeView(window.initialView);
 // Layout state — 'grid' (cover cards) or 'shelf' (cover-slice spines on a wooden shelf).
 // Server always renders grid; JS swaps to shelf on load if that's the stored preference.
 let currentLayout = localStorage.getItem('libraryLayout') === 'shelf' ? 'shelf' : 'grid';
@@ -53,12 +57,20 @@ function spineHeight(filename) {
 // their cover feed, so its presence doubles as the "restricted" marker.
 function lockBadge(book) {
     if (!book.access_level || book.access_level === 'standard') return '';
-    return `<span class="book-lock" title="Admin only" aria-label="Admin only"><i class="fas fa-lock"></i></span>`;
+    return `<span class="book-lock" title="Private — only admins can see this" aria-label="Private"><i class="fas fa-lock" aria-hidden="true"></i></span>`;
+}
+
+// "Title by Author", for alt text and labels. Falls back to the filename for
+// payloads that predate title/author.
+function bookLabel(book) {
+    if (!book.title) return book.filename;
+    return book.author ? `${book.title} by ${book.author}` : book.title;
 }
 
 function getSpineTemplate(book) {
     const urlSafe = encodeURIComponent(book.filename);
     const attrSafe = escapeHtml(book.filename);
+    const label = escapeHtml(bookLabel(book));
     const coverSafe = escapeHtml(book.cover);
     const width = spineWidth(book);
     const height = spineHeight(book.filename);
@@ -66,18 +78,14 @@ function getSpineTemplate(book) {
         <div class="shelf-slot" style="width: ${width}px">
             <div class="book-spine"
                  style="height: ${height}px; background-image: url(${coverSafe})"
-                 title="${attrSafe}">
-                <a class="book-spine__link" href="${appUrl(`/read/${urlSafe}`)}" aria-label="${attrSafe}"></a>
+                 title="${label}">
+                <a class="book-spine__link" href="${appUrl(`/read/${urlSafe}`)}" aria-label="Read ${label}"></a>
                 ${lockBadge(book)}
                 <div class="book-buttons">
-                    <button class="book-button book-button--spine">
-                        <a href="${appUrl(`/download/${urlSafe}`)}" download>
-                            <i class="fas fa-download"></i>
-                        </a>
-                    </button>
                     <button class="book-button book-button--spine"
-                            data-action="show-metadata" data-filename="${attrSafe}">
-                        <i class="fas fa-ellipsis-h"></i>
+                            data-action="show-metadata" data-filename="${attrSafe}"
+                            aria-label="Details" title="Details">
+                        <i class="fas fa-ellipsis-h" aria-hidden="true"></i>
                     </button>
                 </div>
             </div>
@@ -133,23 +141,20 @@ function getBookTemplate(book) {
     const urlSafe = encodeURIComponent(book.filename);
     const attrSafe = escapeHtml(book.filename);
     const coverSafe = escapeHtml(book.cover);
+    const label = escapeHtml(bookLabel(book));
     return `
         <div class="col-6 col-sm-4 col-md-3 mb-3">
             <div class="book">
                 ${lockBadge(book)}
+                <a href="${appUrl(`/read/${urlSafe}`)}" aria-label="Read ${label}">
+                    <img src="${coverSafe}" alt="${label}" loading="lazy">
+                </a>
                 <div class="book-buttons">
-                    <button class="book-button">
-                        <a href="${appUrl(`/download/${urlSafe}`)}" download>
-                            <i class="fas fa-download"></i>
-                        </a>
-                    </button>
-                    <button class="book-button" data-action="show-metadata" data-filename="${attrSafe}">
-                        <i class="fas fa-ellipsis-h"></i>
+                    <button class="book-button" data-action="show-metadata" data-filename="${attrSafe}"
+                            aria-label="Details" title="Details">
+                        <i class="fas fa-ellipsis-h" aria-hidden="true"></i>
                     </button>
                 </div>
-                <a href="${appUrl(`/read/${urlSafe}`)}">
-                    <img src="${coverSafe}" alt="cover" loading="lazy">
-                </a>
             </div>
         </div>
     `;
@@ -185,9 +190,18 @@ function debounce(func, wait) {
 }
 
 // Update loadMoreImages function to use filters
+// When a search or view change reloads the grid, the old results stay up
+// (dimmed) until the new ones arrive, instead of flashing an empty page.
+let replaceOnLoad = false;
+// Bumped on every reload; responses from an older search/view are ignored.
+let loadGeneration = 0;
+
 function loadMoreImages() {
     isLoading = true;
-    const skeletons = appendSkeletons(computeSkeletonCount());
+    const generation = loadGeneration;
+    const replacing = replaceOnLoad;
+    const skeletons = replacing ? [] : appendSkeletons(computeSkeletonCount());
+    if (replacing) $('#library').addClass('is-refreshing');
     repaintShelfPlanks();
 
     const queryParams = new URLSearchParams(currentFilters);
@@ -195,12 +209,18 @@ function loadMoreImages() {
 
     $.get(appUrl(`/load_more/${offset}?${queryParams.toString()}`), function(data, _status, jqXHR) {
         skeletons.forEach(el => el.remove());
+        if (generation !== loadGeneration) return;  // superseded by a newer search
+        if (replacing) {
+            replaceOnLoad = false;
+            loadedBooks.length = 0;
+            $('#library').empty().removeClass('is-refreshing');
+        }
         const reported = parseInt(jqXHR.getResponseHeader('X-Total-Count'), 10);
         if (!Number.isNaN(reported)) totalBooks = reported;
 
         if (data.length === 0) {
             allImagesLoaded = true;
-            if (offset === 0) {
+            if (loadedBooks.length === 0) {
                 renderEmptyState();
                 $('#library').hide();
             }
@@ -213,13 +233,16 @@ function loadMoreImages() {
             });
             repaintShelfPlanks();
         }
-        offset += 8;
+        offset += data.length;
         isLoading = false;
         requestAnimationFrame(tryLoadMoreIfPageStillShort);
     }).fail(function() {
         skeletons.forEach(el => el.remove());
+        if (generation !== loadGeneration) return;
+        $('#library').removeClass('is-refreshing');
+        replaceOnLoad = false;
         isLoading = false;
-        showToast('Could not load more books', 'error');
+        showToast("Couldn't load more books.", 'error', {label: 'Retry', onClick: loadMoreImages});
     });
 }
 
@@ -273,16 +296,16 @@ document.addEventListener('click', (e) => {
     switch (trigger.dataset.action) {
         case 'show-metadata':  showMetadata(filename); break;
         case 'change-cover':   triggerCoverUpload(filename); break;
-        case 'delete-book':    confirmDeleteBook(filename); break;
+        case 'delete-book':    deleteBook(filename); break;
         case 'save-metadata':  saveMetadata(filename); break;
-        case 'save-new-book':  saveNewBook(filename, trigger.dataset.coverPath || ''); break;
+        case 'save-new-book':  saveNewBook(); break;
     }
 });
 
 
 // <== TOAST NOTIFICATIONS ==>
 // Non-blocking replacement for alert() — slides in bottom-right and auto-dismisses.
-function showToast(message, type = 'info') {
+function showToast(message, type = 'info', action = null, {sticky = false} = {}) {
     const container = document.getElementById('toastContainer');
     if (!container) {
         // Fallback if toast container isn't on this page (e.g. reader.html)
@@ -290,19 +313,36 @@ function showToast(message, type = 'info') {
         return;
     }
     const toast = document.createElement('div');
-    toast.className = `toast toast--${type}`;
+    toast.className = `notice notice--${type}`;
     toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
-    toast.textContent = message;
+    const text = document.createElement('span');
+    text.textContent = message;
+    toast.appendChild(text);
+    // Optional action, e.g. {label: 'Undo', onClick() {...}}. Toasts with an
+    // action stay up longer so there's time to use it.
+    if (action) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'notice__action';
+        btn.textContent = action.label;
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            dismissToast(toast);
+            action.onClick();
+        });
+        toast.appendChild(btn);
+    }
     toast.addEventListener('click', () => dismissToast(toast));
     container.appendChild(toast);
     // Force a reflow so the entrance transition fires
-    requestAnimationFrame(() => toast.classList.add('toast--shown'));
-    setTimeout(() => dismissToast(toast), type === 'error' ? 6000 : 4000);
+    requestAnimationFrame(() => toast.classList.add('notice--shown'));
+    if (!sticky) setTimeout(() => dismissToast(toast), action ? 10000 : type === 'error' ? 6000 : 4000);
+    return toast;
 }
 
 function dismissToast(toast) {
     if (!toast.parentNode) return;
-    toast.classList.remove('toast--shown');
+    toast.classList.remove('notice--shown');
     toast.addEventListener(
         'transitionend',
         () => { if (toast.parentNode) toast.remove(); },
@@ -310,59 +350,115 @@ function dismissToast(toast) {
     );
 }
 
+const EMPTY_STATES = {
+    unread: ["Nothing unread", "Every book here has been opened. Time for a new one?"],
+    reading: ["Nothing on the go", "Books you start reading will appear here."],
+    finished: ["Nothing finished yet", "Books you mark as finished will appear here."],
+};
+
 function renderEmptyState() {
     const $empty = $('#emptyState');
-    const hasFilters = Object.keys(currentFilters).some(k => currentFilters[k] && currentFilters[k].length);
-    if (currentView === 'mine' && !hasFilters) {
-        $empty.find('h3').text("Your library is empty");
-        $empty.find('p').text("Open a book to start reading and it'll show up here.");
-    } else {
-        $empty.find('h3').text("No books match your filters");
-        $empty.find('p').text("Try adjusting your search criteria");
+    const searching = Boolean(currentFilters.q);
+    let [title, body] = ["Your shelves are empty", window.isAuthenticated
+        ? "Add an EPUB to begin." : "Sign in to add books."];
+    if (searching) {
+        [title, body] = [`Nothing matches "${currentFilters.q}"`, "Try a different word, or clear the search."];
+    } else if (EMPTY_STATES[currentView]) {
+        [title, body] = EMPTY_STATES[currentView];
     }
+    $empty.find('h3').text(title);
+    $empty.find('p').text(body);
+    $empty.find('.empty-action').prop('hidden', searching || currentView !== 'all' || !window.isAuthenticated);
     $empty.show();
 }
 
 
-// <== VIEW TOGGLE (All books vs My books) ==>
-function toggleView() {
-    currentView = currentView === 'mine' ? 'all' : 'mine';
-    localStorage.setItem('libraryView', currentView);
-    updateViewToggleUI();
+// <== READING-STATUS VIEW (All / Unread / Reading / Finished) ==>
+function setView(view) {
+    currentView = normalizeView(view);
+    try { localStorage.setItem('libraryView', currentView); } catch { /* storage blocked */ }
+    updateViewUI();
     reloadLibrary();
 }
 
-function updateViewToggleUI() {
-    const btn = document.getElementById('viewToggle');
-    if (!btn) return;
-    const icon = btn.querySelector('i');
-    const isMine = currentView === 'mine';
-    btn.classList.toggle('active', isMine);
-    btn.setAttribute('aria-pressed', isMine ? 'true' : 'false');
-    btn.title = isMine
-        ? "Showing your library — click to browse all books"
-        : "Show only books you've started reading";
-    if (icon) icon.className = isMine ? 'fas fa-bookmark' : 'far fa-bookmark';
+function updateViewUI() {
+    document.querySelectorAll('.status-filter [data-view]').forEach(btn => {
+        btn.setAttribute('aria-checked', btn.dataset.view === currentView ? 'true' : 'false');
+    });
 }
 
+document.querySelectorAll('.status-filter [data-view]').forEach(btn => {
+    btn.addEventListener('click', () => {
+        if (btn.dataset.view !== currentView) setView(btn.dataset.view);
+    });
+});
+
 function reloadLibrary() {
+    loadGeneration += 1;
+    isLoading = false;
     offset = 0;
     allImagesLoaded = false;
-    loadedBooks.length = 0;
+    replaceOnLoad = loadedBooks.length > 0;
+    if (!replaceOnLoad) $('#library').empty();
     $('#emptyState').hide();
-    $('#library').empty().show();
+    $('#library').show();
     loadMoreImages();
 }
 
+// <== COMING BACK FROM A BOOK ==>
+// Leaving the library saves what was on screen (books loaded, search, scroll
+// position) for this tab; returning from the reader puts it all back
+// instead of starting over at the top.
+const RETURN_STATE_KEY = 'libraryReturnState';
+const RETURN_STATE_MAX_AGE = 30 * 60 * 1000;
+
+window.addEventListener('pagehide', () => {
+    try {
+        sessionStorage.setItem(RETURN_STATE_KEY, JSON.stringify({
+            t: Date.now(), books: loadedBooks, offset, allImagesLoaded, totalBooks,
+            q: currentFilters.q || '', view: currentView, scrollY: window.scrollY,
+        }));
+    } catch { /* storage full or blocked */ }
+});
+
+function restoreReturnState() {
+    let state = null;
+    try {
+        state = JSON.parse(sessionStorage.getItem(RETURN_STATE_KEY));
+        sessionStorage.removeItem(RETURN_STATE_KEY);
+    } catch { return false; }
+    const fromReader = document.referrer.includes('/read/');
+    if (!state || !fromReader || Date.now() - state.t > RETURN_STATE_MAX_AGE
+        || !Array.isArray(state.books) || !state.books.length) return false;
+
+    currentView = normalizeView(state.view);
+    currentFilters = state.q ? {q: state.q} : {};
+    $('#librarySearch').val(state.q);
+    $('#continueReading').prop('hidden', Boolean(state.q));
+    loadedBooks.length = 0;
+    loadedBooks.push(...state.books);
+    offset = state.offset;
+    allImagesLoaded = state.allImagesLoaded;
+    totalBooks = state.totalBooks;
+    applyLayoutClasses();
+    rerenderLibrary();
+    updateViewUI();
+    updateLayoutToggleUI();
+    requestAnimationFrame(() => window.scrollTo(0, state.scrollY || 0));
+    return true;
+}
+
 // On page load: respect a stored view preference if it differs from what the
-// server rendered. Causes a brief flash on first load when 'mine' is stored.
+// server rendered. Causes a brief flash on first load when one is stored.
 $(function() {
-    const stored = localStorage.getItem('libraryView');
-    if (window.isAuthenticated && stored && stored !== currentView) {
-        currentView = stored;
+    if (restoreReturnState()) return;
+    let stored = null;
+    try { stored = localStorage.getItem('libraryView'); } catch { /* storage blocked */ }
+    if (window.isAuthenticated && stored && normalizeView(stored) !== currentView) {
+        currentView = normalizeView(stored);
         reloadLibrary();
     }
-    updateViewToggleUI();
+    updateViewUI();
 
     // Mirror the initial grid HTML into loadedBooks so flipping to shelf doesn't
     // require a refetch. Then, if 'shelf' is the stored preference, swap layout.
@@ -370,6 +466,11 @@ $(function() {
     applyLayoutClasses();
     if (currentLayout === 'shelf') rerenderLibrary();
     updateLayoutToggleUI();
+    if (totalBooks === 0) {
+        renderEmptyState();
+        // Nothing to search or sort yet.
+        if (currentView === 'all') $('.library-toolbar').prop('hidden', true);
+    }
     requestAnimationFrame(tryLoadMoreIfPageStillShort);
 });
 
@@ -387,6 +488,8 @@ function seedLoadedBooksFromDOM() {
         const rawLength = parseInt(col.dataset.length || '', 10);
         loadedBooks.push({
             filename: decodeURIComponent(href.slice(readIdx + readMarker.length)),
+            title: col.dataset.title || '',
+            author: col.dataset.author || '',
             cover: img.getAttribute('src') || '',
             length: Number.isFinite(rawLength) ? rawLength : 0,
             // The lock badge encodes admin-only state in the server-rendered grid.
@@ -432,55 +535,34 @@ function updateLayoutToggleUI() {
 }
 
 
-// <== FUNCTIONS FOR FILTERING ==>
-// Add filter handling
+// <== SEARCH ==>
+// One box: every word must match the title, author, genre or one of your tags.
 function applyFilters() {
     // Reset pagination
     offset = 0;
     allImagesLoaded = false;
-    
-    // Collect filter values
-    currentFilters = {
-        title: $('#filterTitle').val(),
-        author: $('#filterAuthor').val(),
-        genre: $('#filterGenre').val(),
-        tags: [
-            ...Array.from($('#filter-tags-container .tag')).map(tag =>
-                tag.innerText.replace(/×/g, '').trim()
-            ),
-            $('#filterTags').val().trim() // Include text from the input box
-        ].filter(tag => tag) // Filter out any empty strings
-    };
 
-    // Clear existing books (DOM + in-memory mirror)
-    loadedBooks.length = 0;
-    $('#library').empty();
+    const q = ($('#librarySearch').val() || '').trim();
+    currentFilters = q ? {q} : {};
 
-    // Load filtered books
-    loadMoreImages();
+    // "Continue reading" isn't filtered, so hide it while searching.
+    $('#continueReading').prop('hidden', Boolean(q));
+
+    reloadLibrary();
 }
 
-// Add event listeners for filter inputs
-const debouncedApplyFilters = debounce(applyFilters, 300);
-$('#filterTitle, #filterAuthor, #filterGenre').on('input', debouncedApplyFilters);
-$('#filterTags').on('keydown', function(event) { 
-    if (event.key === 'Enter') { 
+const debouncedApplyFilters = debounce(applyFilters, 250);
+$('#librarySearch').on('input', debouncedApplyFilters);
+$('#librarySearch').on('keydown', function(e) {
+    if (e.key === 'Enter') {
+        applyFilters();
+        this.blur();  // drops the phone keyboard so the results show
+    } else if (e.key === 'Escape' && this.value) {
+        e.stopPropagation();
+        this.value = '';
         applyFilters();
     }
 });
-
-$('.filter-button').on('click', function() {
-    $('#filterSidebar').toggleClass('active');
-    $('#filterOverlay').fadeToggle();
-});
-
-$('#filterOverlay').on('click', function() {
-    $('#filterSidebar').removeClass('active');
-    $('#filterOverlay').fadeOut();
-});
-
-// Initialize the filter tags input
-initializeTagInput('filterTags', 'filter-tags-container');
 
 
 // <== FUNCTIONS FOR VIEWING AND EDITING METADATA ==>
@@ -498,30 +580,31 @@ function generateMetadataHtml(data, isUpload = false) {
 
     const ids = isUpload
         ? { title: 'upload-metadata-title', author: 'upload-metadata-author',
-            genre: 'upload-metadata-genre', filename: 'upload-metadata-filename' }
+            genre: 'upload-metadata-genre' }
         : { title: 'metadata-title', author: 'metadata-author',
             genre: 'metadata-genre' };
 
     // --- Header: title and author act as the panel's heading ---
+    // A textarea so long titles wrap and stay readable; autoGrow sizes it.
     const titleEl = editable
-        ? `<input type="text" id="${ids.title}" class="meta-title-input"
-                  value="${escapeHtml(data.title || '')}" placeholder="Untitled">`
+        ? `<textarea id="${ids.title}" class="meta-title-input" rows="1"
+                     placeholder="Untitled">${escapeHtml(data.title || '')}</textarea>`
         : `<h2 id="${ids.title}" class="meta-title">${escapeHtml(data.title || 'Untitled')}</h2>`;
 
     const authorEl = editable
         ? `<input type="text" id="${ids.author}" class="meta-author-input"
                   value="${escapeHtml(data.author || '')}" placeholder="Author">`
-        : `<p id="${ids.author}" class="meta-author">${escapeHtml(data.author || 'Unknown author')}</p>`;
+        : `<p id="${ids.author}" class="meta-author">${escapeHtml(data.author_display || data.author || 'Unknown author')}</p>`;
 
     // --- Cover with hover overlay for admins ---
-    const coverChange = isAdmin
+    const coverChange = (isAdmin && !isUpload)
         ? `<button type="button" class="meta-cover__change"
                    data-action="change-cover" data-filename="${escapeHtml(data.filename)}">
               <i class="fas fa-camera"></i><span>Change cover</span>
            </button>`
         : '';
     const cover = `
-        <figure class="meta-cover${isAdmin ? ' meta-cover--editable' : ''}">
+        <figure class="meta-cover${isAdmin && !isUpload ? ' meta-cover--editable' : ''}">
             <img id="cover-preview-image" src="${escapeHtml(data.cover)}"
                  alt="Cover of ${escapeHtml(data.title || 'this book')}">
             ${coverChange}
@@ -546,29 +629,35 @@ function generateMetadataHtml(data, isUpload = false) {
             <label class="meta-field meta-checkbox-field">
                 <input type="checkbox" id="metadata-admin-only"
                        ${data.access_level !== 'standard' ? 'checked' : ''}>
-                <span class="meta-label">Admin only — hide from standard users</span>
+                <span class="meta-label">Private — only admins can see this book</span>
             </label>
           `
         : '';
 
-    // --- Tags (existing book) or filename (upload) ---
-    const extraField = isUpload
+    // --- Reading status (signed-in, existing books) ---
+    const STATUSES = [['Unread', 'Unread'], ['In Progress', 'Reading'], ['Finished', 'Finished']];
+    const statusField = (isAuth && !isUpload)
         ? `
-            <label class="meta-field meta-field--muted">
-                <span class="meta-label">Filename</span>
-                <input type="text" id="${ids.filename}"
-                       class="meta-input meta-input--mono"
-                       value="${escapeHtml(data.filename || '')}">
-            </label>
-          `
-        : `
             <div class="meta-field">
-                <span class="meta-label">Custom tags</span>
+                <span class="meta-label" id="meta-status-label">Status</span>
+                <div class="status-filter meta-status" role="radiogroup" aria-labelledby="meta-status-label">
+                    ${STATUSES.map(([value, label]) => `
+                        <button type="button" role="radio" data-status="${value}"
+                                aria-checked="${(data.status || 'Unread') === value}">${label}</button>`).join('')}
+                </div>
+            </div>
+          `
+        : '';
+
+    // --- Tags (new uploads included) ---
+    const extraField = `
+            <div class="meta-field">
+                <span class="meta-label">Tags</span>
                 ${isAuth
                     ? `<div class="tag-input-container">
                           <div class="tags-container" id="tags-container"></div>
                           <input type="text" id="tags-input"
-                                 placeholder="Type and press Enter">
+                                 placeholder="Add a tag" aria-label="Add a tag">
                        </div>`
                     : `<span class="meta-value">${escapeHtml((data.tags || []).join(', ') || 'No tags yet')}</span>`}
             </div>
@@ -576,9 +665,13 @@ function generateMetadataHtml(data, isUpload = false) {
 
     // --- Footer: timestamp on the left, actions on the right ---
     const created = (!isUpload && data.created_at)
-        ? `<span class="meta-footer-info">Added ${escapeHtml(data.created_at.split(' ')[0])}</span>`
+        ? `<span class="meta-footer-info">Added ${escapeHtml(formatAddedDate(data.created_at))}</span>`
         : `<span class="meta-footer-info"></span>`;
 
+    const downloadButton = !isUpload
+        ? `<a class="btn btn-secondary meta-download" href="${appUrl(`/download/${encodeURIComponent(data.filename)}`)}" download
+              title="Download the EPUB"><i class="fas fa-download" aria-hidden="true"></i><span>Download</span></a>`
+        : '';
     const deleteButton = (isAdmin && !isUpload)
         ? `<button type="button" class="delete-book-button btn btn-danger"
                    data-action="delete-book" data-filename="${escapeHtml(data.filename)}">
@@ -589,9 +682,7 @@ function generateMetadataHtml(data, isUpload = false) {
     const saveButton = isAuth
         ? (isUpload
             ? `<button type="button" class="save-button btn btn-primary"
-                       data-action="save-new-book"
-                       data-filename="${escapeHtml(data.filename)}"
-                       data-cover-path="${escapeHtml(data.cover_path || '')}">
+                       data-action="save-new-book">
                   ${saveLabel}
                </button>`
             : `<button type="button" class="save-button btn btn-primary"
@@ -608,6 +699,7 @@ function generateMetadataHtml(data, isUpload = false) {
         <section class="meta-body">
             ${cover}
             <div class="meta-fields">
+                ${statusField}
                 ${genreField}
                 ${extraField}
                 ${adminOnlyField}
@@ -616,6 +708,7 @@ function generateMetadataHtml(data, isUpload = false) {
         <footer class="meta-footer">
             ${created}
             <div class="meta-footer-actions">
+                ${downloadButton}
                 ${deleteButton}
                 ${saveButton}
             </div>
@@ -623,44 +716,192 @@ function generateMetadataHtml(data, isUpload = false) {
     `;
 }
 
+// A cover picked in the details panel, applied on Save. Tied to the book it
+// was picked for and cleared whenever the panel opens or closes, so it can
+// never be saved onto a different book.
+let pendingCover = null;  // {filename, file}
+
+// "2026-05-10 13:45:53" (UTC) -> "10 May 2026" in the reader's own locale.
+function formatAddedDate(utcString) {
+    const d = new Date(utcString.replace(' ', 'T') + 'Z');
+    if (Number.isNaN(d.getTime())) return utcString.split(' ')[0];
+    return d.toLocaleDateString(undefined, {day: 'numeric', month: 'short', year: 'numeric'});
+}
+
 function showMetadata(filename) {
+    pendingCover = null;
+    rememberFocus();
     const urlSafe = encodeURIComponent(filename);
     $.get(appUrl(`/book_metadata/${urlSafe}`), function(data) {
         $('#metadataContent').html(generateMetadataHtml(data));
         $('#metadataOverlay').css('display', 'flex').fadeIn();
         initializeTagInput('tags-input', 'tags-container', data.tags);
+        snapshotPanel();
         focusFirstMetadataField();
     }).fail(function() {
-        showToast('Could not load book metadata', 'error');
+        showToast("Couldn't open this book's details. Try again.", 'error');
     });
 }
 
+// The upload being reviewed in the panel: {upload_id, cover_path}. Closing the
+// panel without adding the book discards the staged file on the server.
+let pendingUpload = null;
+
 function showUploadMetadata(data) {
+    pendingCover = null;
+    rememberFocus();
+    pendingUpload = {upload_id: data.upload_id, cover_path: data.cover_path};
     $('#metadataContent').html(generateMetadataHtml(data, true));
     $('#metadataOverlay').css('display', 'flex').fadeIn();
+    initializeTagInput('tags-input', 'tags-container');
+    snapshotPanel();
     focusFirstMetadataField();
 }
+
+function discardPendingUpload() {
+    if (!pendingUpload) return;
+    const id = pendingUpload.upload_id;
+    pendingUpload = null;
+    fetch(appUrl(`/upload_book/${id}`), {method: 'DELETE'}).catch(() => {});
+}
+
+// Grow a textarea to fit its text (titles wrap instead of scrolling sideways).
+function autoGrow(el) {
+    el.style.height = 'auto';
+    el.style.height = el.scrollHeight + 'px';
+}
+document.addEventListener('input', (e) => {
+    if (e.target.matches?.('.meta-title-input')) autoGrow(e.target);
+});
+// The title is a single logical line: Enter saves instead of adding a newline.
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && e.target.matches?.('textarea.meta-title-input')) {
+        e.preventDefault();
+        document.querySelector('#metadataContent .save-button')?.click();
+    }
+});
+
+// Touch devices: focusing an input pops up the keyboard over half the sheet,
+// so only focus where there's a real keyboard already.
+const COARSE_POINTER = window.matchMedia('(hover: none), (pointer: coarse)').matches;
 
 function focusFirstMetadataField() {
     // Defer until after the fadeIn so focus actually lands on a visible input.
     // Place the caret at the end of the existing text rather than at the start.
     setTimeout(() => {
         const first = document.querySelector('#metadataContent .meta-title-input');
-        if (!first) return;
+        if (!first) {
+            // Read-only details: put keyboard focus inside the dialog anyway.
+            if (!COARSE_POINTER) document.querySelector('.close-metadata')?.focus();
+            return;
+        }
+        autoGrow(first);
+        if (COARSE_POINTER) return;
         first.focus();
         const end = first.value.length;
         first.setSelectionRange(end, end);
     }, 50);
 }
 
-function closeMetadataOverlay() {
-    $('#metadataOverlay').fadeOut(150);
+// Unsaved-changes guard. A snapshot of the panel's fields is taken when it
+// opens; closing with different values (or a pending cover, or an upload
+// that hasn't been added) asks first.
+let _panelSnapshot = null;
+function panelState() {
+    return JSON.stringify({
+        fields: Array.from(document.querySelectorAll('#metadataContent input, #metadataContent textarea'))
+            .map(el => el.type === 'checkbox' ? el.checked : el.value),
+        tags: Array.from(document.querySelectorAll('#tags-container .tag')).map(t => t.textContent),
+        status: $('.meta-status [aria-checked="true"]').data('status') || null,
+    });
+}
+function snapshotPanel() { _panelSnapshot = panelState(); }
+function panelIsDirty() {
+    return Boolean(pendingUpload) || Boolean(pendingCover)
+        || (_panelSnapshot !== null && panelState() !== _panelSnapshot);
 }
 
-// Close on Escape
+// Close from Esc, the backdrop or ×: ask first if something would be lost.
+function requestCloseMetadata() {
+    if (!panelIsDirty()) return closeMetadataOverlay();
+    if (document.querySelector('.discard-bar')) return;  // already asking
+    const bar = document.createElement('div');
+    bar.className = 'discard-bar';
+    bar.setAttribute('role', 'alertdialog');
+    bar.setAttribute('aria-label', 'Unsaved changes');
+    const text = document.createElement('span');
+    text.textContent = pendingUpload ? "This book hasn't been added yet." : 'You have unsaved changes.';
+    const keep = document.createElement('button');
+    keep.type = 'button';
+    keep.className = 'btn btn-secondary';
+    keep.textContent = 'Keep editing';
+    keep.addEventListener('click', () => bar.remove());
+    const discard = document.createElement('button');
+    discard.type = 'button';
+    discard.className = 'btn btn-danger';
+    discard.textContent = pendingUpload ? 'Discard book' : 'Discard changes';
+    discard.addEventListener('click', () => { bar.remove(); closeMetadataOverlay(); });
+    bar.append(text, keep, discard);
+    document.querySelector('.meta-footer').prepend(bar);
+    keep.focus();
+}
+
+function closeMetadataOverlay() {
+    _panelSnapshot = null;
+    document.querySelector('.discard-bar')?.remove();
+    pendingCover = null;
+    discardPendingUpload();
+    $('#metadataOverlay').fadeOut(150);
+    restoreFocus();
+}
+
+// <== KEYBOARD + FOCUS ==>
+// "/" search, "U" add a book, Esc closes whatever panel is open.
 document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && $('#metadataOverlay').is(':visible')) {
-        closeMetadataOverlay();
+    if (e.key === 'Escape') {
+        if (document.querySelector('.discard-bar')) document.querySelector('.discard-bar').remove();
+        else if ($('#metadataOverlay').is(':visible')) requestCloseMetadata();
+        else if ($('#loginOverlay').is(':visible')) closeLoginDialog();
+        return;
+    }
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.target.closest && e.target.closest('input, textarea, select, [contenteditable]')) return;
+    if ($('#metadataOverlay').is(':visible') || $('#loginOverlay').is(':visible')) return;
+    if (e.key === '/') {
+        e.preventDefault();
+        document.getElementById('librarySearch')?.focus();
+    } else if (e.key.toLowerCase() === 'u' && window.isAuthenticated) {
+        e.preventDefault();
+        document.getElementById('fileUploadInput').click();
+    }
+});
+
+// While a panel is open, Tab cycles inside it; on close, focus returns to
+// whatever opened it (e.g. the cover's Details button).
+let _focusBeforePanel = null;
+function rememberFocus() { _focusBeforePanel = document.activeElement; }
+function restoreFocus() {
+    if (_focusBeforePanel && document.contains(_focusBeforePanel)) _focusBeforePanel.focus();
+    _focusBeforePanel = null;
+}
+document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Tab') return;
+    const panel = $('#metadataOverlay').is(':visible') ? document.querySelector('.metadata-content')
+        : $('#loginOverlay').is(':visible') ? document.querySelector('.login-content') : null;
+    if (!panel) return;
+    const focusable = [...panel.querySelectorAll('a[href], button:not([disabled]), input, textarea, select, [tabindex]:not([tabindex="-1"])')]
+        .filter(el => el.offsetParent !== null);
+    if (!focusable.length) return;
+    const first = focusable[0], last = focusable[focusable.length - 1];
+    if (!panel.contains(document.activeElement)) {
+        e.preventDefault();
+        first.focus();
+    } else if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
     }
 });
 
@@ -669,18 +910,25 @@ function saveMetadata(filename) {
     let isAdmin = window.currentUserRole && window.currentUserRole.toLowerCase() === 'admin';
 
     // For each metadata field, check if it is rendered as an input (editable) or as a span.
-    const title = $('#metadata-title').is('input') ? $('#metadata-title').val() : $('#metadata-title').text().trim();
+    const title = $('#metadata-title').is('input, textarea') ? $('#metadata-title').val() : $('#metadata-title').text().trim();
     const author = $('#metadata-author').is('input') ? $('#metadata-author').val() : $('#metadata-author').text().trim();
     const genre = $('#metadata-genre').is('input') ? $('#metadata-genre').val() : $('#metadata-genre').text().trim();
 
+    // Include a tag that was typed but not yet confirmed with Enter.
+    const pendingTag = ($('#tags-input').val() || '').trim();
     const metadata = {
         title,
         author,
         genre,
-        tags: Array.from($('#tags-container .tag')).map(tag =>
-            tag.textContent.replace(/×/g, '').trim()
-        )
+        tags: [
+            ...Array.from($('#tags-container .tag')).map(tag =>
+                tag.textContent.replace(/×/g, '').trim()
+            ),
+            ...(pendingTag ? [pendingTag] : []),
+        ],
     };
+    const status = $('.meta-status [aria-checked="true"]').data('status');
+    if (status) metadata.status = status;
 
     // Access level is admin-only; the toggle only renders for admins. The
     // server ignores the field for non-admins regardless.
@@ -690,13 +938,13 @@ function saveMetadata(filename) {
 
     const saveButton = $('.save-button');
     const originalText = saveButton.text();
-    saveButton.text('Saving...');
+    saveButton.text('Saving…');
 
     // If a new cover is selected, update it on the server first
     function updateCover() {
-        if (window.newCoverFile) {
+        if (pendingCover && pendingCover.filename === filename) {
             const formData = new FormData();
-            formData.append('cover', window.newCoverFile);
+            formData.append('cover', pendingCover.file);
             formData.append('filename', filename);
             return fetch(appUrl('/update_cover'), {
                 method: 'POST',
@@ -710,7 +958,8 @@ function saveMetadata(filename) {
             })
             .then(data => {
                 document.getElementById('cover-preview-image').src = data.cover;
-                window.newCoverFile = null;
+                pendingCover = null;
+                updateCoverEverywhere(filename, data);
             });
         } else {
             return Promise.resolve();
@@ -725,63 +974,163 @@ function saveMetadata(filename) {
             data: JSON.stringify(metadata),
             success: function(response) {
                 invalidateTagsCache();
-                saveButton.text('Saved!');
-                setTimeout(() => {
-                    saveButton.text(originalText);
-                    $('#metadataOverlay').fadeOut(200);
-                }, 500);
+                saveButton.text(originalText);
+                _panelSnapshot = null;
+                closeMetadataOverlay();
+                showToast('Saved', 'success');
             },
             error: function(xhr, status, error) {
-                showToast('Error saving metadata: ' + error, 'error');
+                const msg = (xhr.responseJSON && xhr.responseJSON.error) || "Couldn't save your changes. Try again.";
+                showToast(msg, 'error');
                 saveButton.text(originalText);
             }
         });
     }).catch(error => {
-        showToast('Error updating cover: ' + error, 'error');
+        showToast(typeof error === 'string' && error ? error : "Couldn't change the cover. Try a JPG or PNG.", 'error');
         saveButton.text(originalText);
     });
 }
 
 $('.close-metadata, .metadata-overlay').on('click', function(e) {
     if (e.target === this) {
-        $('#metadataOverlay').fadeOut();
+        requestCloseMetadata();
     }
 });
 
-async function confirmDeleteBook(filename) {
-    if (!confirm(`Permanently delete "${filename}"?\nThis removes the file from disk and cannot be undone.`)) {
-        return;
-    }
+// After a cover change, swap the new (versioned) thumbnail URLs into every
+// place the book's cover shows: grid card, shelf spine, Continue reading, and
+// the mirror used to re-render layouts.
+function updateCoverEverywhere(filename, urls) {
+    const coverUrl = urls.thumb || urls.cover;
+    const book = loadedBooks.find(b => b.filename === filename);
+    if (book) book.cover = coverUrl;
+    const readHref = appUrl(`/read/${encodeURIComponent(filename)}`);
+    document.querySelectorAll(`a[href="${CSS.escape(readHref)}"]`).forEach(link => {
+        const card = link.closest('.col-md-3, .shelf-slot, .continue-card');
+        if (!card) return;
+        const img = card.querySelector('img');
+        if (img) img.src = card.classList.contains('continue-card')
+            ? (urls.thumb_small || coverUrl) : coverUrl;
+        const spine = card.querySelector('.book-spine');
+        if (spine) spine.style.backgroundImage = `url("${coverUrl}")`;
+    });
+}
 
+// Delete moves the book to the trash on the server; the toast's Undo restores
+// it. No confirm dialog: the action is reversible (for TRASH_RETENTION_DAYS).
+async function deleteBook(filename) {
     const button = $('.delete-book-button');
     const originalText = button.text();
-    button.text('Deleting...').prop('disabled', true);
+    button.text('Deleting…').prop('disabled', true);
 
+    let title = filename;
     try {
         const response = await fetch(appUrl(`/book/${encodeURIComponent(filename)}`), {
             method: 'DELETE',
         });
-        if (!response.ok) {
-            const data = await response.json().catch(() => ({}));
-            throw new Error(data.error || `HTTP ${response.status}`);
-        }
-        // Drop the card/spine from the library, and from the in-memory mirror
-        // so a later layout switch doesn't resurrect it.
-        const link = document.querySelector(
-            `a[href="${CSS.escape(appUrl(`/read/${encodeURIComponent(filename)}`))}"]`
-        );
-        const card = link?.closest('.col-md-3, .shelf-slot');
-        if (card) card.remove();
-        const idx = loadedBooks.findIndex(b => b.filename === filename);
-        if (idx !== -1) loadedBooks.splice(idx, 1);
-        repaintShelfPlanks();
-        $('#metadataOverlay').fadeOut();
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+        title = data.title || title;
     } catch (err) {
-        showToast(`Failed to delete: ${err.message}`, 'error');
+        showToast(`Couldn't delete this book: ${err.message}`, 'error');
         button.text(originalText).prop('disabled', false);
+        return;
     }
+
+    // Drop the card/spine from the library, and from the in-memory mirror so a
+    // later layout switch doesn't resurrect it. Keep both for Undo.
+    const index = loadedBooks.findIndex(b => b.filename === filename);
+    const removed = index !== -1 ? loadedBooks.splice(index, 1)[0] : null;
+    rerenderLibrary();
+    const continueCard = findContinueCard(filename);
+    if (continueCard) continueCard.hidden = true;
+    closeMetadataOverlay();
+
+    showToast(`Deleted "${title}"`, 'info', {
+        label: 'Undo',
+        onClick: () => restoreBook(filename, title, removed, index, continueCard),
+    });
 }
 
+async function restoreBook(filename, title, removed, index, continueCard) {
+    try {
+        const response = await fetch(appUrl(`/book/${encodeURIComponent(filename)}/restore`), {
+            method: 'POST',
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    } catch (err) {
+        showToast(`Couldn't restore "${title}". Try again.`, 'error');
+        return;
+    }
+    if (removed) {
+        loadedBooks.splice(Math.min(index, loadedBooks.length), 0, removed);
+        rerenderLibrary();
+    }
+    if (continueCard) continueCard.hidden = false;
+    showToast(`Restored "${title}"`, 'success');
+}
+
+function findContinueCard(filename) {
+    return Array.from(document.querySelectorAll('.continue-card'))
+        .find(card => card.dataset.filename === filename) || null;
+}
+
+
+// Status control in the details panel: a radio group of buttons.
+document.addEventListener('click', (e) => {
+    const btn = e.target.closest('.meta-status [data-status]');
+    if (!btn) return;
+    btn.parentElement.querySelectorAll('[data-status]').forEach(b =>
+        b.setAttribute('aria-checked', b === btn ? 'true' : 'false'));
+});
+
+// <== LONG-PRESS (touch) ==>
+// Covers have no hover on phones, and shelf spines are too narrow for a
+// button: press and hold any book to open its details.
+(function enableLongPress() {
+    const SELECTOR = '#library .book, #library .book-spine, .continue-card';
+    const HOLD_MS = 500;
+    let timer = null, start = null, fired = false;
+    document.addEventListener('touchstart', (e) => {
+        const target = e.target.closest(SELECTOR);
+        if (!target || e.touches.length !== 1 || e.target.closest('.book-button')) return;
+        fired = false;
+        start = {x: e.touches[0].clientX, y: e.touches[0].clientY};
+        timer = setTimeout(() => {
+            const link = target.querySelector('a[href*="/read/"]') || target.closest('a[href*="/read/"]');
+            const filename = link && readFilenameFromHref(link.getAttribute('href'));
+            if (!filename) return;
+            fired = true;
+            navigator.vibrate?.(10);
+            showMetadata(filename);
+        }, HOLD_MS);
+    }, {passive: true});
+    const cancel = () => { clearTimeout(timer); timer = null; };
+    document.addEventListener('touchmove', (e) => {
+        if (!timer || !start) return;
+        const t = e.touches[0];
+        if (Math.abs(t.clientX - start.x) > 10 || Math.abs(t.clientY - start.y) > 10) cancel();
+    }, {passive: true});
+    document.addEventListener('touchend', cancel, {passive: true});
+    document.addEventListener('touchcancel', cancel, {passive: true});
+    // The press shouldn't also open the book or the system's link menu.
+    document.addEventListener('click', (e) => {
+        if (fired && e.target.closest(SELECTOR)) {
+            e.preventDefault();
+            e.stopPropagation();
+            fired = false;
+        }
+    }, true);
+    document.addEventListener('contextmenu', (e) => {
+        if (e.target.closest(SELECTOR) && matchMedia('(hover: none)').matches) e.preventDefault();
+    });
+})();
+
+function readFilenameFromHref(href) {
+    const marker = '/read/';
+    const i = (href || '').indexOf(marker);
+    return i === -1 ? null : decodeURIComponent(href.slice(i + marker.length));
+}
 
 // <== FUNCTIONS FOR TAGGING ==>
 
@@ -853,8 +1202,6 @@ function attachTagAutocomplete(input, container) {
         if (idx < 0 || idx >= visible.length) return;
         addTag(visible[idx], container);
         input.value = '';
-        // If this is the filter input, rerun the filter immediately
-        if (container.id === 'filter-tags-container') applyFilters();
         refresh();
     }
 
@@ -944,25 +1291,17 @@ function addTag(text, container) {
     const cleanText = text.replace(/×/g, '').trim();
     if (!cleanText) return;
 
-    const isFiltering = container.id === 'filter-tags-container';
-    const statusClass = {
-        'Finished': 'finished-tag',
-        'In Progress': 'started-tag',
-        'Unread': 'unread-tag',
-    }[cleanText];
-
     // Build via DOM nodes so user-supplied tag text is never interpreted as HTML.
     const tag = document.createElement('span');
-    tag.className = 'tag' + (statusClass ? ' ' + statusClass : '');
+    tag.className = 'tag';
     tag.appendChild(document.createTextNode(cleanText + ' '));
 
     const removeBtn = document.createElement('span');
     removeBtn.className = 'remove-tag';
     removeBtn.textContent = '×';
-    removeBtn.addEventListener('click', () => {
-        tag.remove();
-        if (isFiltering) applyFilters();
-    });
+    removeBtn.setAttribute('role', 'button');
+    removeBtn.setAttribute('aria-label', `Remove tag ${cleanText}`);
+    removeBtn.addEventListener('click', () => tag.remove());
     tag.appendChild(removeBtn);
 
     container.appendChild(tag);
@@ -970,76 +1309,162 @@ function addTag(text, container) {
 
 
 // <== FUNCTIONS FOR UPLOADING BOOKS AND COVERS ==>
-async function handleFileUpload(files) {
-    if (files.length) {
-        const file = files[0]; // For simplicity, we handle one file at a time.
-        const formData = new FormData();
-        formData.append('file', file);
-        
-        try {
-            const response = await fetch(appUrl('/upload_book'), {
-                method: 'POST',
-                body: formData
-            });
-            if (!response.ok) {
-                const errorData = await response.json();
-                showToast("Upload failed: " + errorData.error, 'error');
-                return;
-            }
-            const data = await response.json();
-            // Open the metadata overlay with pre-populated fields from the uploaded book.
-            showUploadMetadata(data);
-        } catch (error) {
-            console.error("Error during file upload", error);
-            showToast("Error uploading file", 'error');
-        }
-    }
+// <== ADDING BOOKS ==>
+// One file: stage it, then review it in the panel. Several files: add each
+// with the metadata from the EPUB, with a running progress toast.
+async function stageUpload(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await fetch(appUrl('/upload_book'), {method: 'POST', body: formData});
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || "Couldn't add this book.");
+    return data;
 }
 
-function saveNewBook(originalFilename, cover_path) {
-    // Match createField(): admins get <input>, others get <span> — use .val() only for inputs.
-    function uploadMetadataField(id) {
-        const $el = $('#' + id);
-        return $el.is('input') ? $el.val() : $el.text().trim();
-    }
-    const metadata = {
-        title: uploadMetadataField('upload-metadata-title'),
-        author: uploadMetadataField('upload-metadata-author'),
-        genre: uploadMetadataField('upload-metadata-genre'),
-        original_filename: originalFilename,
-        new_filename: uploadMetadataField('upload-metadata-filename'),
-        cover_path: cover_path
-    };
-
-    $.ajax({
-        url: appUrl('/upload_book_metadata'),
-        type: 'POST',
-        contentType: 'application/json',
-        data: JSON.stringify(metadata),
-        success: function(response) {
-            $('.save-button').text("Uploaded!");
-            $('#metadataOverlay').fadeOut();
-            location.reload();
-        },
-        error: function(xhr, status, error) {
-            const msg = (xhr.responseJSON && xhr.responseJSON.error) ? xhr.responseJSON.error : error;
-            console.error("Error saving new book:", msg);
-            showToast("Error saving new book: " + msg, 'error');
-        }
+async function confirmUpload(body) {
+    const response = await fetch(appUrl('/upload_book_metadata'), {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(body),
     });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || "Couldn't add the book. Try again.");
+    return data.book;
 }
+
+// Put a newly added book at the front of the library and flash it.
+function insertNewBook(book) {
+    $('#emptyState').hide();
+    $('.library-toolbar').prop('hidden', false);
+    $('#library').show();
+    loadedBooks.unshift(book);
+    if (totalBooks != null) totalBooks += 1;
+    offset += 1;  // keep infinite scroll from re-fetching it
+    rerenderLibrary();
+    const link = document.querySelector(`#library a[href="${CSS.escape(appUrl(`/read/${encodeURIComponent(book.filename)}`))}"]`);
+    const card = link?.closest('.col-md-3, .shelf-slot');
+    if (card) {
+        card.classList.add('is-new');
+        card.scrollIntoView({block: 'nearest', behavior: 'smooth'});
+    }
+}
+
+async function handleFileUpload(files) {
+    const input = document.getElementById('fileUploadInput');
+    const list = Array.from(files || []).filter(f => f.name);
+    input.value = '';  // so choosing the same file again still triggers
+    if (!list.length) return;
+
+    if (list.length === 1) {
+        const toast = showToast(`Reading ${list[0].name}…`, 'info', null, {sticky: true});
+        try {
+            const data = await stageUpload(list[0]);
+            dismissToast(toast);
+            showUploadMetadata(data);
+        } catch (err) {
+            dismissToast(toast);
+            showToast(navigator.onLine ? err.message
+                : "Upload didn't finish. Check your connection and try again.", 'error');
+        }
+        return;
+    }
+
+    const toast = showToast(`Adding ${list.length} books…`, 'info', null, {sticky: true});
+    const failed = [];
+    let added = 0;
+    for (const [i, file] of list.entries()) {
+        toast.firstChild.textContent = `Adding ${list.length} books… (${i + 1} of ${list.length})`;
+        try {
+            const staged = await stageUpload(file);
+            const book = await confirmUpload({
+                upload_id: staged.upload_id, title: staged.title,
+                author: staged.author, cover_path: staged.cover_path,
+            });
+            insertNewBook(book);
+            added += 1;
+        } catch (err) {
+            failed.push(`${file.name}: ${err.message}`);
+        }
+    }
+    dismissToast(toast);
+    if (added) showToast(`Added ${added} book${added === 1 ? '' : 's'}.`, 'success');
+    if (failed.length) showToast(`Couldn't add ${failed.length}: ${failed.join(' · ')}`, 'error');
+}
+
+async function saveNewBook() {
+    if (!pendingUpload) return;
+    const field = id => {
+        const $el = $('#' + id);
+        return $el.is('input, textarea') ? $el.val() : $el.text().trim();
+    };
+    const pendingTag = ($('#tags-input').val() || '').trim();
+    const body = {
+        upload_id: pendingUpload.upload_id,
+        cover_path: pendingUpload.cover_path,
+        title: field('upload-metadata-title'),
+        author: field('upload-metadata-author'),
+        genre: field('upload-metadata-genre'),
+        tags: [
+            ...Array.from($('#tags-container .tag')).map(t => t.textContent.replace(/×/g, '').trim()),
+            ...(pendingTag ? [pendingTag] : []),
+        ],
+    };
+    const button = $('.save-button');
+    button.text('Adding…').prop('disabled', true);
+    try {
+        const book = await confirmUpload(body);
+        pendingUpload = null;  // it's in the library now; nothing to discard
+        closeMetadataOverlay();
+        insertNewBook(book);
+        showToast(`Added "${book.title}"`, 'success');
+    } catch (err) {
+        button.text('Add to library').prop('disabled', false);
+        showToast(err.message, 'error');
+    }
+}
+
+// Drop EPUBs anywhere on the library page to add them.
+(function enableDropToAdd() {
+    if (!window.isAuthenticated) return;
+    let depth = 0;
+    const hasFiles = e => Array.from(e.dataTransfer?.types || []).includes('Files');
+    const zone = document.getElementById('dropZone');
+    document.addEventListener('dragenter', (e) => {
+        if (!hasFiles(e)) return;
+        depth += 1;
+        zone.hidden = false;
+    });
+    document.addEventListener('dragleave', (e) => {
+        if (!hasFiles(e)) return;
+        depth = Math.max(0, depth - 1);
+        if (!depth) zone.hidden = true;
+    });
+    document.addEventListener('dragover', (e) => {
+        if (hasFiles(e)) e.preventDefault();
+    });
+    document.addEventListener('drop', (e) => {
+        if (!hasFiles(e)) return;
+        e.preventDefault();
+        depth = 0;
+        zone.hidden = true;
+        handleFileUpload(e.dataTransfer.files);
+    });
+})();
 
 // Function to trigger the cover upload dialog
 function triggerCoverUpload(filename) {
-    window.currentCoverBook = filename; // Store the book filename for later reference
-    document.getElementById('coverUploadInput').click();
+    const input = document.getElementById('coverUploadInput');
+    input.dataset.filename = filename;
+    input.value = '';  // so picking the same file twice still fires change
+    input.click();
 }
 
 // Function to handle uploading the new cover image
 async function handleCoverUpload(files) {
     if (files.length) {
-        // Store the file globally so that the actual update happens on Save
-        window.newCoverFile = files[0];
+        // Held until Save; tied to the book the picker was opened for.
+        const filename = document.getElementById('coverUploadInput').dataset.filename;
+        pendingCover = {filename, file: files[0]};
         let reader = new FileReader();
         reader.onload = function(e) {
             // Update the cover preview immediately with the new image
@@ -1052,12 +1477,14 @@ async function handleCoverUpload(files) {
 
 // <== FUNCTIONS FOR AUTHENTICATING ==>
 function showLoginDialog() {
+    rememberFocus();
     $('#loginOverlay').css('display', 'flex').fadeIn();
     $('#username').focus();
 }
 
 function closeLoginDialog() {
     $('#loginOverlay').fadeOut();
+    restoreFocus();
     $('#loginForm')[0].reset();
     $('#loginError').hide();
 }
@@ -1081,7 +1508,7 @@ async function handleLogin(event) {
         }
     } catch (error) {
         console.error('Login error:', error);
-        $('#loginError').text('An error occurred. Please try again.').show();
+        $('#loginError').text("Couldn't reach the library. Try again.").show();
     }
 }
 

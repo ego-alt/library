@@ -1,7 +1,7 @@
 import logging
 import os
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, render_template, request
 from flask_caching import Cache
 from flask_compress import Compress
 from flask_login import LoginManager
@@ -17,6 +17,7 @@ from .routes import (
     auth_blueprint,
     index_blueprint,
     metadata_blueprint,
+    pwa_blueprint,
     read_blueprint,
     upload_blueprint,
 )
@@ -24,7 +25,7 @@ from .routes import (
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-cache = Cache(config={"CACHE_TYPE": "flask_caching.backends.simplecache.SimpleCache"})
+cache = Cache()
 
 
 def create_app(config_overrides: dict | None = None):
@@ -56,7 +57,17 @@ def create_app(config_overrides: dict | None = None):
             raise RuntimeError(
                 f"BOOK_DIR does not exist or is not a directory: {book_dir}"
             )
-    cache.init_app(app)
+    # Cover bytes and per-book sizes are cached on disk so a restart or
+    # deploy doesn't mean re-reading every EPUB. Tests get a throwaway
+    # in-memory cache.
+    if app.config.get("TESTING"):
+        cache.init_app(app, config={"CACHE_TYPE": "SimpleCache"})
+    else:
+        cache.init_app(app, config={
+            "CACHE_TYPE": "FileSystemCache",
+            "CACHE_DIR": os.path.join(DATA_DIR, "cache"),
+            "CACHE_THRESHOLD": 5000,
+        })
 
     # Honor X-Forwarded-* from nginx when TLS terminates upstream. x_prefix
     # picks up X-Forwarded-Prefix so url_for() emits the /library mount path.
@@ -76,6 +87,10 @@ def create_app(config_overrides: dict | None = None):
 
     @app.errorhandler(HTTPException)
     def handle_http_exception(e):
+        # Pages opened in the browser get a readable page; API calls (fetch
+        # sends */*) keep getting JSON.
+        if request.accept_mimetypes.best == "text/html":
+            return render_template("error.html", code=e.code), e.code
         return jsonify({"error": e.description}), e.code
 
     login_manager = LoginManager()
@@ -103,6 +118,7 @@ def create_app(config_overrides: dict | None = None):
     app.register_blueprint(auth_blueprint)
     app.register_blueprint(index_blueprint)
     app.register_blueprint(metadata_blueprint)
+    app.register_blueprint(pwa_blueprint)
     app.register_blueprint(read_blueprint)
     app.register_blueprint(upload_blueprint)
 

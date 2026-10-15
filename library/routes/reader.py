@@ -20,8 +20,14 @@ from flask_login import current_user
 
 from ..llm_caller import LLMCaller, LLMError
 from ..models import Bookmark, BookProgressChoice, _utcnow, db
-from ..utils import get_epub_structure, process_chapter_content, rotate_list
+from ..utils import (
+    display_author,
+    get_epub_structure,
+    process_chapter_content,
+    rotate_list,
+)
 from ._helpers import (
+    book_mtime,
     commit_or_rollback,
     get_book_or_404,
     json_login_required,
@@ -29,6 +35,10 @@ from ._helpers import (
 )
 
 read_blueprint = Blueprint("read_routes", __name__)
+
+# Fraction of the opening section you must scroll past for a book to count as
+# started.
+STARTED_POSITION = 0.02
 
 llm_caller = LLMCaller()
 
@@ -38,7 +48,9 @@ def _llm_response(payload_key: str, fn, *args):
         return jsonify({payload_key: fn(*args)})
     except LLMError as e:
         current_app.logger.error(f"LLM call failed: {e}")
-        return jsonify({"error": str(e)}), 502
+        if "ANTHROPIC_API_KEY" in str(e):
+            return jsonify({"error": "AI help isn't set up on this library."}), 503
+        return jsonify({"error": "Couldn't get an answer just now. Try again."}), 502
 
 
 @read_blueprint.route("/read/<filename>")
@@ -47,7 +59,11 @@ def read_book(filename):
     book = get_book_or_404(filename)
     if not user_can_access_book(book):
         abort(403, description="Forbidden")
-    return render_template("reader.html")
+    # The version keys the browser's offline copy of the book, so it changes
+    # whenever the EPUB is rewritten.
+    return render_template(
+        "reader.html", book=book, book_version=book_mtime(book) or 0
+    )
 
 
 @read_blueprint.route("/load_book/<filename>")
@@ -58,30 +74,15 @@ def load_book(filename):
         abort(403, description="Forbidden")
     bookmark = None
 
+    # Opening a book doesn't mark it as started; reading past the opening
+    # does (see bookmark()). Just note when it was last opened.
     if current_user.is_authenticated:
         bookmark = Bookmark.query.filter_by(
             user_id=current_user.id, book_id=book.id
         ).first()
-        if not bookmark:
-            # Brand new bookmark: opening counts as starting to read.
-            # (Setting status explicitly because the column default only
-            # applies at flush time, leaving the attribute None on the
-            # in-memory object — so the UNREAD check below would not fire.)
-            bookmark = Bookmark(
-                user_id=current_user.id,
-                book_id=book.id,
-                status=BookProgressChoice.IN_PROGRESS,
-            )
-            db.session.add(bookmark)
-        elif bookmark.status == BookProgressChoice.UNREAD:
-            bookmark.status = BookProgressChoice.IN_PROGRESS
-            logging.info(
-                "Setting status to IN_PROGRESS for book "
-                f"{book.id} and user {current_user.id}"
-            )
-
-        bookmark.last_read = _utcnow()
-        db.session.commit()
+        if bookmark:
+            bookmark.last_read = _utcnow()
+            db.session.commit()
 
     asset_url_prefix = url_for(
         "read_routes.book_asset", filename=filename, asset_path=""
@@ -94,7 +95,7 @@ def load_book(filename):
                     epub_dir=current_app.config["BOOK_DIR"],
                     epub_path=filename,
                     book_title=book.title,
-                    book_author=book.author,
+                    book_author=display_author(book.author),
                     start_chapter=bookmark.chapter_index if bookmark else 0,
                     chapter_pos=bookmark.position if bookmark else 0,
                     asset_url_prefix=asset_url_prefix,
@@ -130,6 +131,7 @@ def stream_book_content(
                     "image_count": structure["image_count"],
                     "toc": structure["toc"],
                     "spine_length": structure["spine_length"],
+                    "chapter_sizes": structure["chapter_sizes"],
                     "start_chapter": start_chapter,
                     "chapter_pos": chapter_pos,
                 }
@@ -200,7 +202,7 @@ def book_asset(filename, asset_path):
 def bookmark(filename):
     """Get or update the user's bookmark for the book."""
     if not current_user.is_authenticated:
-        return jsonify({"message": "Authentication required."}), 200
+        return jsonify({"error": "Sign in to save your place across devices."}), 401
 
     book = get_book_or_404(filename)
 
@@ -215,6 +217,12 @@ def bookmark(filename):
                 db.session.add(bookmark)
             bookmark.chapter_index = data.get("chapter_index", 0)
             bookmark.position = data.get("position", 0)
+            # A book counts as started once you've read past where it opens,
+            # so peeking at a book doesn't put it in "Reading".
+            if bookmark.status in (None, BookProgressChoice.UNREAD) and (
+                bookmark.chapter_index > 0 or bookmark.position > STARTED_POSITION
+            ):
+                bookmark.status = BookProgressChoice.IN_PROGRESS
             bookmark.last_read = _utcnow()
         return jsonify({"message": "Bookmark updated successfully"})
 
@@ -248,10 +256,11 @@ def tag_finished(filename):
         f"Setting status to FINISHED for book {book.id} and user {current_user.id}"
     )
     db.session.commit()
-    return jsonify({"message": "Book tagged as finished"})
+    return jsonify({"message": "Marked as finished"})
 
 
 @read_blueprint.route("/ask_question", methods=["POST"])
+@json_login_required
 def ask_question():
     """Handle questions about highlighted text."""
     data = request.get_json()
@@ -259,12 +268,13 @@ def ask_question():
     question = data.get("question", "")
 
     if not context or not question:
-        return jsonify({"error": "Missing context or question"}), 400
+        return jsonify({"error": "Select some text and type a question."}), 400
 
     return _llm_response("answer", llm_caller.ask_question, context, question)
 
 
 @read_blueprint.route("/define_word", methods=["POST"])
+@json_login_required
 def define_word():
     """Handle word definition requests."""
     data = request.get_json()
@@ -272,15 +282,30 @@ def define_word():
     context = data.get("context", "")
 
     if not word or not context:
-        return jsonify({"error": "Missing word or context"}), 400
+        return jsonify({"error": "Select a word to define."}), 400
 
     return _llm_response("definition", llm_caller.define_word, word, context)
 
 
+@read_blueprint.route("/explain", methods=["POST"])
+@json_login_required
+def explain():
+    """Define, translate or gloss the selected text (one action for all three)."""
+    data = request.get_json() or {}
+    text = (data.get("text") or "").strip()
+    context = data.get("context", "")
+    if not text:
+        return jsonify({"error": "Select some text to explain."}), 400
+    return _llm_response("explanation", llm_caller.explain, text, context)
+
+
 @read_blueprint.route("/translate_text", methods=["POST"])
+@json_login_required
 def translate_text():
     data = request.json
     text = data.get("text", "")
     context = data.get("context", "")
+    if not text.strip():
+        return jsonify({"error": "Select some text to translate."}), 400
 
     return _llm_response("translation", llm_caller.translate_text, text, context)

@@ -237,9 +237,26 @@ def backup_db_command(dest_dir: str, keep: int) -> None:
     )
 
 
+@click.command("purge-trash")
+@click.option(
+    "--days",
+    type=click.IntRange(min=0),
+    default=None,
+    help="Purge books deleted more than this many days ago "
+    "[default: TRASH_RETENTION_DAYS, 30]",
+)
+@with_appcontext
+def purge_trash_command(days: int | None) -> None:
+    """Permanently remove trashed books (DB rows and EPUB files)."""
+    from .routes.index import purge_trash
+
+    click.echo(f"Purged {purge_trash(days)} book(s) from the trash.")
+
+
 def init_commands(app):
     """Register CLI commands."""
     app.cli.add_command(import_books_command)
     app.cli.add_command(create_user_command)
     app.cli.add_command(refresh_cover_paths_command)
     app.cli.add_command(backup_db_command)
+    app.cli.add_command(purge_trash_command)

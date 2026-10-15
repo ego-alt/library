@@ -29,6 +29,7 @@ def app(book_dir, monkeypatch):
         "TESTING": True,
         "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
         "BOOK_DIR": str(book_dir),
+        "THUMB_DIR": str(book_dir.parent / "thumbs"),
         "WTF_CSRF_ENABLED": False,
     })
     with app.app_context():

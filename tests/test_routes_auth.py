@@ -8,7 +8,7 @@ def test_login_succeeds_with_correct_password(client, standard_user):
 def test_login_rejects_wrong_password(client, standard_user):
     r = client.post("/auth/login", data={"username": "standard", "password": "wrong"})
     assert r.status_code == 401
-    assert "Invalid" in r.get_json()["error"]
+    assert r.get_json()["error"] == "That username and password don't match."
 
 
 def test_login_rejects_unknown_user(client):
@@ -29,13 +29,13 @@ def test_login_required_endpoints_reject_anonymous(client, book):
     # /upload_book is @json_login_required
     r = client.post("/upload_book")
     assert r.status_code == 401
-    assert r.get_json()["error"] == "Authentication required"
+    assert r.get_json()["error"] == "Sign in to do that."
 
 
 def test_admin_required_endpoint_rejects_standard(standard_client, book):
     r = standard_client.delete(f"/book/{book.filename}")
     assert r.status_code == 403
-    assert "Admin" in r.get_json()["error"]
+    assert r.get_json()["error"] == "Only an admin can do that."
 
 
 def test_admin_required_endpoint_rejects_anonymous(client, book):

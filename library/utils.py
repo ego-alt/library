@@ -206,6 +206,100 @@ def read_epub_cover(epub_file_path: str, cover_path: str | None = None) -> bytes
         )
 
 
+def display_author(author: str | None) -> str:
+    """How an author name is shown. Catalogue-style "Judt, Tony" reads as
+    "Tony Judt"; anything that isn't a single "Last, First" pair (several
+    authors, "Jr.", organisations) is left as stored. Empty -> "Unknown author"."""
+    name = " ".join((author or "").split())
+    if not name or name.lower() in ("unknown author", "unknown"):
+        return "Unknown author"
+    if name.count(",") == 1 and "&" not in name and " and " not in name.lower():
+        last, first = (part.strip() for part in name.split(","))
+        suffixes = {"jr", "jr.", "sr", "sr.", "ii", "iii", "iv"}
+        if last and first and first.lower() not in suffixes and len(first.split()) <= 3:
+            return f"{first} {last}"
+    return name
+
+
+def make_thumbnail(image_bytes: bytes, width: int) -> bytes:
+    """Downscale a raster cover to `width` px wide as WebP. Raises for formats
+    Pillow can't read (e.g. SVG); callers fall back to the original bytes."""
+    from io import BytesIO
+
+    from PIL import Image
+
+    with Image.open(BytesIO(image_bytes)) as img:
+        img = img.convert("RGBA" if img.mode in ("RGBA", "LA", "P") else "RGB")
+        if img.width > width:
+            height = round(img.height * width / img.width)
+            img = img.resize((width, height), Image.LANCZOS)
+        out = BytesIO()
+        img.save(out, "WEBP", quality=80, method=4)
+        return out.getvalue()
+
+
+# Fallback cover colours: muted spines from the shelf palette, each paired
+# with a light ink. Picked per book from a hash of the title, so a book keeps
+# its colour.
+_FALLBACK_COVERS = [
+    ("#34495E", "#FFF1E5"),
+    ("#8B6F47", "#FFF1E5"),
+    ("#5F7F74", "#FFF1E5"),
+    ("#7A5C6E", "#FFF1E5"),
+    ("#4F6D8F", "#FFF1E5"),
+]
+
+
+def _wrap_words(text: str, max_chars: int, max_lines: int) -> list[str]:
+    lines: list[str] = []
+    for word in (text or "").split():
+        if lines and len(lines[-1]) + 1 + len(word) <= max_chars:
+            lines[-1] += " " + word
+        else:
+            lines.append(word)
+    if len(lines) > max_lines:
+        lines = lines[:max_lines]
+        lines[-1] = lines[-1][: max_chars - 1].rstrip() + "…"
+    return lines
+
+
+def fallback_cover_svg(title: str, author: str) -> bytes:
+    """A typographic 2:3 cover for books whose EPUB has none: title and author
+    set in a serif on a coloured board, like a cloth-bound hardback."""
+    from html import escape
+    from zlib import crc32
+
+    bg, ink = _FALLBACK_COVERS[crc32((title or "").encode()) % len(_FALLBACK_COVERS)]
+    title_lines = _wrap_words(title or "Untitled", 16, 5)
+    author_lines = _wrap_words(author or "", 24, 2)
+    title_size = 40 if max(map(len, title_lines)) <= 12 else 34
+    serif = "Georgia, 'Times New Roman', serif"
+    line_gap = round(title_size * 1.15)
+    tspans = "".join(
+        f'<tspan x="40" dy="{0 if i == 0 else line_gap}">{escape(line)}</tspan>'
+        for i, line in enumerate(title_lines)
+    )
+    author_tspans = "".join(
+        f'<tspan x="40" dy="{0 if i == 0 else 28}">{escape(line)}</tspan>'
+        for i, line in enumerate(author_lines)
+    )
+    svg = "\n".join([
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 600"'
+        ' width="400" height="600">',
+        f'<rect width="400" height="600" fill="{bg}"/>',
+        f'<rect x="20" y="20" width="360" height="560" fill="none" stroke="{ink}"'
+        ' stroke-opacity="0.35" stroke-width="2"/>',
+        f'<text x="40" y="{110 + title_size}" fill="{ink}" font-family="{serif}"'
+        f' font-size="{title_size}" font-weight="600">{tspans}</text>',
+        f'<line x1="40" x2="140" y1="470" y2="470" stroke="{ink}"'
+        ' stroke-opacity="0.6" stroke-width="2"/>',
+        f'<text x="40" y="510" fill="{ink}" fill-opacity="0.85" font-family="{serif}"'
+        f' font-size="22" font-style="italic">{author_tspans}</text>',
+        "</svg>",
+    ])
+    return svg.encode("utf-8")
+
+
 _HTML_EXTENSIONS = (".html", ".xhtml", ".htm")
 
 
@@ -226,6 +320,53 @@ def epub_text_size(epub_file_path: str) -> int:
         logger.warning(f"Could not measure text size for {epub_file_path}: {e}")
         return 0
     return total
+
+
+def spine_chapter_sizes(epub_file_path: str) -> list[int]:
+    """Uncompressed byte size of each XHTML spine item, in reading order.
+
+    These are the weights for whole-book progress: a position inside chapter
+    `i` maps to (sum of sizes before i + fraction * size of i) / total. Uses
+    the same spine filtering as get_epub_structure so indices line up with
+    Bookmark.chapter_index. Reads the OPF and the zip directory only.
+    """
+    with zipfile.ZipFile(epub_file_path) as z:
+        container = etree.fromstring(z.read("META-INF/container.xml"))
+        rootfile_path = container.xpath(
+            "/u:container/u:rootfiles/u:rootfile", namespaces=namespaces
+        )[0].get("full-path")
+        rootfile_dir = os.path.dirname(rootfile_path)
+        root = etree.fromstring(z.read(rootfile_path))
+        manifest = {
+            item.get("id"): item
+            for item in root.xpath("//opf:manifest/opf:item", namespaces=namespaces)
+        }
+        sizes = []
+        spine = root.xpath("//opf:spine/opf:itemref/@idref", namespaces=namespaces)
+        for idref in spine:
+            item = manifest.get(idref)
+            if item is None or item.get("media-type") != "application/xhtml+xml":
+                continue
+            path = os.path.normpath(os.path.join(rootfile_dir, item.get("href")))
+            try:
+                sizes.append(z.getinfo(path).file_size)
+            except KeyError:
+                sizes.append(0)
+        return sizes
+
+
+def book_progress(
+    chapter_sizes: list[int], chapter_index: int, position: float
+) -> float:
+    """Whole-book progress in [0, 1] from a (chapter, fraction-through-chapter)
+    bookmark, weighting each chapter by its size."""
+    total = sum(chapter_sizes)
+    if total <= 0 or not chapter_sizes:
+        return 0.0
+    idx = max(0, min(chapter_index or 0, len(chapter_sizes) - 1))
+    pos = max(0.0, min(position or 0.0, 1.0))
+    done = sum(chapter_sizes[:idx]) + pos * chapter_sizes[idx]
+    return max(0.0, min(done / total, 1.0))
 
 
 def normalize_path(path):
@@ -623,8 +764,17 @@ def get_epub_structure(epub_path: str) -> dict:
                 os.path.join(rootfile_dir, manifest[itemref]["href"])
             )
             spine_paths[chapter_path] = len(chapters)
+            try:
+                size = z.getinfo(chapter_path).file_size
+            except KeyError:
+                size = 0
             chapters.append(
-                {"id": itemref, "path": chapter_path, "index": len(chapters)}
+                {
+                    "id": itemref,
+                    "path": chapter_path,
+                    "index": len(chapters),
+                    "size": size,
+                }
             )
 
         # 1) Publisher's nav/NCX
@@ -657,6 +807,7 @@ def get_epub_structure(epub_path: str) -> dict:
             "image_count": len(images),
             "toc": toc,
             "spine_length": len(chapters),
+            "chapter_sizes": [c["size"] for c in chapters],
         }
 
 

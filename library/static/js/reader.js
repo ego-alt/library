@@ -36,6 +36,7 @@ function updateReadingModeButton() {
     const icon = btn.querySelector('i');
     if (icon) icon.className = isPaginated() ? 'fas fa-scroll' : 'fas fa-book-open';
     btn.title = isPaginated() ? 'Switch to scroll view' : 'Switch to paginated view';
+    btn.setAttribute('aria-label', btn.title);
 }
 
 function computeSpreadCount() {
@@ -146,14 +147,46 @@ function pageOfElement(el) {
     return step > 0 ? Math.max(0, Math.floor(x / step)) : 0;
 }
 
+// Whole-book progress in [0, 1]: chapters weighted by size, matching the
+// server's utils.book_progress so the library's "Continue reading" % agrees.
+function bookProgressFraction() {
+    const sizes = (currentBook && currentBook.chapter_sizes) || [];
+    const total = sizes.reduce((a, b) => a + b, 0);
+    if (!total) return 0;
+    const idx = Math.max(0, Math.min(currentChapterNum, sizes.length - 1));
+    const before = sizes.slice(0, idx).reduce((a, b) => a + b, 0);
+    const pos = Math.max(0, Math.min(1, currentPositionFraction()));
+    return Math.max(0, Math.min(1, (before + pos * sizes[idx]) / total));
+}
+
+// Spine index -> the table of contents' name for it. The TOC names are the
+// publisher's; titles scraped from chapter HTML are often the book's title.
+let tocTitles = {};
+function indexTocTitles(entries) {
+    for (const entry of entries || []) {
+        if (entry.spine_index >= 0 && !(entry.spine_index in tocTitles) && !entry.synthetic) {
+            tocTitles[entry.spine_index] = entry.title;
+        }
+        indexTocTitles(entry.children);
+    }
+}
+
 function updateChapterNumberLabel() {
     if (!currentBook) return;
     const el = document.getElementById('chapter-number');
-    let text = `Section ${currentChapterNum + 1} of ${currentBook.spine_length}`;
-    if (isPaginated() && totalPages > 1) {
-        text += ` · ${currentPageIndex + 1}/${totalPages}`;
-    }
-    el.textContent = text;
+    const chapter = allChapters[currentChapterNum];
+    const title = tocTitles[currentChapterNum]
+        || (chapter && chapter.title) || `Section ${currentChapterNum + 1}`;
+    const pct = Math.floor(bookProgressFraction() * 100);
+    // Title truncates on narrow screens; the percentage never does.
+    const titleEl = document.createElement('span');
+    titleEl.className = 'chapter-number__title';
+    titleEl.textContent = title;
+    const pctEl = document.createElement('span');
+    pctEl.className = 'chapter-number__pct';
+    pctEl.textContent = `\u00a0· ${pct}%`;  // nbsp: flex would drop a plain space
+    el.replaceChildren(titleEl, pctEl);
+    el.title = `Section ${currentChapterNum + 1} of ${currentBook.spine_length}`;
 }
 
 function nextPage() {
@@ -164,6 +197,7 @@ function nextPage() {
         updateProgressBar();
         updateChapterNumberLabel();
         saveBookmark();
+        maybeOfferFinished();
     } else {
         nextChapter();
     }
@@ -219,8 +253,6 @@ function currentPositionFraction() {
 
 
 document.documentElement.style.setProperty('--reader-font-size', currentFontSize + 'px');
-document.documentElement.style.setProperty('--highlight-color', 'rgba(225, 204, 171)'); // Light mode
-document.documentElement.style.setProperty('--highlight-color-dark', 'rgba(58, 109, 154, 0.6)'); // Dark mode
 
 // Initialize overlay and event listeners when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
@@ -230,7 +262,7 @@ document.addEventListener('DOMContentLoaded', () => {
     overlay.innerHTML = `
         <div class="search-container">
             <div class="search-input-container">
-                <input type="text" class="search-input" placeholder="Ask a quick question...">
+                <input type="text" class="search-input" placeholder="Ask about this…" aria-label="Ask about the selected text">
             </div>
             <div class="search-response-container">
                 <div class="search-response"></div>
@@ -242,18 +274,19 @@ document.addEventListener('DOMContentLoaded', () => {
     // Add selection menu
     const selectionMenu = document.createElement('div');
     selectionMenu.className = 'selection-menu';
+    // Two actions: Ask (type a question) and Explain (define a word,
+    // translate foreign text, or gloss a passage — the server picks).
     selectionMenu.innerHTML = `
-        <button class="ask-button" title="Ask a question">
-            <i class="fas fa-question"></i>
+        <button class="ask-button" title="Ask about this (A)">
+            <i class="fas fa-comment" aria-hidden="true"></i><span>Ask</span>
         </button>
-        <button class="define-button" title="Define word">
-            <i class="fas fa-book"></i>
-        </button>
-        <button class="translate-button" title="Translate text">
-            <i class="fas fa-language"></i>
+        <button class="explain-button" title="Explain this (E)">
+            <i class="fas fa-lightbulb" aria-hidden="true"></i><span>Explain</span>
         </button>
     `;
     document.body.appendChild(selectionMenu);
+    // Keep the text selected while pressing a menu button.
+    selectionMenu.addEventListener('mousedown', (e) => e.preventDefault());
 
     // Handle all mouse events at the document level
     document.addEventListener('mousedown', (e) => {
@@ -283,15 +316,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const responseContainer = document.querySelector('.search-response-container');
                 const responseElement = document.querySelector('.search-response');
                 responseContainer.classList.add('active');
-                responseElement.textContent = 'Thinking.'
-                
-                // Create thinking animation
-                let dots = 0;
                 responseElement.className = 'thinking-animation';
-                const thinkingAnimation = setInterval(() => {
-                    dots = (dots + 1) % 11;
-                    responseElement.textContent = 'Thinking' + '.'.repeat(dots);
-                }, 200);
+                responseElement.textContent = 'Thinking';
                 
                 try {
                     const response = await fetch(appUrl('/ask_question'), {
@@ -303,23 +329,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         })
                     });
 
-                    const data = await response.json();
-
-                    // Clear thinking animation
-                    clearInterval(thinkingAnimation);
-                    responseElement.className = 'search-response';
-                    responseElement.textContent = data.answer;
-                    
-                    // Only expand if answer is over 150 characters
-                    if (data.answer.length > 150) {
-                        container.classList.add('expanded');
-                    }
+                    const data = await response.json().catch(() => ({}));
+                    showAiResult(data.answer, data.error);
                 } catch (error) {
                     console.error('Error getting answer:', error);
-                    // Clear thinking animation and show error
-                    clearInterval(thinkingAnimation);
-                    responseElement.className = 'search-response';
-                    responseElement.textContent = 'Sorry, an error occurred while getting the answer.';
+                    showAiResult(null, "Couldn't reach the library. Check your connection.");
                 }
             }
         }
@@ -327,26 +341,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Handle keyboard shortcuts
     document.addEventListener('keydown', (e) => {
-        if ((e.metaKey || e.ctrlKey) && (e.key === 'k' || e.key === 'd' || e.key === 'l')) {
-            e.preventDefault();
-            
+        // With text selected: A asks, E explains (D and L, the old define and
+        // translate keys, explain too). No modifier, so the browser's own ⌘D
+        // (bookmark) and ⌘L (address bar) keep working.
+        if (e.metaKey || e.ctrlKey || e.altKey || isTypingTarget(e.target)) return;
+        const key = e.key.toLowerCase();
+        if (key === 'a' || key === 'e' || key === 'd' || key === 'l') {
             const selection = window.getSelection();
-            const selectedString = selection.toString().trim(); 
+            const selectedString = selection.toString().trim();
             if (!selection.rangeCount || !selectedString) return;
+            e.preventDefault();
             
             // Store the selected range and create highlight
             selectedRange = selection.getRangeAt(0).cloneRange();
             const tempHighlight = wrapRangeInHighlight(selectedRange);
             if (!tempHighlight) return;
 
-            if (e.key === 'k') {
+            document.querySelector('.selection-menu')?.classList.remove('active');
+            if (key === 'a') {
                 initializeOverlay(tempHighlight, 'question');
-            } else if (e.key === 'd') {
-                initializeOverlay(tempHighlight, 'definition');
-                handleDefinitionRequest(selectedString, tempHighlight);
-            } else if (e.key === 'l') {
-                initializeOverlay(tempHighlight, 'translation');
-                handleTranslationRequest(selectedString, tempHighlight);
+            } else {
+                initializeOverlay(tempHighlight, 'explanation');
+                handleExplainRequest(selectedString, tempHighlight);
             }
         }
     });
@@ -355,7 +371,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const menuToggle = document.getElementById('menu-toggle');
     if (menuToggle) {
         menuToggle.addEventListener('click', () => {
-            document.getElementById('toc-menu').classList.toggle('visible');
+            const menu = document.getElementById('toc-menu');
+            menu.classList.toggle('visible');
+            // Open at the chapter you're in, not at the top of a long list.
+            if (menu.classList.contains('visible')) {
+                menu.querySelector('.toc-item.active')?.scrollIntoView({block: 'center'});
+            }
         });
     }
 
@@ -369,16 +390,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Handle text selection on mobile/touch devices
+    // Show Ask / Explain next to any selection in the book (touch and mouse).
     document.addEventListener('selectionchange', () => {
-        const isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
-        if (!isTouchDevice) return;
-
         const selection = window.getSelection();
         const selectionMenu = document.querySelector('.selection-menu');
         const selectedString = selection.toString().trim();
+        const inBook = selection.rangeCount
+            && document.getElementById('chapter-content').contains(selection.getRangeAt(0).commonAncestorContainer);
 
-        if (!selection.rangeCount || !selectedString) {
+        if (!selection.rangeCount || !selectedString || !inBook) {
             selectionMenu.classList.remove('active');
             return;
         }
@@ -396,15 +416,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Add click handlers to buttons
         document.querySelector('.ask-button').onclick = () => handleSelectionAction('question');
-        document.querySelector('.define-button').onclick = () => handleSelectionAction('definition');
-        document.querySelector('.translate-button').onclick = () => handleSelectionAction('translation');
+        document.querySelector('.explain-button').onclick = () => handleSelectionAction('explanation');
     });
 
     // Handle selection menu actions
     function handleSelectionAction(action) {
-        const selection = window.getSelection();
-        const selectedString = selection.toString().trim();
-        if (!selection.rangeCount || !selectedString) return;
+        // Use the range saved when the menu appeared: clicking a button can
+        // clear the live selection first.
+        if (!selectedRange) return;
+        const selectedString = selectedRange.toString().trim();
+        if (!selectedString) return;
 
         // Create highlight
         const tempHighlight = wrapRangeInHighlight(selectedRange);
@@ -412,10 +433,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Initialize overlay and handle action
         initializeOverlay(tempHighlight, action);
-        if (action === 'definition') {
-            handleDefinitionRequest(selectedString, tempHighlight);
-        } else if (action === 'translation') {
-            handleTranslationRequest(selectedString, tempHighlight);
+        if (action === 'explanation') {
+            handleExplainRequest(selectedString, tempHighlight);
         }
 
         // Hide the selection menu
@@ -423,99 +442,193 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
-// Load book on page load
-window.addEventListener('DOMContentLoaded', () => { 
+// <== READING POSITION ==>
+// The last position is also kept on this device, so reading offline (or
+// through a failed save) never loses your place. `pending` marks a position
+// the server hasn't confirmed yet; it's resent when the connection returns.
+const POSITION_KEY = `position:${filename}`;
+
+function readLocalPosition() {
+    try { return JSON.parse(localStorage.getItem(POSITION_KEY)); } catch { return null; }
+}
+
+function writeLocalPosition(pos) {
+    try { localStorage.setItem(POSITION_KEY, JSON.stringify(pos)); } catch { /* storage full or blocked */ }
+}
+
+async function fetchWithTimeout(url, ms, options = {}) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), ms);
+    try {
+        return await fetch(url, {...options, signal: controller.signal});
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+// Where to open the book: an unsynced local position wins (it's newer than
+// anything the server has), then the server's bookmark, then any local one.
+async function resolveStartPosition() {
+    const local = readLocalPosition();
+    if ((local && local.pending) || !window.IS_AUTHENTICATED) return local;
+    try {
+        const r = await fetchWithTimeout(appUrl(`/bookmark/${filename}`), 2000);
+        if (r.ok) {
+            const d = await r.json();
+            if ('chapter_index' in d) return {chapter: d.chapter_index, position: d.position};
+        }
+    } catch { /* offline or slow: fall through */ }
+    return local;
+}
+
+// <== LOADING THE BOOK ==>
+function showLoadError(message) {
+    document.getElementById('loading-spinner').style.display = 'none';
+    document.getElementById('reader-content').style.display = 'block';
+    const box = document.getElementById('chapter-content');
+    box.replaceChildren();
+    const card = document.createElement('div');
+    card.className = 'reader-message';
+    const p = document.createElement('p');
+    p.textContent = message;
+    const actions = document.createElement('div');
+    actions.className = 'reader-message__actions';
+    const back = document.createElement('a');
+    back.className = 'btn btn-secondary';
+    back.href = appUrl('/');
+    back.textContent = 'Back to library';
+    const retry = document.createElement('button');
+    retry.className = 'btn btn-secondary';
+    retry.textContent = 'Try again';
+    retry.addEventListener('click', () => location.reload());
+    actions.append(back, retry);
+    card.append(p, actions);
+    box.append(card);
+}
+
+window.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('loading-spinner').style.display = 'block';
     // Show controls immediately on load
     document.querySelector('.top-controls').classList.add('visible');
-    
-    fetch(appUrl(`/load_book/${filename}`))
-        .then(response => {
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder("utf-8");
-            let buffer = '';
 
-            function processChunk(chunk) {
-                buffer += chunk;
-                const lines = buffer.split('\n');
-                buffer = lines.pop(); // Keep the last incomplete line
+    const start = await resolveStartPosition();
 
-                for (const line of lines) {
-                    if (!line.trim()) continue;
+    let response;
+    try {
+        // ?v= keys the offline copy to this version of the EPUB (sw.js).
+        response = await fetch(appUrl(`/load_book/${filename}?v=${window.BOOK_VERSION || 0}`));
+    } catch (err) {
+        console.error('Error fetching book:', err);
+        showLoadError(navigator.onLine
+            ? "This book couldn't be opened. Check your connection and try again."
+            : "This book isn't saved on this device yet. Open it once while online to read it offline.");
+        return;
+    }
+    if (!response.ok) {
+        showLoadError(response.status === 404
+            ? 'This book is no longer in the library.'
+            : "This book couldn't be opened.");
+        return;
+    }
 
-                    const data = JSON.parse(line);
-                    switch (data.type) {
-                        case 'metadata':
-                            currentBook = data;
-                            currentChapterNum = currentBook.start_chapter;
-                            currentPagePosition = currentBook.chapter_pos;
-                            displayBookMetadata();
-                            break;
-                        case 'chapter':
-                            currentChapter = data;
-                            chapterNum = currentChapter.index;
-                            hrefChapterMapping[currentChapter.href] = chapterNum;
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder("utf-8");
+    let buffer = '';
 
-                            // Ungrey every TOC entry pointing at this spine index, and
-                            // for synthetic entries (no real NCX) replace the placeholder
-                            // title with the one scraped from the chapter HTML.
-                            document.querySelectorAll(
-                                `#toc-content .toc-item[data-spine-index="${chapterNum}"]`
-                            ).forEach(item => {
-                                item.classList.remove('unprocessed');
-                                if (item.dataset.synthetic === 'true' && currentChapter.title) {
-                                    item.textContent = currentChapter.title;
-                                }
-                            });
+    function processChunk(chunk) {
+        buffer += chunk;
+        const lines = buffer.split('\n');
+        buffer = lines.pop(); // Keep the last incomplete line
 
-                            allChapters[chapterNum] = currentChapter;
-                            if (chapterNum == currentChapterNum) {
-                                document.getElementById('loading-spinner').style.display = 'none';
-                                document.getElementById('reader-content').style.display = 'block';
-                                applyReadingModeClass();
-                                updateReadingModeButton();
-                                displayChapter();
+        for (const line of lines) {
+            if (!line.trim()) continue;
 
-                                // Wait for next paint to ensure content is rendered
-                                requestAnimationFrame(() => {
-                                    if (isPaginated()) {
-                                        relayoutPreservingPosition(currentPagePosition);
-                                    } else {
-                                        jumpScroll(currentPagePosition * document.documentElement.scrollHeight);
-                                    }
-                                });
-                            }
-                    }    
-                }
-            }
-            function readStream() {
-                reader.read().then(({done, value}) => {
-                    if (done) {
-                        if (buffer) {
-                            processChunk('');
-                        }
-                        return;
+            const data = JSON.parse(line);
+            switch (data.type) {
+                case 'metadata':
+                    currentBook = data;
+                    currentChapterNum = start ? start.chapter : currentBook.start_chapter;
+                    currentPagePosition = start ? start.position : currentBook.chapter_pos;
+                    if (!(currentChapterNum >= 0 && currentChapterNum < currentBook.spine_length)) {
+                        currentChapterNum = 0;
+                        currentPagePosition = 0;
                     }
-                    processChunk(decoder.decode(value, {stream: true}));
-                    readStream();
-                }).catch(error => {
-                    console.error('Error reading stream:', error);
-                    document.getElementById('loading-spinner').style.display = 'none';
-                    document.getElementById('chapter-content').innerHTML = 
-                        '<div class="alert alert-danger">Error loading book. Please try again.</div>';
-                });
+                    displayBookMetadata();
+                    break;
+                case 'chapter':
+                    currentChapter = data;
+                    chapterNum = currentChapter.index;
+                    hrefChapterMapping[currentChapter.href] = chapterNum;
+
+                    // Ungrey every TOC entry pointing at this spine index, and
+                    // for synthetic entries (no real NCX) replace the placeholder
+                    // title with the one scraped from the chapter HTML.
+                    document.querySelectorAll(
+                        `#toc-content .toc-item[data-spine-index="${chapterNum}"]`
+                    ).forEach(item => {
+                        item.classList.remove('unprocessed');
+                        if (item.dataset.synthetic === 'true' && currentChapter.title) {
+                            item.textContent = currentChapter.title;
+                        }
+                    });
+
+                    allChapters[chapterNum] = currentChapter;
+                    if (chapterNum == currentChapterNum) {
+                        document.getElementById('loading-spinner').style.display = 'none';
+                        document.getElementById('reader-content').style.display = 'block';
+                        applyReadingModeClass();
+                        updateReadingModeButton();
+                        displayChapter();
+
+                        // Wait for next paint to ensure content is rendered
+                        requestAnimationFrame(() => {
+                            if (isPaginated()) {
+                                relayoutPreservingPosition(currentPagePosition);
+                            } else {
+                                jumpScroll(currentPagePosition * document.documentElement.scrollHeight);
+                            }
+                            updateChapterNumberLabel();
+                        });
+                    }
+                    break;
+                case 'error':
+                    console.error('Error streaming book:', data.message);
+                    if (!allChapters[currentChapterNum]) {
+                        showLoadError("This book couldn't be opened. The file may be damaged.");
+                    }
+                    break;
             }
+        }
+    }
+    function readStream() {
+        reader.read().then(({done, value}) => {
+            if (done) {
+                if (buffer) {
+                    processChunk('\n');
+                }
+                return;
+            }
+            processChunk(decoder.decode(value, {stream: true}));
             readStream();
-        })
+        }).catch(error => {
+            console.error('Error reading stream:', error);
+            if (!allChapters[currentChapterNum]) {
+                showLoadError("This book couldn't be opened. Check your connection and try again.");
+            }
+        });
+    }
+    readStream();
 });
 
 function displayBookMetadata() {
     document.title = currentBook.title;
     document.getElementById('book-title').textContent = currentBook.title;
-    document.getElementById('book-author').textContent = `by ${currentBook.author}`;
+    document.getElementById('book-author').textContent = currentBook.author || 'Unknown author';
 
     const tocContent = document.getElementById('toc-content');
     tocContent.replaceChildren(buildTocList(currentBook.toc || []));
+    tocTitles = {};
+    indexTocTitles(currentBook.toc);
     highlightActiveTocItem();
 }
 
@@ -566,26 +679,65 @@ function updateProgressBar() {
     document.getElementById('chapter-progress').style.width = `${position * 100}%`;
 }
 
+function currentBookmark() {
+    return {chapter_index: currentChapterNum, position: currentPositionFraction()};
+}
+
+function postBookmark(body) {
+    return fetch(appUrl(`/bookmark/${filename}`), {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(body),
+    }).then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        const local = readLocalPosition();
+        // Only clear the flag if nothing newer was recorded meanwhile.
+        if (local && local.chapter === body.chapter_index && local.position === body.position) {
+            writeLocalPosition({...local, pending: false});
+        }
+    });
+}
+
 function saveBookmark() {
     if (!lastSaveTimeout) {
         lastSaveTimeout = setTimeout(() => {
-            const position = currentPositionFraction();
-
-            fetch(appUrl(`/bookmark/${filename}`), {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    chapter_index: currentChapterNum,
-                    position: position
-                })
-            }).catch(error => console.error('Error saving bookmark:', error));
-
+            const body = currentBookmark();
+            // Signed out: the position lives on this device only.
+            writeLocalPosition({chapter: body.chapter_index, position: body.position,
+                                pending: Boolean(window.IS_AUTHENTICATED)});
+            if (window.IS_AUTHENTICATED) {
+                postBookmark(body).catch(error => console.warn('Position saved on this device only:', error));
+            }
             lastSaveTimeout = null;
         }, 1000); // Debounce save for 1 second
     }
 }
+
+// Resend a position that was saved while offline.
+window.addEventListener('online', () => {
+    const local = readLocalPosition();
+    if (local && local.pending) {
+        postBookmark({chapter_index: local.chapter, position: local.position}).catch(() => {});
+    }
+});
+
+// Leaving the page can cancel the debounced save; record the final position
+// locally and send it with a beacon, which survives navigation.
+window.addEventListener('pagehide', () => {
+    if (!currentBook || !window.IS_AUTHENTICATED) {
+        if (currentBook) {
+            const body = currentBookmark();
+            writeLocalPosition({chapter: body.chapter_index, position: body.position, pending: false});
+        }
+        return;
+    }
+    const body = currentBookmark();
+    writeLocalPosition({chapter: body.chapter_index, position: body.position, pending: true});
+    const blob = new Blob([JSON.stringify(body)], {type: 'application/json'});
+    if (navigator.sendBeacon && navigator.sendBeacon(appUrl(`/bookmark/${filename}`), blob)) {
+        // Beacons can't report success; a later successful save clears the flag.
+    }
+});
 
 function displayChapter() {
     const content = allChapters[currentChapterNum].content;
@@ -619,11 +771,49 @@ function nextChapter() {
         saveBookmark();
     }
 
-    if (currentChapterNum === currentBook.spine_length - 1) {
-        fetch(appUrl(`/tag_finished/${filename}`), {
-            method: 'POST'
-        }).catch(error => console.error('Error adding tag:', error));
-    }
+    maybeOfferFinished();
+}
+
+// Near the end, offer to mark the book finished instead of deciding for you:
+// the last sections are often notes or an index, read or not.
+const FINISH_OFFER_AT = 0.9;
+let _finishOffered = false;
+function maybeOfferFinished() {
+    if (_finishOffered || !currentBook || !window.IS_AUTHENTICATED) return;
+    if (bookProgressFraction() < FINISH_OFFER_AT) return;
+    _finishOffered = true;
+    const bar = document.querySelector('.controls');
+    const offer = document.createElement('div');
+    offer.className = 'finish-offer';
+    offer.setAttribute('role', 'status');
+    const text = document.createElement('span');
+    text.textContent = `Finished ${currentBook.title}?`;
+    const yes = document.createElement('button');
+    yes.type = 'button';
+    yes.className = 'btn btn-secondary';
+    yes.textContent = 'Mark as finished';
+    yes.addEventListener('click', async () => {
+        yes.disabled = true;
+        try {
+            const r = await fetch(appUrl(`/tag_finished/${filename}`), {method: 'POST'});
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            text.textContent = 'Marked as finished.';
+            yes.remove();
+            setTimeout(() => offer.remove(), 2500);
+        } catch {
+            text.textContent = "Couldn't save that. Try again.";
+            yes.disabled = false;
+        }
+    });
+    const dismiss = document.createElement('button');
+    dismiss.type = 'button';
+    dismiss.className = 'finish-offer__dismiss';
+    dismiss.setAttribute('aria-label', 'Not yet');
+    dismiss.textContent = '×';
+    dismiss.addEventListener('click', () => offer.remove());
+    offer.append(text, yes, dismiss);
+    bar.prepend(offer);
+    showBottomControls();
 }
 
 function prevChapter() {
@@ -692,7 +882,9 @@ function adjustFontSize(delta) {
 
 window.addEventListener('scroll', () => {
     updateProgressBar();
+    updateChapterNumberLabel();
     saveBookmark();
+    maybeOfferFinished();
 });
 
 const HOVER_CAPABLE = window.matchMedia('(hover: hover)').matches;
@@ -751,13 +943,35 @@ if (HOVER_CAPABLE) {
 document.querySelector('.bottom-trigger')?.addEventListener('mouseenter', showBottomControls);
 
 
+// True when a key press is going into a text field (so shortcuts stay out of it).
+function isTypingTarget(target) {
+    return Boolean(target && target.closest && target.closest('input, textarea, select, [contenteditable]'));
+}
+
 // <== PAGINATED MODE: input + lifecycle ==>
-// Plain arrows = page nav (paginated only). Shift+arrows = section jump
-// (both modes). Avoids stealing keys from inputs or from the existing
-// Cmd/Ctrl+K/D/L selection shortcuts.
+// Plain arrows = a page (paginated) or a screen (scroll). Shift+arrows =
+// section jump. Never steals keys from inputs or modified shortcuts.
+// T contents, +/- text size, N night, Esc closes whatever is open, ? help.
 document.addEventListener('keydown', (e) => {
-    if (e.target.matches('input, textarea')) return;
+    if (isTypingTarget(e.target)) return;
     if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+    if (e.key === 'Escape') {
+        const toc = document.getElementById('toc-menu');
+        if (document.querySelector('.shortcut-help')) closeShortcutHelp();
+        else if (document.querySelector('.search-overlay.active')) closeOverlay();
+        else if (toc.classList.contains('visible')) toc.classList.remove('visible');
+        return;
+    }
+    const hasSelection = Boolean(window.getSelection().toString().trim());
+    if (!e.shiftKey && !hasSelection) {
+        const k = e.key.toLowerCase();
+        if (k === 't') { e.preventDefault(); document.getElementById('menu-toggle').click(); return; }
+        if (k === 'n') { e.preventDefault(); toggleDarkMode(); return; }
+    }
+    if (e.key === '+' || e.key === '=') { e.preventDefault(); adjustFontSize(1); return; }
+    if (e.key === '-' || e.key === '_') { e.preventDefault(); adjustFontSize(-1); return; }
+    if (e.key === '?') { e.preventDefault(); toggleShortcutHelp(); return; }
 
     if (e.shiftKey) {
         if (e.key === 'ArrowRight') {
@@ -770,7 +984,15 @@ document.addEventListener('keydown', (e) => {
         return;
     }
 
-    if (!isPaginated()) return;
+    if (!isPaginated()) {
+        // Scroll mode: arrows move a screen, keeping a couple of lines of overlap.
+        if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+            e.preventDefault();
+            const step = window.innerHeight * 0.85;
+            window.scrollBy({top: e.key === 'ArrowRight' ? step : -step, behavior: 'smooth'});
+        }
+        return;
+    }
     if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') {
         e.preventDefault();
         nextPage();
@@ -779,6 +1001,48 @@ document.addEventListener('keydown', (e) => {
         prevPage();
     }
 });
+
+const SHORTCUTS = [
+    ['← →', 'Previous / next page'],
+    ['Shift + ← →', 'Previous / next section'],
+    ['T', 'Contents'],
+    ['+ −', 'Text size'],
+    ['N', 'Night mode'],
+    ['A', 'Ask about the selected text'],
+    ['E', 'Explain it: define, translate or gloss'],
+    ['Esc', 'Close'],
+    ['?', 'Show these shortcuts'],
+];
+
+function toggleShortcutHelp() {
+    if (document.querySelector('.shortcut-help')) return closeShortcutHelp();
+    const sheet = document.createElement('div');
+    sheet.className = 'shortcut-help';
+    sheet.setAttribute('role', 'dialog');
+    sheet.setAttribute('aria-label', 'Keyboard shortcuts');
+    const list = document.createElement('dl');
+    for (const [keys, what] of SHORTCUTS) {
+        const dt = document.createElement('dt');
+        keys.split(' ').forEach((k, i) => {
+            if (i) dt.append(' ');
+            // The "+" in "Shift + ←" joins keys; elsewhere it's a key.
+            if (k === '+' && keys.startsWith('Shift')) { dt.append(k); return; }
+            const kbd = document.createElement('kbd');
+            kbd.textContent = k;
+            dt.append(kbd);
+        });
+        const dd = document.createElement('dd');
+        dd.textContent = what;
+        list.append(dt, dd);
+    }
+    sheet.append(list);
+    sheet.addEventListener('click', closeShortcutHelp);
+    document.body.append(sheet);
+}
+
+function closeShortcutHelp() {
+    document.querySelector('.shortcut-help')?.remove();
+}
 
 // Interactive chrome that page-level clicks, taps, and swipes ignore.
 const CHROME_SELECTOR =
@@ -802,7 +1066,7 @@ document.addEventListener('click', (e) => {
     }
 });
 
-// <== HORIZONTAL SWIPE: page turn (paginated) / section nav (scroll) ==>
+// <== HORIZONTAL SWIPE: page turn (paginated mode only) ==>
 // Vertical-dominant gestures fall through to normal scrolling, and an active
 // text selection suppresses nav so the selection menu stays usable.
 const SWIPE_MIN_PX = 70;        // ignore short drags
@@ -823,11 +1087,10 @@ document.addEventListener('touchend', (e) => {
     // Require a clearly horizontal swipe past the threshold.
     if (Math.abs(dx) < SWIPE_MIN_PX || Math.abs(dx) < Math.abs(dy) * 1.5) return;
     if (window.getSelection().toString().trim()) return;
-    if (isPaginated()) {
-        if (dx < 0) nextPage(); else prevPage();
-    } else {
-        if (dx < 0) nextChapter(); else prevChapter();
-    }
+    // Paginated only: in scroll mode a slightly diagonal scroll would jump a
+    // whole section. The bottom bar's buttons change section there.
+    if (!isPaginated()) return;
+    if (dx < 0) nextPage(); else prevPage();
 }, {passive: true});
 
 // <== BARS: hide on scroll down, show near the top, tap to toggle ==>
@@ -942,6 +1205,19 @@ function closeOverlay() {
     selectedRange = null;
 }
 
+// Phones: the AI box is a bottom sheet instead of a popover. Keep it above the
+// on-screen keyboard by tracking the visual viewport.
+const SHEET_QUERY = window.matchMedia('(max-width: 640px)');
+function positionSheetAboveKeyboard() {
+    const overlay = document.querySelector('.search-overlay');
+    if (!overlay || !SHEET_QUERY.matches) return;
+    const vv = window.visualViewport;
+    const covered = vv ? Math.max(0, window.innerHeight - vv.height - vv.offsetTop) : 0;
+    overlay.style.bottom = `${covered}px`;
+}
+window.visualViewport?.addEventListener('resize', positionSheetAboveKeyboard);
+window.visualViewport?.addEventListener('scroll', positionSheetAboveKeyboard);
+
 function initializeOverlay(tempHighlight, mode = 'question') {
     const overlay = document.querySelector('.search-overlay');
     const responseContainer = document.querySelector('.search-response-container');
@@ -955,6 +1231,10 @@ function initializeOverlay(tempHighlight, mode = 'question') {
     container.classList.remove('expanded');
     input.value = '';
     
+    if (SHEET_QUERY.matches) {
+        overlay.style.left = overlay.style.top = '';
+        positionSheetAboveKeyboard();
+    } else {
     // Get positions and dimensions
     const highlightRect = tempHighlight.getBoundingClientRect();
     const readerRect = readerContent.getBoundingClientRect();
@@ -979,18 +1259,21 @@ function initializeOverlay(tempHighlight, mode = 'question') {
     } else {
         overlay.style.top = `${window.scrollY + highlightRect.top - overlay.offsetHeight - 5}px`;
     }
+    }
     
     // Configure based on mode
     switch (mode) {
         case 'question':
-            input.placeholder = 'Ask a quick question...';
+            input.placeholder = 'Ask about this…';
             requestAnimationFrame(() => {
                 overlay.classList.add('active');
                 input.focus();
             });
             break;
+        case 'explanation':
         case 'definition':
         case 'translation':
+            input.placeholder = 'Ask a follow-up…';
             requestAnimationFrame(() => {
                 overlay.classList.add('active', 'define-mode');
                 responseContainer.classList.add('active');
@@ -1015,37 +1298,42 @@ function handleTextRequest(selectedString, tempHighlight, endpoint, loadingMessa
 
     responseElement.className = 'thinking-animation';
     responseElement.textContent = loadingMessage;
-    
+
     fetch(endpoint, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
-            [endpoint.includes('translate') ? 'text' : 'word']: selectedString,
+            [endpoint.includes('define_word') ? 'word' : 'text']: selectedString,
             context: context
         })
     })
-    .then(response => response.json())
-    .then(data => {
-        responseElement.className = 'search-response';
-        const result = data.translation || data.definition;
-        responseElement.textContent = result;
-        
-        // Only expand if result is over 150 characters
-        if (result.length > 150) {
-            container.classList.add('expanded');
-        }
-    })
+    .then(response => response.json().catch(() => ({})))
+    .then(data => showAiResult(data.explanation || data.translation || data.definition, data.error))
     .catch(error => {
         console.error(`Error processing request:`, error);
-        responseElement.className = 'search-response';
-        responseElement.textContent = 'Sorry, an error occurred while processing your request.';
+        showAiResult(null, "Couldn't reach the library. Check your connection.");
     });
 }
 
+// Put an AI answer (or the server's plain-language error) in the box.
+function showAiResult(text, error) {
+    const responseElement = document.querySelector('.search-response, .thinking-animation');
+    const container = document.querySelector('.search-container');
+    responseElement.className = 'search-response';
+    responseElement.classList.toggle('search-response--error', !text);
+    responseElement.textContent = text || error || "Couldn't get an answer just now. Try again.";
+    // Long answers get the wider box.
+    if (text && text.length > 150) container.classList.add('expanded');
+}
+
+function handleExplainRequest(selectedString, tempHighlight) {
+    handleTextRequest(selectedString, tempHighlight, appUrl('/explain'), 'Thinking');
+}
+
 function handleDefinitionRequest(selectedString, tempHighlight) {
-    handleTextRequest(selectedString, tempHighlight, appUrl('/define_word'), 'Looking up definition...');
+    handleTextRequest(selectedString, tempHighlight, appUrl('/define_word'), 'Looking it up');
 }
 
 function handleTranslationRequest(selectedString, tempHighlight) {
-    handleTextRequest(selectedString, tempHighlight, appUrl('/translate_text'), 'Translating...');
+    handleTextRequest(selectedString, tempHighlight, appUrl('/translate_text'), 'Translating');
 }

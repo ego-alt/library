@@ -77,6 +77,9 @@ class Book(db.Model):
     access_level = db.Column(db.String(20), nullable=False, default="standard")
     created_at = db.Column(db.DateTime, nullable=False, default=_utcnow)
     uploaded_by = db.Column(db.Integer, db.ForeignKey("users.id"))
+    # Soft delete: set when a book is deleted, cleared by undo. Rows (and their
+    # EPUBs) older than TRASH_RETENTION_DAYS are purged for good.
+    deleted_at = db.Column(db.DateTime, nullable=True, index=True)
 
     # Relationships
     tags = db.relationship(

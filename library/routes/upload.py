@@ -1,19 +1,26 @@
 import base64
 import os
 import re
+import time
 import uuid
 
 from ebooklib import epub
 from flask import Blueprint, current_app, jsonify, request
+from flask_login import current_user
 
-from ..models import Book, db
+from ..models import Book, Tag, book_tags, db
 from ..utils import (
     cover_mimetype,
+    display_author,
+    epub_text_size,
     extract_metadata,
+    fallback_cover_svg,
     get_epub_cover_path,
+    get_epub_structure,
+    guess_cover_mimetype_from_bytes,
     read_epub_cover,
 )
-from ._helpers import commit_or_rollback, json_login_required
+from ._helpers import commit_or_rollback, cover_url, json_login_required
 
 upload_blueprint = Blueprint("upload_routes", __name__)
 
@@ -37,115 +44,184 @@ def generate_filename(title: str, author: str, book_dir: str) -> str:
     return candidate
 
 
+# Uploads wait in BOOK_DIR/.incoming/<id>.epub until the uploader confirms
+# them, so an abandoned upload never shows up as a stray EPUB in the library
+# (and the client never names files on disk).
+INCOMING_DIRNAME = ".incoming"
+INCOMING_MAX_AGE = 24 * 60 * 60  # seconds; older unconfirmed uploads are swept
+_UPLOAD_ID_RE = re.compile(r"^[0-9a-f]{32}$")
+
+
+def _incoming_dir() -> str:
+    path = os.path.join(current_app.config["BOOK_DIR"], INCOMING_DIRNAME)
+    os.makedirs(path, exist_ok=True)
+    return path
+
+
+def _incoming_path(upload_id: str) -> str | None:
+    if not isinstance(upload_id, str) or not _UPLOAD_ID_RE.match(upload_id):
+        return None
+    return os.path.join(_incoming_dir(), f"{upload_id}.epub")
+
+
+def _sweep_incoming():
+    """Remove unconfirmed uploads older than INCOMING_MAX_AGE."""
+    now = time.time()
+    folder = _incoming_dir()
+    for name in os.listdir(folder):
+        path = os.path.join(folder, name)
+        try:
+            if now - os.path.getmtime(path) > INCOMING_MAX_AGE:
+                os.remove(path)
+        except OSError:
+            pass
+
+
 @upload_blueprint.route("/upload_book", methods=["POST"])
 @json_login_required
 def upload_book():
-    """Endpoint to save the uploaded EPUB and return pre-populated metadata."""
-    # Check for the file in the request
-    if "file" not in request.files:
-        return jsonify({"error": "No file part in the request"}), 400
-
+    """Stage an uploaded EPUB and return its metadata for the uploader to
+    review. Nothing is added to the library until /upload_book_metadata."""
+    if "file" not in request.files or request.files["file"].filename == "":
+        return jsonify({"error": "Choose an EPUB file to add."}), 400
     file = request.files["file"]
-    if file.filename == "":
-        return jsonify({"error": "No file selected"}), 400
+    if not file.filename.lower().endswith(".epub"):
+        return jsonify({"error": "Only .epub files can be added."}), 400
 
-    # Validate file format
-    if not file.filename.endswith(".epub"):
-        return jsonify(
-            {"error": "Invalid file format. Please upload an EPUB file"}
-        ), 400
+    _sweep_incoming()
+    upload_id = uuid.uuid4().hex
+    path = _incoming_path(upload_id)
+    file.save(path)
 
-    # Use a temporary filename with timestamp to ensure uniqueness
-    temp_filename = f"temp_{uuid.uuid4().hex}.epub"
-    temp_file_path = os.path.join(current_app.config["BOOK_DIR"], temp_filename)
-    file.save(temp_file_path)
-    current_app.logger.info(f"Temporarily saved uploaded file to {temp_file_path}")
-
-    # Read the EPUB file to extract metadata
     try:
-        epub_book = epub.read_epub(temp_file_path, options={"ignore_ncx": True})
-        table_of_contents = epub_book.get_items_of_type(epub.EpubNav)
-        if not table_of_contents:
-            os.remove(temp_file_path)
+        epub_book = epub.read_epub(path, options={"ignore_ncx": True})
+        if not epub_book.get_items_of_type(epub.EpubNav) and not _has_toc(path):
+            os.remove(path)
             return jsonify(
                 {
-                    "error": "Uploaded EPUB does not contain a table of contents. Quality is questionable."
+                    "error": "This book has no table of contents, so it can't be "
+                    "added. Re-exporting it from Calibre usually fixes this."
                 }
             ), 400
 
-        metadata = extract_metadata(epub_book)
-        title, author = metadata.get("title", ""), metadata.get("author", "")
-        filename = generate_filename(title, author, current_app.config["BOOK_DIR"])
-
-        # Rename the file to standardized name
-        final_file_path = os.path.join(current_app.config["BOOK_DIR"], filename)
-        os.rename(temp_file_path, final_file_path)
-        current_app.logger.info(f"Renamed file to {final_file_path}")
-
-        cover_path = get_epub_cover_path(final_file_path)
-        cover_bytes = read_epub_cover(final_file_path, cover_path)
-        cover_data_url = (
-            f"data:{cover_mimetype(cover_path)};base64,"
-            f"{base64.b64encode(cover_bytes).decode('utf-8')}"
-        )
+        metadata = extract_metadata(epub_book) or {}
+        try:
+            cover_path = get_epub_cover_path(path)
+            cover_bytes = read_epub_cover(path, cover_path)
+            mimetype = guess_cover_mimetype_from_bytes(cover_bytes)
+            mimetype = mimetype or cover_mimetype(cover_path)
+            cover = (
+                f"data:{mimetype};base64,{base64.b64encode(cover_bytes).decode('ascii')}"
+            )
+        except Exception:
+            cover_path = None
+            cover = (
+                "data:image/svg+xml;base64,"
+                + base64.b64encode(fallback_cover_svg(
+                    metadata.get("title", ""), metadata.get("author", "")
+                )).decode("ascii")
+            )
 
         # Cover comes back as an inline data URL because no Book row exists yet
         # to serve via the cached /cover route.
         return jsonify(
             {
-                "filename": filename,
-                "title": title,
-                "author": author,
-                "cover": cover_data_url,
+                "upload_id": upload_id,
+                "title": metadata.get("title", ""),
+                "author": metadata.get("author", ""),
+                "cover": cover,
                 "cover_path": cover_path,
             }
         )
-
     except Exception as e:
-        # Clean up the temporary file if anything goes wrong
-        if os.path.exists(temp_file_path):
-            os.remove(temp_file_path)
-
+        if os.path.exists(path):
+            os.remove(path)
         current_app.logger.error(f"Failed to process EPUB file: {str(e)}")
-        return jsonify({"error": "Failed to process EPUB file: " + str(e)}), 500
+        return jsonify(
+            {"error": "Couldn't read this file. It may be damaged or not a real EPUB."}
+        ), 400
+
+
+def _has_toc(path: str) -> bool:
+    """EPUB 2 books carry their table of contents as an NCX rather than a nav
+    document; accept either."""
+    try:
+        return bool(get_epub_structure(path)["toc"])
+    except Exception:
+        return False
+
+
+@upload_blueprint.route("/upload_book/<upload_id>", methods=["DELETE"])
+@json_login_required
+def cancel_upload(upload_id):
+    """The uploader closed the review panel: discard the staged file."""
+    path = _incoming_path(upload_id)
+    if path and os.path.exists(path):
+        os.remove(path)
+    return jsonify({"message": "Discarded"})
 
 
 @upload_blueprint.route("/upload_book_metadata", methods=["POST"])
 @json_login_required
 def upload_book_metadata():
-    """Endpoint to save metadata for a newly uploaded book (creating a new DB record)."""
-    data = request.get_json()
-    original_filename = data.get("original_filename")
-    new_filename = data.get("new_filename")
-    if not new_filename:
-        return jsonify({"error": "Missing new filename"}), 400
+    """Confirm a staged upload: move it into the library under a filename
+    generated from the (possibly edited) title and author, and create its row.
+    Returns the new book in the same shape as /load_more items."""
+    data = request.get_json() or {}
+    path = _incoming_path(data.get("upload_id"))
+    if not path or not os.path.exists(path):
+        return jsonify(
+            {"error": "This upload has expired. Choose the file again."}
+        ), 400
 
-    if original_filename != new_filename:
-        try:
-            original_filepath = os.path.join(
-                current_app.config["BOOK_DIR"], original_filename
-            )
-            new_filepath = os.path.join(current_app.config["BOOK_DIR"], new_filename)
-            os.rename(original_filepath, new_filepath)
-            current_app.logger.info(
-                f"Renamed file from {original_filepath} to {new_filepath}"
-            )
-        except Exception as e:
-            current_app.logger.error(f"Failed to rename file: {str(e)}")
-            return jsonify({"error": "Failed to rename file: " + str(e)}), 500
+    title = (data.get("title") or "").strip() or "Untitled"
+    author = (data.get("author") or "").strip() or "Unknown author"
+    book_dir = current_app.config["BOOK_DIR"]
+    filename = generate_filename(title, author, book_dir)
+    try:
+        os.replace(path, os.path.join(book_dir, filename))
+    except OSError as e:
+        current_app.logger.error(f"Failed to move upload into library: {e}")
+        return jsonify({"error": "Couldn't save the book file. Try again."}), 500
 
     try:
         with commit_or_rollback():
-            db.session.add(
-                Book(
-                    title=data.get("title"),
-                    author=data.get("author"),
-                    genre=data.get("genre"),
-                    filename=new_filename,
-                    cover_path=data.get("cover_path"),
-                    access_level="standard",
-                )
+            book = Book(
+                title=title[:200],
+                author=author[:200],
+                genre=(data.get("genre") or "").strip()[:100] or None,
+                filename=filename,
+                cover_path=data.get("cover_path"),
+                access_level="standard",
+                uploaded_by=current_user.id,
             )
-        return jsonify({"message": "Book added successfully"})
+            db.session.add(book)
+            db.session.flush()
+            for name in {t.strip()[:50] for t in data.get("tags", []) if t.strip()}:
+                tag = Tag.query.filter_by(name=name, user_id=current_user.id).first()
+                if not tag:
+                    tag = Tag(name=name, user_id=current_user.id)
+                    db.session.add(tag)
+                    db.session.flush()
+                db.session.execute(book_tags.insert().values(
+                    book_id=book.id, tag_id=tag.id, user_id=current_user.id
+                ))
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        current_app.logger.error(f"Failed to add book: {e}")
+        # Put the file back so the uploader can retry.
+        os.replace(os.path.join(book_dir, filename), path)
+        return jsonify(
+            {"error": "Couldn't add the book to the library. Try again."}
+        ), 500
+
+    return jsonify({
+        "message": "Book added",
+        "book": {
+            "filename": book.filename,
+            "title": book.title,
+            "author": display_author(book.author),
+            "cover": cover_url(book, width=400),
+            "length": epub_text_size(os.path.join(book_dir, filename)),
+            "access_level": book.access_level,
+        },
+    })
