@@ -1,64 +1,104 @@
 # Shelves
 
-An EPUB library for the home stack, hung like a gallery wall in warm light: sun through a paper blind by day, a reading lamp at night. The reader leaves all of that behind for a calm, even page.
+A self-hosted EPUB library and reader. Books are presented like works on a gallery wall, with each cover shown at its true proportions under warm light. The reader puts comfort first, with a calm page tuned for long sessions.
 
-![Shelves by day](images/shelves-2026-10.png)
+Shelves runs on its own or as part of the home stack behind the [dashboard](../dashboard), which handles sign-in.
 
-![Shelves at night: covers rest in shadow and come up into the lamplight](images/shelves-night-2026-10.png)
-
-![The reader: a footnote opened in place, and time left in the chapter and book](images/reader-2026-10.png)
-
-![On a phone: the gallery by day and night, a footnote, and a chapter opening](images/phone-2026-10.png)
+![The library by day](images/shelves-2026-10.png)
 
 ## Features
 
-- **The gallery**: covers at their real proportions, five across on a laptop, each labelled with title, author and how far in you are. It opens on what you're reading when something's in progress. A bookshelf view of spines is one tap away.
-- **Find and sort**: one search box for titles, authors, genres and your tags; *All*, *Unread*, *Reading* and *Finished*.
-- **A reader built for long sessions**:
-  - a flat page with softened contrast (about 10:1 by day, 8.6:1 at night);
-  - 70–85 characters a line, generous line spacing and gentle hyphenation;
-  - scroll or paginated, with two-page spreads on wide screens.
-- **Reading aids**:
-  - **time left** in the chapter and book, learned from your own reading speed;
-  - footnotes in a **pop-up** beside the marker, and **↩ Back** after any other jump;
-  - the book's own **structure** kept (centred titles, italics, small caps, poem indents) while its fonts, colours and spacing give way to the reader's.
-- **Ask and Explain**: select text to ask about it, or get a definition, translation or short gloss (Claude; needs `ANTHROPIC_API_KEY`).
-- **Your place everywhere**: saved as you read, on the device and across devices.
-- **Books**: add with **+** or by dropping files, edit details, change covers, mark private, delete with Undo (a 30-day trash).
-- **Phones and offline**: installable; the last 12 books you opened work without a connection. `?` lists the keyboard shortcuts.
+### Library
 
-## Run it
+- **Cover gallery.** Covers keep their original 2:3 shape, five per row on a laptop and fewer as the window narrows. Each label shows the title, the author and, for books in progress, how far you've read. A bookshelf view of spines is also available.
+- **Opens where you left off.** When you have books in progress, the library opens on *Reading*, most recent first.
+- **Search and filter.** One search box matches titles, authors, genres and your tags. Filters cover *All*, *Unread*, *Reading* and *Finished*.
+- **Book management.**
+  - Add EPUBs with **+** or by dropping files onto the page; a single book opens a review panel before it's added.
+  - Edit details and covers, tag books, and mark books private (admins only).
+  - Deleting moves a book to a 30-day trash with **Undo**.
+- **Day and night.** By day, the wall is lit as if through a paper blind. At night, covers rest in shadow and come up into the light as you hover over them.
+
+![The library at night](images/shelves-night-2026-10.png)
+
+### Reader
+
+- **Comfortable by default.**
+  - Each mode has a flat page colour with softened contrast: about 10:1 by day and 8.6:1 at night, avoiding both glare and blooming text.
+  - Lines run 70–85 characters, with generous spacing and gentle hyphenation.
+  - Choose continuous scroll, or pages with two-page spreads on wide screens.
+- **Time left.** The status bar shows the minutes left in the chapter and in the book, estimated from your own reading speed on that device.
+- **Footnotes in place.** A note opens in a pop-up beside its marker, so you don't lose your place. Any other jump inside the book offers **↩ Back to where you were**.
+- **The book's structure, the reader's comfort.** Each book keeps its own centred titles, italics, small caps and poem indents. Its fonts, colours and spacing are replaced with the reader's.
+- **Ask and Explain.** Select text to ask a question about it, or to get a definition, translation or short explanation in context. This uses Claude and needs `ANTHROPIC_API_KEY`.
+- **Your place everywhere.** Progress is saved as you read and synced across devices when you're signed in.
+
+![The reader, with a footnote open](images/reader-2026-10.png)
+
+### Phones and offline
+
+- Built for touch: large tap targets, bottom sheets, and press-and-hold for a book's details.
+- Installable as an app. The last 12 books you opened stay readable offline.
+- Keyboard shortcuts on desktop; press `?` in the reader for the full list.
+
+![On a phone: the library by day and night, a footnote, and a chapter opening](images/phone-2026-10.png)
+
+## Getting started
+
+Requires Python 3.10+ and [uv](https://docs.astral.sh/uv/).
 
 ```sh
 uv sync
-export BOOK_DIR=/path/to/books                 # must exist
+cp .env.example .env        # then set SECRET_KEY and BOOK_DIR
+mkdir -p "$BOOK_DIR"
 uv run flask db upgrade
-uv run flask run --port=8002                   # http://127.0.0.1:8002
+uv run flask run --port=8002
 ```
 
-Or `docker compose up -d`. Settings go in `.env` (see `.env.example`): `SECRET_KEY`, `BOOK_DIR`, and optionally `ANTHROPIC_API_KEY`.
-
-Tests and lint: `uv run pytest` and `uvx ruff check .`
-
-The app also writes `instance/thumbs/` (cover thumbnails), `instance/cache/` (cached covers, sizes and book styles) and `BOOK_DIR/.incoming/` (uploads awaiting confirmation). All are safe to delete.
-
-## Home stack
-
-Served at `/library/` behind the [dashboard](../dashboard)'s nginx, which signs people in. Set:
+Open http://127.0.0.1:8002. To create the first account:
 
 ```sh
-AUTH_PROXY_HEADER=X-Forwarded-User
-APPLICATION_ROOT=/library
+uv run flask create-user <username> <password> --role admin
 ```
 
-The app trusts that header and keeps its own `users` rows for bookmarks and tags; accounts are created on first visit. Commits merged to `master` that pass CI deploy to the Pi on their own (see the dashboard's `docs/DEPLOY.md`), and the container runs `flask db upgrade` when it starts. `MIGRATION.md` has release-specific notes.
+To run with Docker instead: `docker compose up -d`.
+
+### Configuration
+
+| Variable | Purpose |
+|---|---|
+| `SECRET_KEY` | Signs sessions. Required. |
+| `BOOK_DIR` | Folder holding the EPUB files. Must exist. |
+| `ANTHROPIC_API_KEY` | Enables Ask and Explain. Optional. |
+| `AUTH_PROXY_HEADER` | Trust a sign-in header from a proxy, e.g. `X-Forwarded-User`. Optional. |
+| `APPLICATION_ROOT` | Path the app is served under, e.g. `/library`. Optional. |
+| `TRASH_RETENTION_DAYS` | How long deleted books are kept (default 30). Optional. |
+
+### Development
+
+```sh
+uv run pytest            # tests
+uvx ruff check .         # lint
+```
+
+## Behind the dashboard
+
+In the home stack, Shelves is served at `/library/` behind the dashboard's nginx, which signs people in and passes the username on. Set `AUTH_PROXY_HEADER=X-Forwarded-User` and `APPLICATION_ROOT=/library`. Accounts are created automatically on first visit.
+
+Commits merged to `master` that pass CI deploy to the Pi automatically (see the dashboard's [`docs/DEPLOY.md`](../dashboard/docs/DEPLOY.md)). The container applies database migrations on start. Release-specific notes are in [`MIGRATION.md`](MIGRATION.md).
 
 ## Commands
 
-```sh
-uv run flask import-books --directory /path/to/epubs    # add a folder of EPUBs
-uv run flask refresh-cover-paths                        # re-scan cover locations
-uv run flask create-user <username> <password> --role <role>
-uv run flask purge-trash [--days 0]                     # empty the trash (also runs on delete)
-uv run flask backup-db --to /mnt/backup/library-backups [--keep 14]   # online SQLite snapshot
-```
+| Command | Purpose |
+|---|---|
+| `flask import-books --directory <path>` | Add every EPUB in a folder |
+| `flask create-user <username> <password> [--role admin]` | Create an account |
+| `flask refresh-cover-paths` | Re-scan where each book's cover is stored |
+| `flask purge-trash [--days N]` | Permanently remove books deleted more than *N* days ago (also runs automatically on delete) |
+| `flask backup-db --to <path> [--keep N]` | Take a consistent SQLite snapshot while the app is running |
+
+Prefix each with `uv run`. The app also writes cover thumbnails to `instance/thumbs/`, caches to `instance/cache/`, and pending uploads to `BOOK_DIR/.incoming/`. All three can be safely deleted.
+
+## Roadmap
+
+Planned work is tracked in [`docs/roadmap.md`](docs/roadmap.md).
