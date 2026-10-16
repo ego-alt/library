@@ -5,7 +5,7 @@ const filename = window.location.pathname.split('/').pop();
 let allChapters = [];
 let currentChapterNum = 0;
 let currentPagePosition = 0;
-let currentFontSize = parseInt(localStorage.getItem('readerFontSize')) || 16;
+let currentFontSize = parseInt(localStorage.getItem('readerFontSize')) || 17;
 let lastSaveTimeout = null;
 
 let selectedRange = null;
@@ -147,8 +147,43 @@ function pageOfElement(el) {
     return step > 0 ? Math.max(0, Math.floor(x / step)) : 0;
 }
 
+// <== THE BOOK'S OWN DESIGN (a safe subset) ==>
+// The server sends the book's structural styling, filtered and scoped to
+// #chapter-content (see utils.book_style_subset): centred titles, italics,
+// small caps, poem indents, relative sizes.
+function applyBookStyle(css) {
+    let el = document.getElementById('book-style');
+    if (!el) {
+        el = document.createElement('style');
+        el.id = 'book-style';
+        document.head.appendChild(el);
+    }
+    el.textContent = css || '';
+}
+
+// After a chapter renders:
+// - Books pad between blocks with "blank" ones (<div>&nbsp;<br></div>). The
+//   reader already spaces paragraphs, so those add a second, uneven gap: mark
+//   them so CSS can drop them. (CSS alone can't see that &nbsp; is blank.)
+// - Short blocks the book sets noticeably larger than its body text are
+//   headings ("II", "Retribution"), even when they're plain <div>s: mark them
+//   so they get heading weight and spacing.
+function tidyChapter(root) {
+    const base = parseFloat(getComputedStyle(root).fontSize) || 16;
+    root.querySelectorAll('p, div, h1, h2, h3, h4, h5, h6').forEach((el) => {
+        const text = el.textContent.trim();
+        if (!text) {
+            if (!el.querySelector('img, svg, image, hr, table, figure')) el.classList.add('reader-spacer');
+            return;
+        }
+        if (text.length > 120 || el.querySelector('p, div')) return;
+        const size = parseFloat(getComputedStyle(el).fontSize) || base;
+        if (/^H[1-6]$/.test(el.tagName) || size >= base * 1.08) el.classList.add('reader-heading');
+    });
+}
+
 // Whole-book progress in [0, 1]: chapters weighted by size, matching the
-// server's utils.book_progress so the library's "Continue reading" % agrees.
+// server's utils.book_progress so the % under the library's covers agrees.
 function bookProgressFraction() {
     const sizes = (currentBook && currentBook.chapter_sizes) || [];
     const total = sizes.reduce((a, b) => a + b, 0);
@@ -178,15 +213,22 @@ function updateChapterNumberLabel() {
     const title = tocTitles[currentChapterNum]
         || (chapter && chapter.title) || `Section ${currentChapterNum + 1}`;
     const pct = Math.floor(bookProgressFraction() * 100);
-    // Title truncates on narrow screens; the percentage never does.
+    // Title truncates on narrow screens; the time left never does.
     const titleEl = document.createElement('span');
     titleEl.className = 'chapter-number__title';
     titleEl.textContent = title;
-    const pctEl = document.createElement('span');
-    pctEl.className = 'chapter-number__pct';
-    pctEl.textContent = `\u00a0· ${pct}%`;  // nbsp: flex would drop a plain space
-    el.replaceChildren(titleEl, pctEl);
-    el.title = `Section ${currentChapterNum + 1} of ${currentBook.spine_length}`;
+    const left = timeLeft();
+    const timeEl = document.createElement('span');
+    timeEl.className = 'chapter-number__time';
+    // nbsp: flex would drop a plain space. The "in chapter / in book" words
+    // drop on phones (CSS), leaving "· 14 min · 6 h".
+    timeEl.innerHTML = left
+        ? `\u00a0· ${formatMinutes(left.chapter)}<span class="chapter-number__long"> left in chapter</span>`
+          + ` · ${formatMinutes(left.book)}<span class="chapter-number__long"> in book</span>`
+        : `\u00a0· ${pct}%`;
+    el.replaceChildren(titleEl, timeEl);
+    el.title = `${pct}% through the book · section ${currentChapterNum + 1} of ${currentBook.spine_length}`
+        + (left ? ` · at ${Math.round(readingSpeed())} words a minute` : '');
 }
 
 function nextPage() {
@@ -547,6 +589,7 @@ window.addEventListener('DOMContentLoaded', async () => {
             switch (data.type) {
                 case 'metadata':
                     currentBook = data;
+                    applyBookStyle(data.book_css);
                     currentChapterNum = start ? start.chapter : currentBook.start_chapter;
                     currentPagePosition = start ? start.position : currentBook.chapter_pos;
                     if (!(currentChapterNum >= 0 && currentChapterNum < currentBook.spine_length)) {
@@ -741,7 +784,9 @@ window.addEventListener('pagehide', () => {
 
 function displayChapter() {
     const content = allChapters[currentChapterNum].content;
-    document.getElementById('chapter-content').innerHTML = content;
+    const chapterEl = document.getElementById('chapter-content');
+    chapterEl.innerHTML = content;
+    tidyChapter(chapterEl);
 
     // Set bars before layout (paginated geometry depends on them): scroll mode
     // re-shows both each chapter; paginated keeps the current state.
@@ -838,6 +883,7 @@ function prevChapter() {
 
 function jumpToChapter(index, sectionId) {
     if (index < 0 || !allChapters[index]) return;
+    resetSpeedBaseline();   // a jump isn't reading
     currentChapterNum = index;
     displayChapter();
 
@@ -1327,3 +1373,276 @@ function showAiResult(text, error) {
 function handleExplainRequest(selectedString, tempHighlight) {
     handleTextRequest(selectedString, tempHighlight, appUrl('/explain'), 'Thinking');
 }
+
+
+// <== TIME LEFT ==>
+// "14 min left in chapter · 6 h in book", from the text still ahead of you and
+// your own reading speed. Speed starts at a typical 250 words a minute and
+// learns from how fast you actually move through the text on this device
+// (only while the page is visible and you're active; jumps don't count).
+const DEFAULT_WPM = 250;
+const CHARS_PER_WORD = 6;            // average English word plus its space
+const SPEED_KEY = 'readerSpeed';
+const SPEED_SAMPLE_MS = 20000;
+const _chapterChars = {};
+
+function chapterChars(index) {
+    if (_chapterChars[index] != null) return _chapterChars[index];
+    const chapter = allChapters[index];
+    if (chapter) {
+        const doc = new DOMParser().parseFromString(chapter.content, 'text/html');
+        return (_chapterChars[index] = (doc.body.textContent || '').replace(/\s+/g, ' ').trim().length);
+    }
+    // Not streamed in yet: estimate from its file size, scaled by how much of
+    // the loaded chapters' bytes turned out to be text.
+    const sizes = (currentBook && currentBook.chapter_sizes) || [];
+    let text = 0, bytes = 0;
+    Object.keys(_chapterChars).forEach((i) => { text += _chapterChars[i]; bytes += sizes[i] || 0; });
+    return Math.round((sizes[index] || 0) * (bytes > 0 ? text / bytes : 0.5));
+}
+
+function positionInChapter() {
+    if (isPaginated()) return totalPages > 1 ? currentPageIndex / (totalPages - 1) : 0;
+    const max = document.documentElement.scrollHeight - window.innerHeight;
+    return max > 0 ? Math.min(1, Math.max(0, window.scrollY / max)) : 0;
+}
+
+function readSpeedStore() {
+    try { return JSON.parse(localStorage.getItem(SPEED_KEY)) || null; } catch { return null; }
+}
+
+function readingSpeed() {
+    const s = readSpeedStore();
+    if (!s || !s.minutes) return DEFAULT_WPM;
+    // Trust what we've learned in proportion to how much we've seen (5 min = fully).
+    const w = Math.min(1, s.minutes / 5);
+    return DEFAULT_WPM * (1 - w) + s.wpm * w;
+}
+
+function timeLeft() {
+    if (!currentBook || !allChapters[currentChapterNum]) return null;
+    const wpm = readingSpeed();
+    const here = chapterChars(currentChapterNum) * (1 - positionInChapter());
+    let ahead = 0;
+    for (let i = currentChapterNum + 1; i < currentBook.spine_length; i++) ahead += chapterChars(i);
+    const minutes = (chars) => chars / CHARS_PER_WORD / wpm;
+    return {chapter: minutes(here), book: minutes(here + ahead)};
+}
+
+function formatMinutes(m) {
+    if (m < 1) return 'under 1 min';
+    if (m < 60) return `${Math.round(m)} min`;
+    const h = Math.floor(m / 60), rest = Math.round((m % 60) / 5) * 5;
+    if (h >= 10 || rest === 0 || rest === 60) return `${rest === 60 ? h + 1 : h} h`;
+    return `${h} h ${rest} min`;
+}
+
+let _speedBaseline = null;
+let _lastActivity = Date.now();
+function resetSpeedBaseline() { _speedBaseline = null; }
+['scroll', 'keydown', 'touchstart', 'wheel'].forEach((ev) =>
+    window.addEventListener(ev, () => { _lastActivity = Date.now(); }, {passive: true}));
+document.addEventListener('visibilitychange', resetSpeedBaseline);
+
+setInterval(() => {
+    if (!currentBook || !allChapters[currentChapterNum]) return;
+    const now = Date.now();
+    const here = {chapter: currentChapterNum, pos: positionInChapter(), t: now};
+    const b = _speedBaseline;
+    _speedBaseline = here;
+    // Only count stretches where you were actually reading on this page.
+    if (!b || document.hidden || now - _lastActivity > 90000) return;
+    let chars;
+    if (here.chapter === b.chapter) chars = (here.pos - b.pos) * chapterChars(b.chapter);
+    else if (here.chapter === b.chapter + 1) chars = (1 - b.pos) * chapterChars(b.chapter) + here.pos * chapterChars(here.chapter);
+    else return;
+    const minutes = (now - b.t) / 60000;
+    const wpm = chars / CHARS_PER_WORD / minutes;
+    if (!(chars > 0) || wpm < 60 || wpm > 1200) return;   // skimming, jumping or idle
+    const s = readSpeedStore() || {wpm: DEFAULT_WPM, minutes: 0};
+    // A running average weighted by time spent, so long sessions settle it.
+    const weight = Math.min(minutes / (s.minutes + minutes), 0.25);
+    s.wpm = s.wpm * (1 - weight) + wpm * weight;
+    s.minutes += minutes;
+    try { localStorage.setItem(SPEED_KEY, JSON.stringify(s)); } catch { /* storage blocked */ }
+    updateChapterNumberLabel();
+}, SPEED_SAMPLE_MS);
+
+
+// <== NOTES AND JUMPS ==>
+// A footnote opens in a small pop-up beside its marker, so you never leave
+// your place. Any other jump inside the book (a cross-reference, an index
+// entry) shows "↩ Back to where you were".
+function isNoteLink(link, targetId) {
+    const label = link.textContent.trim();
+    if (label.length > 4) return false;
+    const sig = [link.className, link.id, targetId, link.getAttribute('epub:type'), link.getAttribute('role')]
+        .join(' ').toLowerCase();
+    return /note|fn|ftn|noteref/.test(sig) || !!link.closest('sup');
+}
+
+function findInChapter(index, id) {
+    if (!id) return null;
+    if (index === currentChapterNum) return document.getElementById(id);
+    const chapter = allChapters[index];
+    if (!chapter) return null;
+    return new DOMParser().parseFromString(chapter.content, 'text/html').getElementById(id);
+}
+
+document.addEventListener('click', (e) => {
+    const link = e.target.closest('#chapter-content a');
+    if (!link) return;
+    const chapterHref = link.getAttribute('chapter-link');
+    const raw = link.getAttribute('href') || '';
+    if (chapterHref == null && !raw.startsWith('#')) return;   // an outside link
+    e.preventDefault();
+    e.stopPropagation();   // capture phase: beats the link's inline handler
+    const index = chapterHref != null ? hrefChapterMapping[chapterHref] : currentChapterNum;
+    const id = chapterHref != null ? link.getAttribute('section-link') : raw.slice(1);
+    if (index === undefined) return;
+    const target = findInChapter(index, id);
+    if (target && isNoteLink(link, id)) showNote(link, target, index, id);
+    else jumpWithBack(index, id);
+}, true);
+
+// Where you are, as the paragraph at the top of the screen (plus how far into
+// it) rather than a fraction of the page: the page grows as images load, so a
+// fraction drifts; a paragraph doesn't.
+function readingBlocks() {
+    // Innermost blocks only: a wrapper <div> around the whole chapter would
+    // always be "the block at the top".
+    return Array.from(document.querySelectorAll('#chapter-content :is(p, div):not(:has(p, div))'));
+}
+function currentPlace() {
+    const place = {chapter: currentChapterNum, pos: currentPositionFraction(), block: -1, offset: 0};
+    if (isPaginated()) return place;
+    const topBar = document.querySelector('.top-controls.visible')?.offsetHeight || 0;
+    const blocks = readingBlocks();
+    const i = blocks.findIndex((b) => b.getBoundingClientRect().bottom > topBar + 4);
+    if (i >= 0) {
+        place.block = i;
+        place.offset = blocks[i].getBoundingClientRect().top - topBar;
+    }
+    return place;
+}
+function restorePlace(place) {
+    if (isPaginated() || place.block < 0) {
+        if (isPaginated()) relayoutPreservingPosition(place.pos);
+        else jumpScroll(place.pos * document.documentElement.scrollHeight);
+        return;
+    }
+    const block = readingBlocks()[place.block];
+    if (!block) return;
+    const align = () => {
+        const topBar = document.querySelector('.top-controls.visible')?.offsetHeight || 0;
+        jumpScroll(window.scrollY + block.getBoundingClientRect().top - topBar - place.offset);
+    };
+    align();
+    // Images above it may still be loading and pushing it down: keep it pinned
+    // while the page settles, unless you start scrolling yourself.
+    const chapterEl = document.getElementById('chapter-content');
+    const ro = new ResizeObserver(align);
+    ro.observe(chapterEl);
+    const stop = () => {
+        ro.disconnect();
+        ['wheel', 'touchstart', 'keydown'].forEach((ev) => window.removeEventListener(ev, stop));
+    };
+    ['wheel', 'touchstart', 'keydown'].forEach((ev) => window.addEventListener(ev, stop, {passive: true}));
+    setTimeout(stop, 2000);
+}
+
+function jumpWithBack(index, id) {
+    const from = currentPlace();
+    closeNote();
+    const target = index === currentChapterNum && !isPaginated() && id ? document.getElementById(id) : null;
+    if (target) {
+        // Same chapter: just scroll. Re-rendering would reset the images above
+        // your old place, and "Back" would then land somewhere else.
+        resetSpeedBaseline();
+        const topBar = document.querySelector('.top-controls.visible')?.offsetHeight || 0;
+        jumpScroll(window.scrollY + target.getBoundingClientRect().top - topBar - currentFontSize * 2);
+        saveBookmark();
+    } else {
+        jumpToChapter(index, id);
+    }
+    showBackPill(from);
+}
+
+function showBackPill(from) {
+    let pill = document.getElementById('back-pill');
+    if (!pill) {
+        pill = document.createElement('div');
+        pill.id = 'back-pill';
+        pill.className = 'back-pill';
+        pill.innerHTML = '<button type="button" class="back-pill__go">↩ Back to where you were</button>'
+            + '<button type="button" class="back-pill__close" aria-label="Dismiss">×</button>';
+        document.body.appendChild(pill);
+        pill.querySelector('.back-pill__close').addEventListener('click', () => { pill.hidden = true; });
+    }
+    pill.hidden = false;
+    pill.querySelector('.back-pill__go').onclick = () => {
+        pill.hidden = true;
+        resetSpeedBaseline();
+        // Same chapter: just scroll back (no re-render, so nothing moves).
+        if (from.chapter !== currentChapterNum) jumpToChapter(from.chapter);
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+            restorePlace(from);
+            updateProgressBar();
+            updateChapterNumberLabel();
+            saveBookmark();
+        }));
+    };
+}
+
+let _noteEl = null;
+function closeNote() {
+    if (_noteEl) { _noteEl.remove(); _noteEl = null; }
+}
+
+function showNote(link, target, index, id) {
+    closeNote();
+    // The note's text lives in the block around its anchor.
+    const block = target.closest('p, li, aside, div, section') || target;
+    const body = block.cloneNode(true);
+    body.querySelectorAll('[id]').forEach((el) => el.removeAttribute('id'));
+    // Drop the note's own number/back-link at the start; neutralise other links.
+    body.querySelectorAll('a').forEach((a, i) => {
+        if (i === 0 && a.textContent.trim().length <= 4 && body.textContent.trim().startsWith(a.textContent.trim())) a.remove();
+        else a.replaceWith(...a.childNodes);
+    });
+    // …and the punctuation that followed it ("1. The suit…" → "The suit…").
+    const walker = document.createTreeWalker(body, NodeFilter.SHOW_TEXT);
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+        if (!n.textContent.trim()) continue;
+        n.textContent = n.textContent.replace(/^[\s.:)\]]+/, '');
+        break;
+    }
+    const note = document.createElement('div');
+    note.className = 'note-popover';
+    note.setAttribute('role', 'dialog');
+    note.setAttribute('aria-label', `Note ${link.textContent.trim()}`);
+    note.innerHTML = `<div class="note-popover__head"><span>Note ${link.textContent.trim()}</span>`
+        + '<button type="button" class="note-popover__close" aria-label="Close">×</button></div>'
+        + '<div class="note-popover__body"></div>'
+        + '<button type="button" class="note-popover__open">Open in the notes →</button>';
+    note.querySelector('.note-popover__body').append(...body.childNodes);
+    document.body.appendChild(note);
+    note.querySelector('.note-popover__close').addEventListener('click', closeNote);
+    note.querySelector('.note-popover__open').addEventListener('click', () => jumpWithBack(index, id));
+
+    // Beside the marker: below it if there's room, else above; kept on screen.
+    const r = link.getBoundingClientRect();
+    const w = Math.min(420, window.innerWidth - 24);
+    note.style.width = `${w}px`;
+    const left = Math.max(12, Math.min(window.innerWidth - w - 12, r.left + r.width / 2 - w / 2));
+    const h = note.offsetHeight;
+    const below = r.bottom + 10 + h < window.innerHeight;
+    note.style.left = `${left + window.scrollX}px`;
+    note.style.top = `${(below ? r.bottom + 10 : Math.max(12, r.top - 10 - h)) + window.scrollY}px`;
+    _noteEl = note;
+}
+
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeNote(); });
+document.addEventListener('pointerdown', (e) => {
+    if (_noteEl && !_noteEl.contains(e.target) && !e.target.closest('#chapter-content a')) closeNote();
+});

@@ -7,7 +7,7 @@ from flask_login import current_user
 
 from ..choices import AccessLevelChoice, UserRoleChoice
 from ..models import Book, db
-from ..utils import spine_chapter_sizes
+from ..utils import book_style_subset, spine_chapter_sizes
 
 
 def json_login_required(view):
@@ -93,6 +93,25 @@ def chapter_sizes(book: Book) -> list[int]:
             sizes = []
         cache.set(key, sizes, timeout=86400)
     return sizes
+
+
+def book_css(book: Book) -> str:
+    """Cached structural styling for the reader (see utils.book_style_subset),
+    keyed on (book id, file mtime)."""
+    mtime = book_mtime(book)
+    if mtime is None:
+        return ""
+
+    # Local import to avoid circular import via library/__init__.py.
+    from .. import cache
+
+    key = f"book_css:{book.id}:{mtime}"
+    css = cache.get(key)
+    if css is None:
+        path = os.path.join(current_app.config["BOOK_DIR"], book.filename)
+        css = book_style_subset(path)
+        cache.set(key, css, timeout=86400)
+    return css
 
 
 def user_can_access_book(book: Book) -> bool:

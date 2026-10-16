@@ -1,50 +1,95 @@
 /* Shared base (tokens + primitives) lives in structural.css; colours in
  * tokens.css (both loaded by the template). */
-html, body {
+/* ======================================================================
+ * Shelves: covers hung like a gallery wall, in warm light seen through
+ * something translucent — sun through a paper blind by day (from the upper
+ * left), a lamp through a parchment shade at night (from above). The light
+ * is a glow behind the page plus a fine paper grain over it (the grain is what
+ * makes it read as light *through* a material, not a gradient); panels are
+ * frosted glass that lets it through. The reader (reader.css) deliberately
+ * has none of this: a flat, even page is easier on the eyes.
+ * ====================================================================== */
+:root {
+    --glow: rgba(255, 184, 108, 0.34);
+    --glow-2: rgba(255, 210, 160, 0.20);
+    --glow-at: 20% -8%;
+    --glow-2-at: 92% 108%;
+    --room: #f5f0e7;
+    --room-edge: #e6dccb;
+    --pane: rgba(247, 242, 233, 0.9);         /* frosted cards over busy covers */
+    --pane-edge: rgba(255, 255, 255, 0.55);
+    /* Paper grain: warm specks, multiplied in. */
+    --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .42 0 0 0 0 .33 0 0 0 0 .22 0 0 0 .32 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    --grain-blend: multiply;
+}
+.dark-mode {
+    --glow: rgba(255, 170, 88, 0.22);
+    --glow-2: rgba(255, 140, 70, 0.07);
+    --glow-at: 50% -6%;      /* a lamp hanging above */
+    --glow-2-at: 50% 120%;
+    --room: #1f1a15;
+    --room-edge: #0b0a09;
+    --pane: rgba(28, 24, 20, 0.9);
+    --pane-edge: rgba(255, 220, 170, 0.08);
+    /* At night the grain is the lit fibres of the shade: pale specks, screened in. */
+    --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 .86 0 0 0 0 .66 0 0 0 .10 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    --grain-blend: screen;
+}
+/* The light lives on <html>, fixed to the window, so it stays put as you
+   scroll; the page itself is clear. */
+html {
+    background:
+        var(--grain),
+        radial-gradient(ellipse 62% 58% at var(--glow-at), var(--glow), transparent 72%),
+        radial-gradient(ellipse 55% 50% at var(--glow-2-at), var(--glow-2), transparent 72%),
+        radial-gradient(ellipse 150% 115% at 40% 25%, var(--room) 30%, var(--room-edge));
     background-color: var(--color-bg-base);
+    background-blend-mode: var(--grain-blend), normal, normal, normal;
+    background-attachment: fixed;
+    min-height: 100%;
 }
 body {
+    background: transparent;
     font-family: var(--font-sans);
 }
 
 /* Unified type for top-level headings (overrides Bootstrap's reboot). */
 h1 { font-size: var(--text-xl); font-weight: 550; letter-spacing: -0.01em; line-height: 1.2; }
 h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
-.header-row {
+/* The bar all but disappears: the name in spaced capitals on the left, the
+   few actions on the right, no rule. */
+.lib-bar { margin-bottom: 4px; }
+.lib-bar__inner {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    width: 100%;
+    gap: var(--space-3);
+    height: 72px;
 }
-.header-left {
-    display: flex;
-    justify-content: flex-start;
-    position: absolute;
-    left: 0;
-}
-.header-right {
-    display: flex;
-    justify-content: flex-end;
-    position: absolute;
-    right: 0;
-}
-.header-left button, .header-right button {
-    margin-left: var(--space-3);
-}
-.header-row h1 {
-    color: var(--color-text-muted);
+.lib-bar__where { display: flex; align-items: baseline; gap: var(--space-2); min-width: 0; }
+.lib-bar__title {
     margin: 0;
+    font-size: 1.125rem;
+    font-weight: 600;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    color: var(--color-text-primary);
 }
-.library {
-    margin-bottom: var(--space-8);
+.lib-bar__actions { display: flex; align-items: center; gap: var(--space-1); }
+/* The hang: covers at book proportions (2:3, so nothing important is
+   cropped), five across on a laptop, equally spaced, stepping down to 4, 3
+   and 2 as the window narrows (equal columns and one fixed gap keep the
+   spacing even at every width). */
+.library.row {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 40px 28px;
+    margin: 0 0 var(--space-8);
 }
-/* Phones show 2 covers per row (col-6); Bootstrap's default 1.5rem gutter
- * eats too much of that width, so tighten it below the sm breakpoint. */
-@media (max-width: 640px) {
-    .library {
-        --bs-gutter-x: 0.75rem;
-    }
-}
+.library.row > * { width: auto; max-width: none; padding: 0; margin: 0; }
+@media (max-width: 991.98px) { .library.row { grid-template-columns: repeat(4, 1fr); } }
+@media (max-width: 767.98px) { .library.row { grid-template-columns: repeat(3, 1fr); gap: 36px 24px; } }
+@media (max-width: 640px)    { .library.row { grid-template-columns: repeat(2, 1fr); gap: 32px 20px; } }
 .library img {
     position: absolute;
     top: 0;
@@ -52,19 +97,60 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     width: 100%;
     height: 100%;
     object-fit: cover;
-    transition: transform 0.2s;
 }
+/* Hung slightly off the wall: square corners, a soft drop shadow. */
 .book {
     position: relative;
     width: 100%;
-    padding-top: 133%;
+    aspect-ratio: 2 / 3;
     overflow: hidden;
-    border-radius: var(--radius-md);
-    box-shadow: 0 2px 6px var(--color-shadow);
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.08), 0 18px 30px -16px rgba(0, 0, 0, 0.35);
     cursor: pointer;
+    transition: box-shadow 0.35s ease;
 }
-.book:hover img {
-    transform: scale(1.05);
+.book:hover { box-shadow: 0 1px 1px rgba(0, 0, 0, 0.08), 0 26px 40px -18px rgba(0, 0, 0, 0.45); }
+/* At night covers rest in shadow and the one you're over comes up into the
+   lamplight. Touch screens can't hover, so there every cover sits in the light. */
+.dark-mode .book { box-shadow: 0 20px 40px -18px rgba(0, 0, 0, 0.9); }
+.dark-mode .book img {
+    filter: brightness(0.72) saturate(0.9);
+    transition: filter 0.35s ease;
+}
+.dark-mode .book:hover img,
+.dark-mode .book:focus-within img { filter: brightness(1.04) saturate(1); }
+.dark-mode .book:hover {
+    box-shadow: 0 0 0 1px rgba(255, 214, 160, 0.18), 0 0 60px -6px rgba(255, 190, 110, 0.35), 0 24px 44px -18px rgba(0, 0, 0, 0.9);
+}
+@media (hover: none) {
+    .dark-mode .book img { filter: brightness(0.95); }
+}
+/* The wall label: title, then author (and how far in you are) in spaced
+   small capitals. */
+.book-caption {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-top: 16px;
+}
+.book-caption__title {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    line-height: 1.3;
+    color: var(--color-text-primary);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+.book-caption__author {
+    font-size: 0.75rem;
+    font-variant: small-caps;
+    letter-spacing: 0.16em;
+    text-transform: lowercase;
+    color: var(--color-text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 /* Hidden with opacity, not display, so the button stays keyboard-focusable
    (and focus can return to it when the details panel closes). */
@@ -87,7 +173,6 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 /* The cover link fills the card, so it has a real hit area and focus ring. */
 .book > a { position: absolute; inset: 0; display: block; border-radius: inherit; }
 .book > a:focus-visible { outline: 3px solid var(--color-accent); outline-offset: -3px; }
-.book > a:focus-visible img { transform: scale(1.05); }
 /* Touch devices have no hover, so the cover's download/metadata buttons would
  * be unreachable. Surface them permanently in grid view. (Shelf spines are too
  * narrow to carry the stacked buttons legibly, so they stay tap-to-read only.) */
@@ -262,7 +347,7 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     box-shadow: none;
 }
 .dark-mode .book-spine:not(.book-spine--skeleton) {
-    filter: brightness(0.65);
+    filter: brightness(0.85);
 }
 
 /* ============================================================
@@ -317,7 +402,7 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     left: 0;
     width: 100%;
     height: 100%;
-    background: var(--color-bg-overlay);
+    background: rgba(30, 22, 14, 0.28);
     z-index: 1000;
     justify-content: center;
     align-items: center;
@@ -327,18 +412,24 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 /* ============================================================
    Metadata panel — sleeker rebuild
    ============================================================ */
+/* Frosted glass: the glow shows softly through the details card and sign-in. */
 .metadata-content {
-    background: var(--color-bg-base);
+    background: var(--pane);
+    -webkit-backdrop-filter: blur(22px) saturate(1.25);
+    backdrop-filter: blur(22px) saturate(1.25);
+    border: 1px solid var(--pane-edge);
     border-radius: var(--radius-lg);
     max-width: 680px;
     width: 92%;
     max-height: 90vh;
     overflow-y: auto;
     position: relative;
-    box-shadow: 0 8px 24px var(--color-shadow);
+    box-shadow: inset 0 1px 0 var(--pane-edge), 0 18px 40px -20px rgba(40, 25, 10, 0.45);
     animation: slideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
     padding: var(--space-5);
 }
+.dark-mode .metadata-overlay,
+.dark-mode .login-overlay { background: rgba(0, 0, 0, 0.45); }
 @keyframes slideIn {
     from { transform: translateY(var(--space-5)); opacity: 0; }
     to   { transform: translateY(0);              opacity: 1; }
@@ -351,10 +442,10 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 }
 .meta-title,
 .meta-title-input {
-    font-size: var(--text-lg);
-    font-weight: 700;
+    font-size: 1.5rem;
+    font-weight: 600;
     line-height: 1.2;
-    color: var(--color-text-secondary);
+    color: var(--color-text-primary);
     margin: 0;
     letter-spacing: -0.01em;
 }
@@ -362,7 +453,6 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     display: block;
     resize: none;
     overflow: hidden;
-    font-family: inherit;
 }
 .meta-title-input,
 .meta-author-input {
@@ -513,21 +603,19 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 }
 
 /* --- Buttons (preserve legacy class names so JS keeps working) --- */
-/* One primary button for the whole app: dark ink on paper (light mode),
-   parchment on charcoal (night). Overrides the shared accent fill, which
-   reads as a link colour against this palette. */
+/* One primary button for the whole app, in the accent blue. */
 .btn-primary {
-    background: var(--color-text-secondary);
-    border-color: var(--color-text-secondary);
-    color: var(--color-bg-base);
+    background: var(--color-accent);
+    border-color: var(--color-accent);
+    color: var(--color-on-accent);
     font-size: var(--text-sm);
     font-weight: 600;
     padding: var(--space-2) var(--space-4);
 }
 .btn-primary:hover:not(:disabled) {
-    background: var(--color-text-primary);
-    border-color: var(--color-text-primary);
-    color: var(--color-bg-base);
+    background: var(--color-accent-hover);
+    border-color: var(--color-accent-hover);
+    color: var(--color-on-accent);
 }
 .btn-primary:active:not(:disabled) { transform: translateY(1px); }
 .delete-book-button {
@@ -693,23 +781,17 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 .tag .remove-tag:hover {
     opacity: 1;
 }
-.header-row {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    position: relative;
-}
 .login-button, .upload-button, .dark-mode-toggle, .layout-toggle {
     background: none;
     border: none;
-    font-size: var(--text-lg);
-    color: var(--color-text-primary);
+    font-size: var(--text-base);
+    color: var(--color-text-muted);
     padding: var(--space-2);
     cursor: pointer;
     transition: color 0.2s;
 }
 .login-button:hover, .upload-button:hover, .dark-mode-toggle:hover, .layout-toggle:hover {
-    color: var(--color-text-secondary);
+    color: var(--color-accent);
 }
 .layout-toggle.active {
     color: var(--color-accent);
@@ -718,17 +800,8 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     color: var(--color-accent);
     opacity: 0.8;
 }
-/* Narrow screens: up to 6 icon buttons flank the centered title via absolutely-
- * positioned groups. Shrink the icons, their spacing, and the title so they
- * don't crowd (or overlap) each other on phones. */
 @media (max-width: 640px) {
-    .header-left button, .header-right button { margin-left: var(--space-1); }
-    .login-button, .upload-button,
-    .dark-mode-toggle, .layout-toggle {
-        font-size: var(--text-base);
-        padding: var(--space-1);
-    }
-    .header-row h1 { font-size: var(--text-lg); }
+    .lib-bar { margin-bottom: var(--space-4); }
 }
 .login-overlay {
     display: none;
@@ -737,20 +810,23 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     left: 0;
     width: 100%;
     height: 100%;
-    background: var(--color-bg-overlay);
+    background: rgba(30, 22, 14, 0.28);
     z-index: 1000;
     justify-content: center;
     align-items: center;
     backdrop-filter: blur(5px);
 }
 .login-content {
-    background: var(--color-bg-base);
+    background: var(--pane);
+    -webkit-backdrop-filter: blur(22px) saturate(1.25);
+    backdrop-filter: blur(22px) saturate(1.25);
+    border: 1px solid var(--pane-edge);
     padding: var(--space-5);
     border-radius: var(--radius-lg);
     max-width: 400px;
     width: 90%;
     position: relative;
-    box-shadow: 0 8px 24px var(--color-shadow);
+    box-shadow: inset 0 1px 0 var(--pane-edge), 0 18px 40px -20px rgba(40, 25, 10, 0.45);
     animation: slideIn 0.3s ease-out;
 }
 .login-content h3 {
@@ -798,120 +874,13 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 #loginError {
     margin-bottom: var(--space-5);
 }
-.dark-mode .book img {
-    filter: brightness(0.6);
-}
+
 /* Specificity (0,1,1) beats Bootstrap's `.form-control` (0,1,0), so the
  * override sticks without `!important`. */
 .dark-mode input,
 .dark-mode textarea {
     color: var(--color-text-secondary);
 }
-/* ============================================================
-   Continue reading — the books you're in the middle of, newest
-   first, one tap from launch to where you left off
-   ============================================================ */
-.continue-reading {
-    margin-bottom: var(--space-8);
-}
-.continue-reading__label {
-    color: var(--color-text-muted);
-    font-size: var(--text-sm);
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    margin: 0 0 var(--space-3);
-}
-.continue-reading__list {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-    gap: var(--space-3);
-}
-.continue-card {
-    display: flex;
-    gap: var(--space-3);
-    align-items: center;
-    padding: var(--space-3);
-    background: var(--color-bg-inset);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    color: inherit;
-    text-decoration: none;
-    min-width: 0;
-    transition: box-shadow var(--dur-base) ease, border-color var(--dur-base) ease;
-}
-.continue-card:hover,
-.continue-card:focus-visible {
-    color: inherit;
-    border-color: var(--color-text-muted);
-    box-shadow: 0 2px 8px var(--color-shadow);
-}
-.continue-card:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
-.continue-card__cover {
-    flex: 0 0 auto;
-    width: 52px;
-    aspect-ratio: 2 / 3;
-    object-fit: cover;
-    border-radius: var(--radius-sm);
-    box-shadow: 0 1px 4px var(--color-shadow);
-    background: var(--color-highlight-soft);
-}
-.dark-mode .continue-card__cover { filter: brightness(0.8); }
-.continue-card__text {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
-    flex: 1;
-}
-.continue-card__title {
-    color: var(--color-text-secondary);
-    font-weight: 600;
-    line-height: 1.3;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    overflow-wrap: anywhere;
-}
-.continue-card__author {
-    color: var(--color-text-muted);
-    font-size: var(--text-sm);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-.continue-card__progress {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-    margin-top: var(--space-1);
-}
-.continue-card__bar {
-    flex: 1;
-    height: 3px;
-    border-radius: var(--radius-pill);
-    background: var(--color-border);
-    overflow: hidden;
-}
-.continue-card__bar > span {
-    display: block;
-    height: 100%;
-    background: var(--color-accent);
-    border-radius: inherit;
-}
-.continue-card__pct {
-    color: var(--color-text-muted);
-    font-size: var(--text-sm);
-    font-variant-numeric: tabular-nums;
-    min-width: 3.5ch;
-    text-align: right;
-}
-@media (max-width: 640px) {
-    .continue-reading { margin-bottom: var(--space-5); }
-    .continue-reading__list { grid-template-columns: 1fr; gap: var(--space-2); }
-}
-
 /* Toast action (e.g. Undo after delete) */
 .notice {
     display: flex;
@@ -963,14 +932,15 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 .is-unavailable:hover { opacity: 0.55; }
 
 /* ============================================================
-   Library toolbar — one search box + reading-status control
+   Library toolbar — one search box + reading-status control, as
+   hairlines and underlines rather than boxes and pills
    ============================================================ */
 .library-toolbar {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: var(--space-3);
-    margin-bottom: var(--space-5);
+    margin: 0 0 40px;
 }
 .library-search {
     position: relative;
@@ -979,54 +949,53 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 }
 .library-search > i {
     position: absolute;
-    left: var(--space-3);
+    left: 0;   /* flush left, under the name */
     top: 50%;
     transform: translateY(-50%);
     color: var(--color-text-muted);
-    font-size: var(--text-sm);
+    font-size: 1rem;
     pointer-events: none;
 }
 .library-search__input {
     width: 100%;
     height: 40px;
-    padding: 0 var(--space-3) 0 calc(var(--space-3) + 22px);
-    background: var(--color-bg-inset);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-pill);
+    padding: 0 var(--space-3) 0 28px;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid var(--color-border);
+    border-radius: 0;
     color: var(--color-text-primary);
     font: inherit;
-    font-size: var(--text-base);
+    font-size: 1.125rem;
     transition: border-color var(--dur-base) ease;
 }
 .library-search__input::placeholder { color: var(--color-text-muted); }
 .library-search__input:focus { outline: none; border-color: var(--color-accent); }
 
-/* Segmented radio group, used for the library view and the details panel. */
+/* Radio group of words with an underline on the chosen one; used for the
+   library view and the details panel. */
 .status-filter {
     display: inline-flex;
-    padding: 3px;
-    gap: 2px;
-    background: var(--color-bg-inset);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-pill);
+    gap: 20px;
 }
 .status-filter button {
     border: none;
+    border-bottom: 1px solid transparent;
     background: transparent;
     color: var(--color-text-muted);
     font: inherit;
-    font-size: var(--text-sm);
+    font-size: 1.0625rem;
     font-weight: 500;
-    padding: 0 var(--space-3);
-    min-height: 32px;
-    border-radius: var(--radius-pill);
+    padding: 0;
+    min-height: 28px;
     cursor: pointer;
-    transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease;
+    transition: color var(--dur-fast) ease, border-color var(--dur-fast) ease;
 }
+.meta-status button { font-size: var(--text-sm); }
 .status-filter button:hover { color: var(--color-text-primary); }
 .status-filter button[aria-checked="true"] {
-    background: var(--color-text-secondary);
-    color: var(--color-bg-base);
+    color: var(--color-text-primary);
+    border-bottom-color: var(--color-accent);
 }
 .status-filter button:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }
 .meta-status { align-self: flex-start; }
@@ -1034,6 +1003,7 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     .library-search { max-width: none; flex-basis: 100%; }
     .library .status-filter, .library-toolbar .status-filter { width: 100%; }
     .library-toolbar .status-filter button { flex: 1; min-height: 40px; }
+    .library-toolbar { margin-bottom: 28px; }
 }
 
 .empty-state {
@@ -1052,14 +1022,13 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     padding-right: max(calc(var(--bs-gutter-x, 1.5rem) * 0.5), env(safe-area-inset-right, 0px));
     padding-bottom: env(safe-area-inset-bottom, 0px);
 }
-.header-row { padding-top: env(safe-area-inset-top, 0px); }
+.lib-bar { padding-top: env(safe-area-inset-top, 0px); }
 /* Header icons stay small but get a 44px hit area. */
-.header-left .btn, .header-right .btn {
+.lib-bar__actions .btn {
     min-width: 44px;
     min-height: 44px;
 }
 @media (max-width: 640px) {
-    .header-left button, .header-right button { margin-left: 0; }
     /* 16px stops iOS zooming the page when an input is focused. */
     .meta-input, .meta-author-input, .tag-input-container input,
     .login-field input:not([type="checkbox"]) {
@@ -1131,7 +1100,7 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 
 /* Long-press opens details on touch; stop iOS selecting text or showing the
    link preview under the finger. */
-#library .book, #library .book-spine, .continue-card {
+#library .book, #library .book-spine {
     -webkit-touch-callout: none;
     -webkit-user-select: none;
     user-select: none;

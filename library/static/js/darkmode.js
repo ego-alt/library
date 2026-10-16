@@ -22,7 +22,7 @@ function updateDarkModeIcon() {
     if (icon) {
         // Shows the mode a click switches to: the sun at night, the moon by day.
         const dark = document.documentElement.classList.contains('dark-mode');
-        icon.className = dark ? 'fas fa-sun' : 'fas fa-moon';
+        icon.className = dark ? 'fas fa-circle' : 'fas fa-moon';
         const button = icon.closest('button');
         if (button) {
             button.setAttribute('aria-label', dark ? 'Day mode' : 'Night mode');

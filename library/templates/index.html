@@ -20,11 +20,11 @@
         window.totalBooks = {{ total_books|default(0) }};
         window.initialBookCount = {{ images|length }};
     </script>
-    <title>Library</title>
+    <title>Shelves</title>
     <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
     <link rel="manifest" href="{{ url_for('pwa.manifest') }}">
-    <meta name="theme-color" content="#FFF1E5" media="(prefers-color-scheme: light)">
-    <meta name="theme-color" content="#282828" media="(prefers-color-scheme: dark)">
+    <meta name="theme-color" content="#f6f4ef" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#141210" media="(prefers-color-scheme: dark)">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="Library">
     <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
@@ -38,18 +38,20 @@
     <link href="{{ url_for('static', filename='css/index.css') }}" rel="stylesheet">
 </head>
 <body>
-    <div class="container">
-        <div class="header-row my-4">
-            <div class="header-left">
-                <button class="dark-mode-toggle btn btn-ghost" onclick="toggleDarkMode()" aria-label="Night mode" title="Night mode">
-                    <i id="dark-mode-icon" class="fas fa-moon" aria-hidden="true"></i>
-                </button>
+    {# A slim paper bar like the other apps' chrome: the name on the left, the
+       few actions on the right. #}
+    <header class="lib-bar">
+        <div class="lib-bar__inner container">
+            <div class="lib-bar__where">
+                <h1 class="lib-bar__title">Shelves</h1>
+            </div>
+            <div class="lib-bar__actions">
                 <button class="layout-toggle btn btn-ghost" id="layoutToggle" onclick="toggleLayout()" aria-pressed="false" aria-label="Bookshelf view" title="Switch to bookshelf view">
                     <i id="layout-toggle-icon" class="fas fa-grip-vertical" aria-hidden="true"></i>
                 </button>
-            </div>
-            <h1 class="header-title m-0">Library</h1>
-            <div class="header-right">
+                <button class="dark-mode-toggle btn btn-ghost" onclick="toggleDarkMode()" aria-label="Night mode" title="Night mode">
+                    <i id="dark-mode-icon" class="fas fa-moon" aria-hidden="true"></i>
+                </button>
                 {# Standalone only: a Sign in button when signed out. There's no
                    sign-out button (kept light, like tapes); behind the dashboard
                    proxy, signing in and out is the dashboard's job. #}
@@ -65,27 +67,8 @@
                 {% endif %}
             </div>
         </div>
-        {% if continue_books %}
-        <section class="continue-reading" id="continueReading" aria-labelledby="continueReadingLabel">
-            <h2 class="continue-reading__label" id="continueReadingLabel">Continue reading</h2>
-            <div class="continue-reading__list">
-                {% for book in continue_books %}
-                {% set pct = (book.progress * 100)|round(0, 'floor')|int %}
-                <a class="continue-card" href="{{ url_for('read_routes.read_book', filename=book.filename) }}" data-filename="{{ book.filename }}">
-                    <img class="continue-card__cover" src="{{ book.cover }}" alt="" loading="lazy">
-                    <span class="continue-card__text">
-                        <span class="continue-card__title">{{ book.title }}</span>
-                        <span class="continue-card__author">{{ book.author }}</span>
-                        <span class="continue-card__progress">
-                            <span class="continue-card__bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ pct }}" aria-label="{{ pct }}% read"><span style="width: {{ pct }}%"></span></span>
-                            <span class="continue-card__pct">{{ pct }}%</span>
-                        </span>
-                    </span>
-                </a>
-                {% endfor %}
-            </div>
-        </section>
-        {% endif %}
+    </header>
+    <div class="container">
         <div class="library-toolbar">
             <div class="library-search">
                 <i class="fas fa-magnifying-glass" aria-hidden="true"></i>
@@ -105,7 +88,7 @@
         <div class="row library" id="library">
             {% for book in images %}
                 {% set label = book.title ~ (' by ' ~ book.author if book.author else '') %}
-                <div class="col-6 col-sm-4 col-md-3 mb-3" data-length="{{ book.length }}" data-title="{{ book.title }}" data-author="{{ book.author }}">
+                <div class="col-6 col-sm-4 col-md-3 mb-3" data-length="{{ book.length }}" data-title="{{ book.title }}" data-author="{{ book.author }}"{% if book.progress is not none %} data-progress="{{ book.progress }}"{% endif %}>
                     <div class="book">
                         {% if book.access_level and book.access_level != 'standard' %}
                         <span class="book-lock" title="Private — only admins can see this" aria-label="Private"><i class="fas fa-lock" aria-hidden="true"></i></span>
@@ -118,6 +101,13 @@
                                 <i class="fas fa-ellipsis-h" aria-hidden="true"></i>
                             </button>
                         </div>
+                    </div>
+                    <div class="book-caption" aria-hidden="true">
+                        <span class="book-caption__title">{{ book.title }}</span>
+                        {% set meta = [book.author] if book.author else [] %}
+                        {% set pct = ((book.progress or 0) * 100)|round(0, 'floor')|int %}
+                        {% if pct > 0 %}{% set meta = meta + [pct|string ~ '%'] %}{% endif %}
+                        {% if meta %}<span class="book-caption__author">{{ meta|join(' · ') }}</span>{% endif %}
                     </div>
                 </div>
             {% endfor %}

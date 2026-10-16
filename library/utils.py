@@ -355,6 +355,146 @@ def spine_chapter_sizes(epub_file_path: str) -> list[int]:
         return sizes
 
 
+# ---------- a safe subset of the book's own design ----------
+#
+# The reader drops each book's stylesheet (publisher CSS fights reading
+# comfort: fixed fonts, tiny sizes, tight leading). But a few properties carry
+# the book's *structure* — a centred, larger chapter title; an italic
+# epigraph; small caps; an indented poem — and without them headings read as
+# body text. book_style_subset keeps only those, scoped to the reading column:
+#
+#   text-align: center | right        font-style: italic | normal
+#   font-weight: bold / 600–900       font-variant(-caps): small-caps
+#   text-transform: upper/lowercase   letter-spacing: ≤ 0.3em
+#   margin-left / padding-left: ≤ 4em (poetry, block quotes)
+#   font-size: relative to the book's own body text, clamped to 0.8–2×
+#
+# Justification, indents, vertical margins, fonts and colours are left to the
+# reader, which sets those for comfort.
+
+_KEYWORD_SIZES = {
+    "xx-small": 0.6, "x-small": 0.75, "small": 0.89, "medium": 1.0,
+    "large": 1.2, "x-large": 1.5, "xx-large": 2.0, "smaller": 0.83, "larger": 1.2,
+}
+_SIMPLE_SELECTOR = re.compile(r"^(?:[a-z][a-z0-9]*)?(?:\.[A-Za-z_][\w-]*)+$")
+_EM_VALUE = re.compile(r"^(-?\d*\.?\d+)(em|rem|%)?$")
+
+
+def _size_ratio(value: str):
+    value = value.strip().lower()
+    if value in _KEYWORD_SIZES:
+        return _KEYWORD_SIZES[value]
+    m = _EM_VALUE.match(value)
+    if not m or m.group(2) is None:
+        return None
+    n = float(m.group(1))
+    return n / 100 if m.group(2) == "%" else n
+
+
+def _em(value: str, lo: float, hi: float):
+    m = _EM_VALUE.match(value.strip().lower())
+    if not m or m.group(2) not in ("em", "rem"):
+        return None
+    n = float(m.group(1))
+    return max(lo, min(hi, n))
+
+
+def _css_rules(css: str):
+    """(selector, {property: value}) for top-level rules; @-blocks skipped."""
+    css = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+    i, depth, start, rules = 0, 0, 0, []
+    selector = None
+    while i < len(css):
+        c = css[i]
+        if c == "{":
+            if depth == 0:
+                selector = css[start:i].strip()
+                body_start = i + 1
+            depth += 1
+        elif c == "}":
+            depth -= 1
+            if depth == 0:
+                if selector and not selector.startswith("@"):
+                    decls = {}
+                    for part in css[body_start:i].split(";"):
+                        if ":" in part:
+                            k, v = part.split(":", 1)
+                            value = v.replace("!important", "").strip()
+                            decls[k.strip().lower()] = value
+                    rules.append((selector, decls))
+                start = i + 1
+            depth = max(depth, 0)
+        i += 1
+    return rules
+
+
+def book_style_subset(epub_file_path: str) -> str:
+    """CSS for the reader: the book's structural styling (see above), scoped to
+    #chapter-content. Empty if the book has no usable stylesheet."""
+    try:
+        with zipfile.ZipFile(epub_file_path) as z:
+            names = z.namelist()
+            css = "\n".join(
+                z.read(n).decode("utf-8", "ignore")
+                for n in names
+                if n.lower().endswith(".css")
+            )
+            # The book's body-text size is the size of its most-used class, so
+            # "large" means large *relative to this book's paragraphs*.
+            counts: dict[str, int] = {}
+            for n in names:
+                if n.lower().endswith(_HTML_EXTENSIONS):
+                    html = z.read(n).decode("utf-8", "ignore")
+                    for cls in re.findall(r'<(?:p|div)\b[^>]*\bclass="([^"]+)"', html):
+                        for c in cls.split():
+                            counts[c] = counts.get(c, 0) + 1
+    except (zipfile.BadZipFile, FileNotFoundError, OSError, KeyError) as e:
+        logger.warning(f"Could not read styles of {epub_file_path}: {e}")
+        return ""
+    if not css.strip():
+        return ""
+
+    rules = []
+    sizes: dict[str, float] = {}
+    for selector, decls in _css_rules(css):
+        for sel in (s.strip() for s in selector.split(",")):
+            if _SIMPLE_SELECTOR.match(sel):
+                rules.append((sel, decls))
+                if "font-size" in decls and (r := _size_ratio(decls["font-size"])):
+                    for c in sel.split(".")[1:]:
+                        sizes[c] = r
+    used = [c for c in sorted(counts, key=counts.get, reverse=True) if c in sizes]
+    base = sizes[used[0]] if used else 1.0
+
+    out = []
+    for sel, decls in rules:
+        props = []
+        if decls.get("text-align") in ("center", "right"):
+            props.append(f"text-align: {decls['text-align']}")
+        if decls.get("font-style") in ("italic", "oblique", "normal"):
+            props.append(f"font-style: {decls['font-style']}")
+        weight = decls.get("font-weight", "")
+        if weight in ("bold", "bolder") or (weight.isdigit() and int(weight) >= 600):
+            props.append("font-weight: 600")
+        variant = decls.get("font-variant", "") + decls.get("font-variant-caps", "")
+        if "small-caps" in variant:
+            props.append("font-variant-caps: small-caps")
+        if decls.get("text-transform") in ("uppercase", "lowercase"):
+            props.append(f"text-transform: {decls['text-transform']}")
+        if (ls := _em(decls.get("letter-spacing", ""), 0, 0.3)) is not None:
+            props.append(f"letter-spacing: {ls:g}em")
+        for prop in ("margin-left", "padding-left"):
+            if (v := _em(decls.get(prop, ""), 0, 4)) is not None and v > 0:
+                props.append(f"{prop}: {v:g}em")
+        if (r := _size_ratio(decls.get("font-size", ""))) and base:
+            rel = max(0.8, min(2.0, r / base))
+            if abs(rel - 1) >= 0.08:
+                props.append(f"font-size: {rel:.2f}em")
+        if props:
+            out.append(f"#chapter-content {sel} {{ {'; '.join(props)}; }}")
+    return "\n".join(out)
+
+
 def book_progress(
     chapter_sizes: list[int], chapter_index: int, position: float
 ) -> float:

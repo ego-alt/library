@@ -4,8 +4,9 @@ let isLoading = false;
 let allImagesLoaded = false;
 let currentFilters = {};
 // View state — reading status: 'all' (newest first), 'unread', 'reading' or
-// 'finished' (the last two by when you last read). Server renders the initial
-// batch using window.initialView; localStorage may override it.
+// 'finished' (the last two by when you last read). The server picks the
+// opening view (Reading when something's in progress, else All); it isn't
+// remembered between visits, so the page always opens on what you're reading.
 const VIEWS = ['all', 'unread', 'reading', 'finished'];
 function normalizeView(v) { return v === 'mine' ? 'reading' : (VIEWS.includes(v) ? v : 'all'); }
 let currentView = normalizeView(window.initialView);
@@ -132,6 +133,15 @@ window.addEventListener('resize', () => {
     _shelfPlankResizeTimer = setTimeout(repaintShelfPlanks, 120);
 });
 
+/** "AUTHOR · 37%": the author, plus how far in you are for books you're
+ * reading (from 1% — "0%" reads like an error). */
+function captionMeta(book) {
+    const n = Math.floor((book.progress || 0) * 100);
+    const pct = n > 0 ? `${n}%` : '';
+    const parts = [book.author ? escapeHtml(book.author) : '', pct].filter(Boolean);
+    return parts.length ? `<span class="book-caption__author">${parts.join(' · ')}</span>` : '';
+}
+
 function getBookTemplate(book) {
     // book.filename comes from the DB and could contain anything if a malicious
     // filename was placed in BOOK_DIR and imported via `flask import-books`.
@@ -155,6 +165,10 @@ function getBookTemplate(book) {
                         <i class="fas fa-ellipsis-h" aria-hidden="true"></i>
                     </button>
                 </div>
+            </div>
+            <div class="book-caption" aria-hidden="true">
+                <span class="book-caption__title">${escapeHtml(book.title || '')}</span>
+                ${captionMeta(book)}
             </div>
         </div>
     `;
@@ -376,7 +390,6 @@ function renderEmptyState() {
 // <== READING-STATUS VIEW (All / Unread / Reading / Finished) ==>
 function setView(view) {
     currentView = normalizeView(view);
-    try { localStorage.setItem('libraryView', currentView); } catch { /* storage blocked */ }
     updateViewUI();
     reloadLibrary();
 }
@@ -434,7 +447,6 @@ function restoreReturnState() {
     currentView = normalizeView(state.view);
     currentFilters = state.q ? {q: state.q} : {};
     $('#librarySearch').val(state.q);
-    $('#continueReading').prop('hidden', Boolean(state.q));
     loadedBooks.length = 0;
     loadedBooks.push(...state.books);
     offset = state.offset;
@@ -448,16 +460,8 @@ function restoreReturnState() {
     return true;
 }
 
-// On page load: respect a stored view preference if it differs from what the
-// server rendered. Causes a brief flash on first load when one is stored.
 $(function() {
     if (restoreReturnState()) return;
-    let stored = null;
-    try { stored = localStorage.getItem('libraryView'); } catch { /* storage blocked */ }
-    if (window.isAuthenticated && stored && normalizeView(stored) !== currentView) {
-        currentView = normalizeView(stored);
-        reloadLibrary();
-    }
     updateViewUI();
 
     // Mirror the initial grid HTML into loadedBooks so flipping to shelf doesn't
@@ -492,6 +496,7 @@ function seedLoadedBooksFromDOM() {
             author: col.dataset.author || '',
             cover: img.getAttribute('src') || '',
             length: Number.isFinite(rawLength) ? rawLength : 0,
+            progress: col.dataset.progress ? parseFloat(col.dataset.progress) : null,
             // The lock badge encodes admin-only state in the server-rendered grid.
             access_level: col.querySelector('.book-lock') ? 'restricted' : 'standard',
         });
@@ -544,9 +549,6 @@ function applyFilters() {
 
     const q = ($('#librarySearch').val() || '').trim();
     currentFilters = q ? {q} : {};
-
-    // "Continue reading" isn't filtered, so hide it while searching.
-    $('#continueReading').prop('hidden', Boolean(q));
 
     reloadLibrary();
 }
@@ -998,19 +1000,18 @@ $('.close-metadata, .metadata-overlay').on('click', function(e) {
 });
 
 // After a cover change, swap the new (versioned) thumbnail URLs into every
-// place the book's cover shows: grid card, shelf spine, Continue reading, and
-// the mirror used to re-render layouts.
+// place the book's cover shows: grid card, shelf spine, and the mirror used to
+// re-render layouts.
 function updateCoverEverywhere(filename, urls) {
     const coverUrl = urls.thumb || urls.cover;
     const book = loadedBooks.find(b => b.filename === filename);
     if (book) book.cover = coverUrl;
     const readHref = appUrl(`/read/${encodeURIComponent(filename)}`);
     document.querySelectorAll(`a[href="${CSS.escape(readHref)}"]`).forEach(link => {
-        const card = link.closest('.col-md-3, .shelf-slot, .continue-card');
+        const card = link.closest('.col-md-3, .shelf-slot');
         if (!card) return;
         const img = card.querySelector('img');
-        if (img) img.src = card.classList.contains('continue-card')
-            ? (urls.thumb_small || coverUrl) : coverUrl;
+        if (img) img.src = coverUrl;
         const spine = card.querySelector('.book-spine');
         if (spine) spine.style.backgroundImage = `url("${coverUrl}")`;
     });
@@ -1042,17 +1043,15 @@ async function deleteBook(filename) {
     const index = loadedBooks.findIndex(b => b.filename === filename);
     const removed = index !== -1 ? loadedBooks.splice(index, 1)[0] : null;
     rerenderLibrary();
-    const continueCard = findContinueCard(filename);
-    if (continueCard) continueCard.hidden = true;
     closeMetadataOverlay();
 
     showToast(`Deleted "${title}"`, 'info', {
         label: 'Undo',
-        onClick: () => restoreBook(filename, title, removed, index, continueCard),
+        onClick: () => restoreBook(filename, title, removed, index),
     });
 }
 
-async function restoreBook(filename, title, removed, index, continueCard) {
+async function restoreBook(filename, title, removed, index) {
     try {
         const response = await fetch(appUrl(`/book/${encodeURIComponent(filename)}/restore`), {
             method: 'POST',
@@ -1066,13 +1065,7 @@ async function restoreBook(filename, title, removed, index, continueCard) {
         loadedBooks.splice(Math.min(index, loadedBooks.length), 0, removed);
         rerenderLibrary();
     }
-    if (continueCard) continueCard.hidden = false;
     showToast(`Restored "${title}"`, 'success');
-}
-
-function findContinueCard(filename) {
-    return Array.from(document.querySelectorAll('.continue-card'))
-        .find(card => card.dataset.filename === filename) || null;
 }
 
 
@@ -1088,7 +1081,7 @@ document.addEventListener('click', (e) => {
 // Covers have no hover on phones, and shelf spines are too narrow for a
 // button: press and hold any book to open its details.
 (function enableLongPress() {
-    const SELECTOR = '#library .book, #library .book-spine, .continue-card';
+    const SELECTOR = '#library .book, #library .book-spine';
     const HOLD_MS = 500;
     let timer = null, start = null, fired = false;
     document.addEventListener('touchstart', (e) => {

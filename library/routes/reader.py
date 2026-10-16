@@ -27,6 +27,7 @@ from ..utils import (
     rotate_list,
 )
 from ._helpers import (
+    book_css,
     book_mtime,
     commit_or_rollback,
     get_accessible_book_or_404,
@@ -100,6 +101,7 @@ def load_book(filename):
                     start_chapter=bookmark.chapter_index if bookmark else 0,
                     chapter_pos=bookmark.position if bookmark else 0,
                     asset_url_prefix=asset_url_prefix,
+                    book_css=book_css(book),
                 )
             ),
             content_type="application/x-ndjson",
@@ -117,6 +119,7 @@ def stream_book_content(
     start_chapter: int,
     chapter_pos: float,
     asset_url_prefix: str,
+    book_css: str = "",
 ):
     """Stream book content as newline-delimited JSON."""
     try:
@@ -135,6 +138,10 @@ def stream_book_content(
                     "chapter_sizes": structure["chapter_sizes"],
                     "start_chapter": start_chapter,
                     "chapter_pos": chapter_pos,
+                    # The book's structural styling (centred titles, italics,
+                    # small caps…), already filtered and scoped; see
+                    # utils.book_style_subset.
+                    "book_css": book_css,
                 }
             )
             + "\n"

@@ -41,7 +41,6 @@ index_blueprint = Blueprint("index_routes", __name__)
 
 # Books per request: three to four rows of the grid at desktop width.
 BOOKS_PER_LOAD = 24
-CONTINUE_READING_LIMIT = 3
 
 
 # Library views, by reading status.
@@ -132,6 +131,19 @@ def get_covers(offset=0, limit=BOOKS_PER_LOAD, filters=None, view=VIEW_ALL):
     else:
         query = query.order_by(Book.created_at.desc())
 
+    # Signed in, the query already joins your bookmark: bring its position
+    # along so books you're reading can show how far in you are.
+    if current_user.is_authenticated:
+        rows = (
+            query.add_columns(
+                Bookmark.status, Bookmark.chapter_index, Bookmark.position
+            )
+            .offset(offset).limit(limit).all()
+        )
+    else:
+        books = query.offset(offset).limit(limit).all()
+        rows = [(book, None, None, None) for book in books]
+
     return [
         {
             "filename": book.filename,
@@ -140,9 +152,17 @@ def get_covers(offset=0, limit=BOOKS_PER_LOAD, filters=None, view=VIEW_ALL):
             "cover": cover_url(book, width=400),
             "length": _book_text_size(book),
             "access_level": book.access_level,
+            "progress": _progress(book, status, chapter, position),
         }
-        for book in query.offset(offset).limit(limit).all()
+        for book, status, chapter, position in rows
     ]
+
+
+def _progress(book, status, chapter, position):
+    """Whole-book progress (0–1) for a book you're reading, else None."""
+    if status != BookProgressChoice.IN_PROGRESS:
+        return None
+    return round(book_progress(chapter_sizes(book), chapter or 0, position or 0.0), 4)
 
 
 def _book_text_size(book) -> int:
@@ -174,47 +194,23 @@ def count_books(filters=None, view=VIEW_ALL):
     return query.count()
 
 
-def continue_reading(limit=CONTINUE_READING_LIMIT):
-    """The current user's in-progress books, most recently read first, each
-    with whole-book progress. Empty for anonymous users."""
+def _requested_view(default=VIEW_ALL):
+    view = request.args.get("view", default)
+    return view if view in VIEWS else default
+
+
+def _has_books_in_progress() -> bool:
     if not current_user.is_authenticated:
-        return []
-    query = (
-        Book.query.join(Bookmark, db.and_(
-            Bookmark.book_id == Book.id, Bookmark.user_id == current_user.id
-        ))
-        .filter(Book.deleted_at.is_(None))
-        .filter(Bookmark.status == BookProgressChoice.IN_PROGRESS)
-    )
-    if current_user.role == UserRoleChoice.STANDARD:
-        query = query.filter(Book.access_level == AccessLevelChoice.STANDARD.value)
-    rows = (
-        query.add_columns(Bookmark.chapter_index, Bookmark.position)
-        .order_by(Bookmark.last_read.desc())
-        .limit(limit)
-        .all()
-    )
-    return [
-        {
-            "filename": book.filename,
-            "title": book.title,
-            "author": display_author(book.author),
-            "cover": cover_url(book, width=120),
-            "progress": round(book_progress(chapter_sizes(book), chapter, position), 4),
-        }
-        for book, chapter, position in rows
-    ]
-
-
-def _requested_view():
-    view = request.args.get("view", VIEW_ALL)
-    return view if view in VIEWS else VIEW_ALL
+        return False
+    return _filtered_book_query(view=VIEW_READING).first() is not None
 
 
 @index_blueprint.route("/")
 def index():
-    """Render the initial page with the first batch of book covers."""
-    view = _requested_view()
+    """Render the initial page with the first batch of book covers. It opens
+    on what you're reading when there's something in progress, else on
+    everything; ?view= picks explicitly."""
+    view = _requested_view(VIEW_READING if _has_books_in_progress() else VIEW_ALL)
     images = get_covers(0, BOOKS_PER_LOAD, view=view)
     total = count_books(view=view)
     return render_template(
@@ -223,7 +219,6 @@ def index():
         images=images,
         current_view=view,
         total_books=total,
-        continue_books=continue_reading(),
     )
 
 
@@ -239,9 +234,9 @@ def load_more(offset):
     return response
 
 
-# Thumbnail widths the grid and Continue reading ask for. Requests snap to one
-# of these so the disk cache stays bounded.
-THUMB_WIDTHS = (120, 400)
+# Thumbnail widths the grid asks for. Requests snap to one of these so the
+# disk cache stays bounded.
+THUMB_WIDTHS = (400,)
 
 
 def _snap_width(width):
@@ -252,7 +247,7 @@ def _snap_width(width):
 
 @index_blueprint.route("/cover/<filename>")
 def cover(filename):
-    """Serve a book's cover, or a ?w=120|400 WebP thumbnail of it.
+    """Serve a book's cover, or a ?w=400 WebP thumbnail of it.
 
     Caching:
       1. Server-side: full cover bytes memoized in flask-caching; thumbnails
