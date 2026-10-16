@@ -180,7 +180,6 @@ def update_cover():
         return jsonify({
             "cover": cover_url(book),
             "thumb": cover_url(book, width=400),
-            "thumb_small": cover_url(book, width=120),
         })
     except Exception as e:
         current_app.logger.error(f"Error updating cover: {str(e)}")

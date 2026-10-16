@@ -47,7 +47,7 @@ async function markOfflineAvailability() {
     document.querySelectorAll('a[href*="/read/"]').forEach((link) => {
         const filename = readLinkFilename(link);
         if (!filename) return;
-        const card = link.closest('.col-md-3, .shelf-slot, .continue-card') || link;
+        const card = link.closest('.col-md-3, .shelf-slot') || link;
         card.classList.toggle('is-unavailable', offline && !saved.has(filename));
     });
 }

@@ -1,51 +1,54 @@
-/* Theme tokens — soft-academia palette (light) + Gruvbox dark mode.
+/* Theme tokens — a gallery wall by day, the same gallery after hours at night,
+ * one ink-blue accent across both (tapes is Gruvbox orange, calendar Gruvbox
+ * green; library takes the blue). The light, grain and frosted panes are in
+ * index.css; the reader's own calmer page is in reader.css.
  *
  * Structural tokens (spacing, radii, type, fonts, motion) live in
  * structural.css, shared byte-identical across the home stack. Role names match
- * dashboard/docs/ui-spec.md; only colours diverge here. Per-page CSS adds
- * app-specific extensions on top. */
+ * dashboard/docs/ui-spec.md; only colours diverge here. */
 :root {
-    --color-bg-base: #FFF1E5;
-    --color-bg-elevated: rgba(255, 255, 255, 0.9);
-    --color-bg-inset: rgba(255, 255, 255, 0.5);
-    --color-bg-overlay: rgba(0, 0, 0, 0.7);
-    --color-border: rgba(0, 0, 0, 0.1);
-    --color-text-primary: #34495E;
-    --color-text-secondary: #2C3E50;
-    --color-text-muted: #666;
-    --color-accent: #6AACFF;
-    --color-accent-hover: #4F95E8;
-    --color-danger: #C0392B;
-    --color-danger-hover: #A52A1F;
-    --color-success: #2D8F5B;
-    --color-shadow: rgba(0, 0, 0, 0.2);
-    --color-highlight-soft: rgba(0, 0, 0, 0.05);
+    --color-bg-base: #f6f4ef;            /* gallery wall */
+    --color-bg-elevated: #f6f4ef;
+    --color-bg-inset: transparent;       /* fields are hairlines, not wells */
+    --color-bg-overlay: rgba(36, 31, 26, 0.55);
+    --color-border: #d9d4ca;
+    --color-text-primary: #1f1d1a;       /* ink */
+    --color-text-secondary: #4a433a;
+    --color-text-muted: #85807a;
+    --color-accent: #2d5b8a;             /* ink blue */
+    --color-accent-hover: #234a72;
+    --color-on-accent: #f7f2e8;
+    --color-danger: #a6352b;
+    --color-danger-hover: #8c2a21;
+    --color-success: #4f7a3a;
+    --color-shadow: rgba(60, 45, 25, 0.18);
+    --color-highlight-soft: rgba(45, 91, 138, 0.08);
     /* App-specific: reading highlights, image scrims, the bookshelf. */
-    --color-text-selection: rgb(225, 204, 171);
+    --color-text-selection: rgba(45, 91, 138, 0.22);
     --color-scrim: rgba(0, 0, 0, 0.55);
     --wood: #8b6f47;
     --wood-edge: #6f5638;
 }
-/* Dark mode unified with calendar's Gruvbox-dark palette. Light mode keeps
- * library's soft-academia identity; the two apps converge at night. */
+/* Night: the gallery after hours — warm darks, lamplit text. */
 .dark-mode {
     color-scheme: dark;
-    --color-bg-base: #282828;
-    --color-bg-elevated: #3c3836;
-    --color-bg-inset: rgba(40, 40, 40, 0.5);
-    --color-bg-overlay: rgba(40, 40, 40, 0.85);
-    --color-border: #504945;
-    --color-text-primary: #ebdbb2;
-    --color-text-secondary: #d5c4a1;
-    --color-text-muted: #a89984;
-    --color-accent: #689d6a;
-    --color-accent-hover: #8ec07c;
+    --color-bg-base: #141210;
+    --color-bg-elevated: rgba(255, 236, 205, 0.04);
+    --color-bg-inset: rgba(0, 0, 0, 0.25);
+    --color-bg-overlay: rgba(20, 20, 20, 0.7);
+    --color-border: rgba(255, 230, 190, 0.12);
+    --color-text-primary: #eadfca;
+    --color-text-secondary: #d9ccb2;
+    --color-text-muted: #9a8e7a;
+    --color-accent: #8fb0cf;             /* the same ink blue, lit */
+    --color-accent-hover: #a9c4dd;
+    --color-on-accent: #141210;
     --color-danger: #cc241d;
     --color-danger-hover: #fb4934;
     --color-success: #98971a;
-    --color-shadow: rgba(0, 0, 0, 0.3);
-    --color-highlight-soft: rgba(235, 219, 178, 0.05);
-    --color-text-selection: rgba(58, 109, 154, 0.6);
+    --color-shadow: rgba(0, 0, 0, 0.35);
+    --color-highlight-soft: rgba(255, 220, 160, 0.06);
+    --color-text-selection: rgba(143, 176, 207, 0.35);
     --color-scrim: rgba(0, 0, 0, 0.6);
     --wood: #4a3a26;
     --wood-edge: #2f2418;

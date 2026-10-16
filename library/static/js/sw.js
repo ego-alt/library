@@ -13,7 +13,7 @@
 // Served from the app root (see routes/pwa.py), so the scope is the whole
 // mount: "/" standalone, "/library/" behind the dashboard proxy.
 
-const SHELL_CACHE = 'shell-v4';
+const SHELL_CACHE = 'shell-v5';
 const BOOKS_CACHE = 'books-v1';
 const COVERS_CACHE = 'covers-v1';
 const MAX_BOOKS = 12;
@@ -111,8 +111,8 @@ function offlineBookPage() {
   :root { color-scheme: light dark; }
   body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px;
          box-sizing: border-box; font: 16px/1.5 Inter, -apple-system, sans-serif;
-         background: #FFF1E5; color: #34495E; text-align: center; }
-  @media (prefers-color-scheme: dark) { body { background: #282828; color: #ebdbb2; } }
+         background: #f6f4ef; color: #1f1d1a; text-align: center; }
+  @media (prefers-color-scheme: dark) { body { background: #141210; color: #eadfca; } }
   a { color: inherit; }
 </style></head><body><main>
 <p>This book isn't saved on this device yet.<br>Open it once while online to read it offline.</p>

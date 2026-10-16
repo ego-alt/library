@@ -408,7 +408,7 @@ def test_undecodable_cover_thumbnail_serves_original(client, book):
 
 def test_cover_thumbnail_widths_snap(client, book):
     a = client.get(f"/cover/{book.filename}?w=90")
-    b = client.get(f"/cover/{book.filename}?w=120")
+    b = client.get(f"/cover/{book.filename}?w=400")
     assert a.headers["ETag"] == b.headers["ETag"]
 
 
