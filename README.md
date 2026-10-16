@@ -1,8 +1,6 @@
 # Shelves
 
-A self-hosted EPUB library and reader. Books are presented like works on a gallery wall, with each cover shown at its true proportions under warm light. The reader puts comfort first, with a calm page tuned for long sessions.
-
-Shelves runs on its own or as part of the home stack behind the [dashboard](../dashboard), which handles sign-in.
+A self-hosted EPUB library and reader. It runs on its own or behind the home stack's [dashboard](../dashboard), which handles sign-in.
 
 ![The library by day](images/shelves-2026-10.png)
 
@@ -11,25 +9,25 @@ Shelves runs on its own or as part of the home stack behind the [dashboard](../d
 ### Library
 
 - **Cover gallery.** Covers keep their original 2:3 shape, five per row on a laptop and fewer as the window narrows. Each label shows the title, the author and, for books in progress, how far you've read. A bookshelf view of spines is also available.
-- **Opens where you left off.** When you have books in progress, the library opens on *Reading*, most recent first.
+- **Opens on Reading.** When you have books in progress, the library opens on *Reading*, most recent first.
 - **Search and filter.** One search box matches titles, authors, genres and your tags. Filters cover *All*, *Unread*, *Reading* and *Finished*.
 - **Book management.**
   - Add EPUBs with **+** or by dropping files onto the page; a single book opens a review panel before it's added.
   - Edit details and covers, tag books, and mark books private (admins only).
   - Deleting moves a book to a 30-day trash with **Undo**.
-- **Day and night.** By day, the wall is lit as if through a paper blind. At night, covers rest in shadow and come up into the light as you hover over them.
+- **Day and night themes.** At night, covers are dimmed until you hover over them.
 
 ![The library at night](images/shelves-night-2026-10.png)
 
 ### Reader
 
-- **Comfortable by default.**
-  - Each mode has a flat page colour with softened contrast: about 10:1 by day and 8.6:1 at night, avoiding both glare and blooming text.
-  - Lines run 70–85 characters, with generous spacing and gentle hyphenation.
-  - Choose continuous scroll, or pages with two-page spreads on wide screens.
+- **Layout.**
+  - Flat page colour with softened contrast: about 10:1 by day and 8.6:1 at night.
+  - Lines of 70–85 characters, 1.7 line spacing, hyphenation.
+  - Continuous scroll, or pages with two-page spreads on wide screens.
 - **Time left.** The status bar shows the minutes left in the chapter and in the book, estimated from your own reading speed on that device.
-- **Footnotes in place.** A note opens in a pop-up beside its marker, so you don't lose your place. Any other jump inside the book offers **↩ Back to where you were**.
-- **The book's structure, the reader's comfort.** Each book keeps its own centred titles, italics, small caps and poem indents. Its fonts, colours and spacing are replaced with the reader's.
+- **Footnotes in place.** A note opens in a pop-up beside its marker. Any other jump inside the book offers **↩ Back to where you were**.
+- **Book styling.** Each book keeps its own centred titles, italics, small caps and poem indents. Its fonts, colours and spacing are replaced with the reader's.
 - **Ask and Explain.** Select text to ask a question about it, or to get a definition, translation or short explanation in context. This uses Claude and needs `ANTHROPIC_API_KEY`.
 - **Your place everywhere.** Progress is saved as you read and synced across devices when you're signed in.
 
@@ -37,7 +35,7 @@ Shelves runs on its own or as part of the home stack behind the [dashboard](../d
 
 ### Phones and offline
 
-- Built for touch: large tap targets, bottom sheets, and press-and-hold for a book's details.
+- Touch layout: large tap targets, bottom sheets, and press-and-hold for a book's details.
 - Installable as an app. The last 12 books you opened stay readable offline.
 - Keyboard shortcuts on desktop; press `?` in the reader for the full list.
 
