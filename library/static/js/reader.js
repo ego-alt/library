@@ -19,10 +19,11 @@ let readingMode = localStorage.getItem('readingMode') === 'paginate' ? 'paginate
 let currentPageIndex = 0;   // index of the *spread* currently visible
 let totalPages = 1;          // total number of spreads
 let spreadCount = 1;         // 1 (one page) or 2 (two-page spread)
-const PAGE_GAP = 40;
+const PAGE_GAP = 72;           // the centre gap of a two-page spread
+// A page holds about 62 characters a line: its width is capped in ems, so it
+// scales with the text size. Wider screens get wider margins, not longer lines.
+const PAGE_MAX_EM = 29;
 const SPREAD_WIDTH_THRESHOLD = 1000; // px — show 2-up when viewport is at least this wide
-const READER_MAX_W_SINGLE = 820;
-const READER_MAX_W_SPREAD = 1280;
 
 function isPaginated() { return readingMode === 'paginate'; }
 
@@ -61,7 +62,12 @@ function layoutPaginatedChapter() {
     if (!content || !reader) return;
 
     spreadCount = computeSpreadCount();
-    const maxW = spreadCount === 2 ? READER_MAX_W_SPREAD : READER_MAX_W_SINGLE;
+    const fontPx = parseFloat(getComputedStyle(content).fontSize) || 17;
+    const pageMax = PAGE_MAX_EM * fontPx;
+    const container = reader.closest('.reader-container');
+    const cs = container ? getComputedStyle(container) : null;
+    const padX = cs ? parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) : 60;
+    const maxW = Math.round(spreadCount * pageMax + (spreadCount - 1) * PAGE_GAP + padX);
     document.documentElement.style.setProperty('--reader-max-w', maxW + 'px');
 
     // Reading clientWidth flushes layout with the new max-width applied.
@@ -164,7 +170,8 @@ function firstVisibleBlock() {
     return null;
 }
 
-const PAGE_FLIP_MS = 140;
+// Page turns are instant: a slide makes the text move on every page.
+const PAGE_FLIP_MS = 0;
 let _pageFlipRaf = null;
 
 // Custom rAF animation: the browser's smooth scroll is ~300ms with no knob,
@@ -179,7 +186,7 @@ function applyPageTransform(animate = true) {
         cancelAnimationFrame(_pageFlipRaf);
         _pageFlipRaf = null;
     }
-    if (!animate) {
+    if (!animate || PAGE_FLIP_MS <= 0) {
         content.scrollLeft = targetLeft;
         rememberPageAnchor();
         return;
@@ -299,26 +306,22 @@ function indexTocTitles(entries) {
 
 function updateChapterNumberLabel() {
     if (!currentBook) return;
-    const el = document.getElementById('chapter-number');
+    const head = document.getElementById('running-head');
+    const foot = document.getElementById('running-foot');
     const chapter = allChapters[currentChapterNum];
     const title = tocTitles[currentChapterNum]
         || (chapter && chapter.title) || `Section ${currentChapterNum + 1}`;
     const pct = Math.floor(bookProgressFraction() * 100);
-    // Title truncates on narrow screens; the time left never does.
-    const titleEl = document.createElement('span');
-    titleEl.className = 'chapter-number__title';
-    titleEl.textContent = title;
+    // The chapter in the top margin, time left in the bottom one, like a
+    // book's running head and folio. The long words drop on phones (CSS).
+    head.textContent = title;
+    alignRunningLines();
     const left = timeLeft();
-    const timeEl = document.createElement('span');
-    timeEl.className = 'chapter-number__time';
-    // nbsp: flex would drop a plain space. The "in chapter / in book" words
-    // drop on phones (CSS), leaving "· 14 min · 6 h".
-    timeEl.innerHTML = left
-        ? `\u00a0· ${formatMinutes(left.chapter)}<span class="chapter-number__long"> left in chapter</span>`
-          + ` · ${formatMinutes(left.book)}<span class="chapter-number__long"> in book</span>`
-        : `\u00a0· ${pct}%`;
-    el.replaceChildren(titleEl, timeEl);
-    el.title = `${pct}% through the book · section ${currentChapterNum + 1} of ${currentBook.spine_length}`
+    foot.innerHTML = left
+        ? `${formatMinutes(left.chapter)}<span class="running-long"> left in chapter</span>`
+          + ` · ${formatMinutes(left.book)}<span class="running-long"> in book</span>`
+        : `${pct}%`;
+    foot.title = `${pct}% through the book · section ${currentChapterNum + 1} of ${currentBook.spine_length}`
         + (left ? ` · at ${Math.round(readingSpeed())} words a minute` : '');
 }
 
@@ -641,8 +644,6 @@ function showLoadError(message) {
 
 window.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('loading-spinner').style.display = 'block';
-    // Show controls immediately on load
-    document.querySelector('.top-controls').classList.add('visible');
 
     const start = await resolveStartPosition();
 
@@ -880,9 +881,7 @@ function displayChapter() {
     tidyChapter(chapterEl);
     watchChapterImages(chapterEl);
 
-    // Set bars before layout (paginated geometry depends on them): scroll mode
-    // re-shows both each chapter; paginated keeps the current state.
-    applyChrome(!isPaginated() || isChromeVisible());
+    addChapterEnd(chapterEl);
 
     if (isPaginated()) {
         currentPageIndex = 0;
@@ -919,7 +918,6 @@ function maybeOfferFinished() {
     if (_finishOffered || !currentBook || !window.IS_AUTHENTICATED) return;
     if (bookProgressFraction() < FINISH_OFFER_AT) return;
     _finishOffered = true;
-    const bar = document.querySelector('.controls');
     const offer = document.createElement('div');
     offer.className = 'finish-offer';
     offer.setAttribute('role', 'status');
@@ -949,8 +947,7 @@ function maybeOfferFinished() {
     dismiss.textContent = '×';
     dismiss.addEventListener('click', () => offer.remove());
     offer.append(text, yes, dismiss);
-    bar.prepend(offer);
-    showBottomControls();
+    document.body.append(offer);
 }
 
 function prevChapter() {
@@ -1027,33 +1024,11 @@ window.addEventListener('scroll', () => {
 
 const HOVER_CAPABLE = window.matchMedia('(hover: hover)').matches;
 
-// <== AUTO-HIDE BOTTOM CONTROLS (desktop) ==>
-// On desktop the bottom bar is a transient hover affordance: mouse activity
-// reveals it, then it fades after a few seconds. On touch devices both bars
-// move together, governed by scroll and tap (BARS section) — no timer.
-const CONTROLS_AUTOHIDE_MS = 2500;
-let _controlsAutoHideTimer = null;
-
-function showBottomControls() {
-    const c = document.querySelector('.controls');
-    if (!c) return;
-    c.classList.remove('controls--hidden');
-    if (HOVER_CAPABLE) scheduleControlsAutoHide();
-}
-
-function scheduleControlsAutoHide() {
-    if (_controlsAutoHideTimer) clearTimeout(_controlsAutoHideTimer);
-    _controlsAutoHideTimer = setTimeout(() => {
-        const c = document.querySelector('.controls');
-        if (c) c.classList.add('controls--hidden');
-    }, CONTROLS_AUTOHIDE_MS);
-}
-
-// Show/hide both bars together.
+// The top bar floats over the page and is hidden until you reach for it:
+// the mouse at the top edge (CSS), a tap in the middle of the page, or the
+// contents panel. It never changes the page's layout.
 function applyChrome(show) {
     document.querySelector('.top-controls').classList.toggle('visible', show);
-    if (show) showBottomControls();
-    else document.querySelector('.controls')?.classList.add('controls--hidden');
 }
 
 function isChromeVisible() {
@@ -1069,16 +1044,15 @@ function jumpScroll(top) {
     window.scrollTo({top, behavior: 'instant'});
 }
 
-// Hover-capable devices only: phone taps synthesize mousemove, which would
-// undo tap-to-hide. Keydown/touch are not triggers — page turns would flash
-// the bar; touch goes through the tap handler instead.
+// The pointer hides after a moment of stillness, so it doesn't sit on the text.
 if (HOVER_CAPABLE) {
-    document.addEventListener('mousemove', showBottomControls, {passive: true});
+    let idle = null;
+    document.addEventListener('mousemove', () => {
+        document.documentElement.classList.remove('pointer-idle');
+        clearTimeout(idle);
+        idle = setTimeout(() => document.documentElement.classList.add('pointer-idle'), 2000);
+    }, {passive: true});
 }
-// Hovering near the bottom edge of the viewport reveals the bar even when
-// the user isn't moving the mouse — CSS sibling selector can't reach the
-// controls from here, so handle it in JS.
-document.querySelector('.bottom-trigger')?.addEventListener('mouseenter', showBottomControls);
 
 
 // True when a key press is going into a text field (so shortcuts stay out of it).
@@ -1124,8 +1098,12 @@ document.addEventListener('keydown', (e) => {
 
     if (!isPaginated()) {
         // Scroll mode: arrows move a screen, keeping a couple of lines of overlap.
+        // At the end of a chapter → goes on to the next; at the top ← goes back.
         if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
             e.preventDefault();
+            const atEnd = window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 4;
+            if (e.key === 'ArrowRight' && atEnd) { nextChapter(); return; }
+            if (e.key === 'ArrowLeft' && window.scrollY <= 4) { prevChapter(); return; }
             const step = window.innerHeight * 0.85;
             window.scrollBy({top: e.key === 'ArrowRight' ? step : -step, behavior: 'smooth'});
         }
@@ -1184,7 +1162,7 @@ function closeShortcutHelp() {
 
 // Interactive chrome that page-level clicks, taps, and swipes ignore.
 const CHROME_SELECTOR =
-    'button, a, input, textarea, .toc-menu, .top-controls, .controls, ' +
+    'button, a, input, textarea, .toc-menu, .top-controls, ' +
     '.selection-menu, .search-overlay, .temp-highlight, .note-popover, .back-pill, ' +
     '.finish-offer, .shortcut-help';
 
@@ -1237,11 +1215,7 @@ let _lastScrollY = window.scrollY;
 window.addEventListener('scroll', () => {
     const y = window.scrollY;
     if (_ignoreScroll) { _ignoreScroll = false; _lastScrollY = y; return; }
-    if (y > _lastScrollY && y > 100) {
-        applyChrome(false);
-    } else if (y < 50) {
-        applyChrome(true);
-    }
+    if (y > _lastScrollY && y > 100) applyChrome(false);
     _lastScrollY = y;
 }, {passive: true});
 
@@ -1272,7 +1246,6 @@ document.addEventListener('touchend', (e) => {
         (touch.clientX < window.innerWidth * 0.35 || touch.clientX > window.innerWidth * 0.65)) return;
 
     applyChrome(!isChromeVisible());
-    if (isPaginated()) relayoutPreservingPosition();
 }, {passive: true});
 
 // Recompute pagination on resize. Debounced; preserves the user's relative
@@ -1739,3 +1712,37 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeNote(
 document.addEventListener('pointerdown', (e) => {
     if (_noteEl && !_noteEl.contains(e.target) && !e.target.closest('#chapter-content a')) closeNote();
 });
+
+
+// <== END OF A CHAPTER (scroll mode) ==>
+// With no bottom bar, a chapter ends with a quiet link on to the next one.
+// (Paginated mode turns into the next chapter with the next page.)
+function addChapterEnd(root) {
+    if (!currentBook || currentChapterNum >= currentBook.spine_length - 1) return;
+    const next = currentChapterNum + 1;
+    const title = tocTitles[next] || (allChapters[next] && allChapters[next].title) || 'Next section';
+    const nav = document.createElement('nav');
+    nav.className = 'chapter-end';
+    nav.setAttribute('aria-label', 'Next chapter');
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.innerHTML = '<span class="chapter-end__label">Next</span><span class="chapter-end__title"></span><span aria-hidden="true">→</span>';
+    btn.querySelector('.chapter-end__title').textContent = title;
+    btn.addEventListener('click', () => nextChapter());
+    nav.append(btn);
+    root.append(nav);
+}
+
+
+// The running head and foot line up with the edges of the text, wherever the
+// column or spread sits.
+function alignRunningLines() {
+    const content = document.getElementById('chapter-content');
+    if (!content) return;
+    const r = content.getBoundingClientRect();
+    if (r.width <= 0) return;
+    const root = document.documentElement.style;
+    root.setProperty('--text-left', `${Math.max(16, Math.round(r.left))}px`);
+    root.setProperty('--text-right', `${Math.max(16, Math.round(window.innerWidth - r.right))}px`);
+}
+window.addEventListener('resize', alignRunningLines);
