@@ -47,8 +47,7 @@ a {
     max-width: 800px;
     margin: 0 auto;
     padding: var(--space-5);
-    padding-top: var(--space-3);
-    transition: padding-top 0.3s ease;
+    padding-top: calc(56px + env(safe-area-inset-top, 0px));   /* clear the running head */
 }
 /* Comfortable reading: 70–85 characters a line, generous leading, a
    blank line between paragraphs, an even right edge (balanced lines, gentle
@@ -103,37 +102,6 @@ html:not(.paginated) #chapter-content { max-width: 70ch; }
     display: block;
     margin: 1em auto;
 }
-.controls {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    background: var(--color-bg-base);
-    padding: var(--space-3);
-    border-top: 1px solid var(--color-border);
-    display: flex;
-    justify-content: center;
-    gap: var(--space-4);
-    align-items: center;
-    transform: translateY(0);
-    transition: transform 0.25s ease;
-}
-.controls.controls--hidden {
-    transform: translateY(110%);
-    pointer-events: none;
-}
-.bottom-trigger {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 24px;
-    z-index: 97;
-}
-.controls .btn {
-    min-width: 75px;
-    padding: var(--space-1) var(--space-2);
-}
 .btn-primary, .btn-secondary {
     padding: var(--space-2) var(--space-3);
     font-size: var(--text-sm);
@@ -144,24 +112,25 @@ html:not(.paginated) #chapter-content { max-width: 70ch; }
     gap: var(--space-1);
 }
 /* Toolbar buttons are plain icons that turn the accent on hover, not boxes. */
-.top-controls .btn-secondary,
-.controls .btn-secondary {
+.top-controls .btn-secondary {
     background: transparent;
     border-color: transparent;
     color: var(--color-text-muted);
 }
-.top-controls .btn-secondary:hover:not(:disabled),
-.controls .btn-secondary:hover:not(:disabled) {
+.top-controls .btn-secondary:hover:not(:disabled) {
     background: var(--color-highlight-soft);
     border-color: transparent;
     color: var(--color-accent);
 }
+/* The top bar floats over the page (translucent), hidden until wanted. */
 .top-controls {
     position: fixed;
     top: -60px;
     left: 0;
     right: 0;
-    background: var(--controls-background);
+    background: color-mix(in srgb, var(--reader-bg) 88%, transparent);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
     padding: var(--space-3);
     border-bottom: 1px solid var(--color-border);
     z-index: 100;
@@ -183,11 +152,6 @@ html:not(.paginated) #chapter-content { max-width: 70ch; }
 }
 .top-trigger:hover + .top-controls, .top-controls:hover {
     top: 0;
-}
-.top-controls.visible + .container .reader-container,
-.top-trigger:hover + .top-controls + .container .reader-container,
-.top-controls:hover + .container .reader-container {
-    padding-top: 70px;
 }
 .toc-menu {
     position: fixed;
@@ -261,21 +225,88 @@ html:not(.paginated) #chapter-content { max-width: 70ch; }
     height: 100vh;
     height: 100dvh;
 }
-.progress-bar-container {
-    position: absolute;
-    top: -2px;
+/* Progress through the chapter: a hairline along the very top edge. */
+.reading-progress {
+    position: fixed;
+    top: 0;
     left: 0;
     right: 0;
     height: 2px;
-    background-color: var(--color-border);
+    z-index: 101;
+    pointer-events: none;
 }
-
-.progress-bar {
+#chapter-progress {
     height: 100%;
     width: 0;
     background-color: var(--color-text-muted);
+    opacity: 0.45;
     transition: width 0.3s ease;
 }
+
+/* Where you are, in the margins: the chapter in the top one, time left in
+   the bottom one. Scroll mode fades the text out beneath them. */
+.running-head,
+.running-foot {
+    position: fixed;
+    left: 0;
+    right: 0;
+    z-index: 50;
+    padding-left: var(--text-left, calc(24px + env(safe-area-inset-left, 0px)));
+    padding-right: var(--text-right, calc(24px + env(safe-area-inset-right, 0px)));
+    color: var(--color-text-muted);
+    font-size: 0.75rem;
+    letter-spacing: 0.02em;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    pointer-events: none;
+}
+.running-head {
+    top: 0;
+    padding-top: calc(14px + env(safe-area-inset-top, 0px));
+    padding-bottom: 14px;
+    background: linear-gradient(var(--reader-bg) 60%, transparent);
+}
+.running-foot {
+    bottom: 0;
+    padding-top: 14px;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    text-align: right;
+    background: linear-gradient(transparent, var(--reader-bg) 40%);
+    pointer-events: auto;   /* its tooltip has the % and reading speed */
+}
+@media (max-width: 640px) { .running-long { display: none; } }
+html.pointer-idle, html.pointer-idle * { cursor: none !important; }
+
+/* End of a chapter in scroll mode: on to the next. */
+.chapter-end {
+    margin: 4em 0 2em;
+    padding-top: 1.5em;
+    border-top: 1px solid var(--color-border);
+}
+.chapter-end button {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75em;
+    width: 100%;
+    padding: 0;
+    background: none;
+    border: none;
+    color: var(--reader-heading);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+.chapter-end button:hover { color: var(--color-accent); }
+.chapter-end__label {
+    color: var(--color-text-muted);
+    font-size: 0.75em;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+.chapter-end__title { flex: 1; font-weight: 600; }
+.paginated .chapter-end { display: none; }
 
 .toc-item.unprocessed {
     opacity: 0.5;
@@ -446,9 +477,10 @@ html.paginated, html.paginated body {
     max-width: min(var(--reader-max-w, 820px), 100vw);
     height: 100vh;
     height: 100dvh;
-    padding: calc(72px + env(safe-area-inset-top, 0px))
+    /* Top and bottom margins hold the running head and foot. */
+    padding: calc(52px + env(safe-area-inset-top, 0px))
              calc(30px + env(safe-area-inset-right, 0px))
-             calc(60px + env(safe-area-inset-bottom, 0px))
+             calc(48px + env(safe-area-inset-bottom, 0px))
              calc(30px + env(safe-area-inset-left, 0px));
     box-sizing: border-box;
     margin: 0 auto;
@@ -456,13 +488,6 @@ html.paginated, html.paginated body {
     /* No padding animation here — layout code measures the page synchronously
        on bar toggle. */
     transition: none;
-}
-/* Bars retreated (tap-toggled): reclaim their reserved space for the page. */
-.paginated .top-controls:not(.visible) + .container .reader-container {
-    padding: calc(24px + env(safe-area-inset-top, 0px))
-             calc(30px + env(safe-area-inset-right, 0px))
-             calc(28px + env(safe-area-inset-bottom, 0px))
-             calc(30px + env(safe-area-inset-left, 0px));
 }
 .paginated #reader-content {
     height: 100%;
@@ -500,18 +525,6 @@ html.paginated, html.paginated body {
     width: auto;
     object-fit: contain;
 }
-/* Section title + whole-book %, truncated so a long chapter title never
-   pushes the prev/next buttons off a phone screen. */
-#chapter-number {
-    display: flex;
-    min-width: 0;
-    max-width: min(28rem, calc(100vw - 180px));
-    white-space: nowrap;
-    font-variant-numeric: tabular-nums;
-}
-.chapter-number__title { overflow: hidden; text-overflow: ellipsis; }
-.chapter-number__time { flex: 0 0 auto; }
-@media (max-width: 640px) { .chapter-number__long { display: none; } }
 
 /* A footnote, beside its marker. */
 .note-popover {
@@ -633,8 +646,9 @@ html.paginated, html.paginated body {
 
 /* "Finished <title>?" offer, shown once near the end of a book. */
 .finish-offer {
-    position: absolute;
-    bottom: calc(100% + var(--space-2));
+    position: fixed;
+    z-index: 110;
+    bottom: calc(44px + env(safe-area-inset-bottom, 0px));
     left: 50%;
     transform: translateX(-50%);
     display: flex;
@@ -676,14 +690,6 @@ html.paginated, html.paginated body {
 .top-controls:not(.visible) {
     top: calc(-60px - env(safe-area-inset-top, 0px));
 }
-.controls {
-    padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
-}
-.top-controls.visible + .container .reader-container,
-.top-trigger:hover + .top-controls + .container .reader-container,
-.top-controls:hover + .container .reader-container {
-    padding-top: calc(70px + env(safe-area-inset-top, 0px));
-}
 .toc-menu { top: calc(60px + env(safe-area-inset-top, 0px)); }
 .reader-container {
     padding-left: calc(var(--space-5) + env(safe-area-inset-left, 0px));
@@ -691,12 +697,10 @@ html.paginated, html.paginated body {
     padding-bottom: calc(var(--space-8) + env(safe-area-inset-bottom, 0px));
 }
 @media (pointer: coarse), (max-width: 640px) {
-    .top-controls .btn,
-    .controls .btn {
+    .top-controls .btn {
         min-height: 44px;
         min-width: 44px;
     }
-    .controls { gap: var(--space-3); }
     .top-controls:not(.visible) { top: calc(-72px - env(safe-area-inset-top, 0px)); }
     .toc-menu { top: calc(72px + env(safe-area-inset-top, 0px)); }
     .toc-item { padding-block: var(--space-3); }

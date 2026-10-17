@@ -37,9 +37,13 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/reader.css') }}">
 </head>
 <body>
+    {# No bottom bar: where you are lives in the page margins (running head and
+       foot), and the top bar stays hidden until you reach for it. #}
+    <div class="reading-progress" aria-hidden="true"><div id="chapter-progress"></div></div>
+    <div class="running-head" id="running-head" aria-hidden="true"></div>
+    <div class="running-foot" id="running-foot"></div>
     <div class="top-trigger"></div>
-    <div class="bottom-trigger"></div>
-    <div class="top-controls visible">
+    <div class="top-controls">
         <div class="d-flex align-items-center gap-3">
             <button class="btn btn-secondary" id="menu-toggle" aria-label="Contents" title="Contents">
                 <i class="fas fa-bars"></i>
@@ -73,18 +77,6 @@
             </div>
             <div id="reader-content" style="display: none;">
                 <div id="chapter-content"></div>
-            </div>
-            <div class="controls">
-                <div class="progress-bar-container">
-                    <div class="progress-bar" id="chapter-progress"></div>
-                </div>
-                <button class="btn btn-secondary" onclick="prevChapter()" title="Previous section (Shift + ←)" aria-label="Previous section">
-                    <i class="fas fa-angles-left"></i>
-                </button>
-                <span class="text-muted" id="chapter-number"></span>
-                <button class="btn btn-secondary" onclick="nextChapter()" title="Next section (Shift + →)" aria-label="Next section">
-                    <i class="fas fa-angles-right"></i>
-                </button>
             </div>
         </div>
     </div>
