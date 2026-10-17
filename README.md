@@ -4,7 +4,17 @@ A personal EPUB library and reader for the home stack: covers hung on a warmly l
 
 ![Shelves](images/shelves-2026-10.png)
 
+<p>
+  <img src="images/shelves-night-2026-10.png" alt="The gallery at night" width="49%">
+  <img src="images/book-details-2026-10.png" alt="A book's details" width="49%">
+</p>
+
 ![The reader, with a footnote open](images/reader-2026-10.png)
+
+<p>
+  <img src="images/reader-pages-sepia-2026-10.png" alt="Two-page spread in Sepia, with the reading settings open" width="49%">
+  <img src="images/reader-pages-night-2026-10.png" alt="Two-page spread at night" width="49%">
+</p>
 
 ![On a phone: the library by day and night, a footnote, and a chapter opening](images/phone-2026-10.png)
 
