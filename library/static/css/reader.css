@@ -143,7 +143,8 @@ html:not(.paginated) #chapter-content { max-width: var(--reader-measure, 70ch); 
 /* The top bar floats over the page (translucent), hidden until wanted. */
 .top-controls {
     position: fixed;
-    top: -60px;
+    top: 0;
+    transform: translateY(calc(-100% - 4px));   /* fully out of sight, whatever its height */
     left: 0;
     right: 0;
     background: color-mix(in srgb, var(--reader-bg) 88%, transparent);
@@ -155,11 +156,11 @@ html:not(.paginated) #chapter-content { max-width: var(--reader-measure, 70ch); 
     display: flex;
     justify-content: space-between;
     align-items: center;
-    transition: top 0.3s ease;
+    transition: transform 0.25s ease;
 }
 .top-controls.visible,
 .top-controls.pinned {
-    top: 0;
+    transform: none;
 }
 .aa-button {
     font-weight: 600;
@@ -767,9 +768,6 @@ html.paginated, html.paginated body {
     padding-left: calc(var(--space-3) + env(safe-area-inset-left, 0px));
     padding-right: calc(var(--space-3) + env(safe-area-inset-right, 0px));
 }
-.top-controls:not(.visible) {
-    top: calc(-60px - env(safe-area-inset-top, 0px));
-}
 .toc-menu { top: calc(60px + env(safe-area-inset-top, 0px)); }
 .reader-container {
     padding-left: calc(var(--space-5) + env(safe-area-inset-left, 0px));
@@ -781,7 +779,6 @@ html.paginated, html.paginated body {
         min-height: 44px;
         min-width: 44px;
     }
-    .top-controls:not(.visible) { top: calc(-72px - env(safe-area-inset-top, 0px)); }
     .toc-menu { top: calc(72px + env(safe-area-inset-top, 0px)); }
     .toc-item { padding-block: var(--space-3); }
     .selection-menu button { height: 44px; }
