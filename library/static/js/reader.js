@@ -20,8 +20,8 @@ let currentPageIndex = 0;   // index of the *spread* currently visible
 let totalPages = 1;          // total number of spreads
 let spreadCount = 1;         // 1 (one page) or 2 (two-page spread)
 const PAGE_GAP = 72;           // the centre gap of a two-page spread
-// A page holds about 62 characters a line: its width is capped in ems, so it
-// scales with the text size. Wider screens get wider margins, not longer lines.
+// Page width caps, in ems of the default 17px text (about 62 characters a
+// line at that size). Wider screens get wider margins, not longer lines.
 const PAGE_MAX_EM = {narrow: 25, normal: 29, wide: 33};
 const SPREAD_WIDTH_THRESHOLD = 1000; // px — show 2-up when viewport is at least this wide
 
@@ -57,8 +57,9 @@ function layoutPaginatedChapter() {
     if (!content || !reader) return;
 
     spreadCount = computeSpreadCount();
-    const fontPx = parseFloat(getComputedStyle(content).fontSize) || 17;
-    const pageMax = (PAGE_MAX_EM[readerSetting('readerWidth', 'normal')] || 29) * fontPx;
+    // Measured at the default text size, so changing the size reflows the
+    // text but leaves the page where it is; only Width moves the margins.
+    const pageMax = (PAGE_MAX_EM[readerSetting('readerWidth', 'normal')] || 29) * 17;
     const container = reader.closest('.reader-container');
     const cs = container ? getComputedStyle(container) : null;
     const padX = cs ? parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) : 60;
