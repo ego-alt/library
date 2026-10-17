@@ -21,17 +21,21 @@ A self-hosted EPUB library and reader. It runs on its own or behind the home sta
 
 ### Reader
 
+- **No toolbars while you read.** The chapter title and time left sit in the page margins, like a book's running head. The top bar appears when you move the pointer to the top edge or tap the middle of the page.
 - **Layout.**
   - Flat page colour with softened contrast: about 10:1 by day and 8.6:1 at night.
-  - Lines of 70–85 characters, 1.7 line spacing, hyphenation.
-  - Continuous scroll, or pages with two-page spreads on wide screens.
-- **Time left.** The status bar shows the minutes left in the chapter and in the book, estimated from your own reading speed on that device.
+  - Continuous scroll, with a link on to the next chapter at the end of each; or pages, as two-page spreads of about 60 characters a line on wide screens.
+  - Hyphenation, a blank line between paragraphs, extra space at chapter openings.
+- **Reading settings (Aa).** Text size, line spacing, column width, theme (Day, Sepia, Night, Black) and layout, remembered per device.
+- **Time left.** Minutes left in the chapter and the book, estimated from your own reading speed on that device.
 - **Footnotes in place.** A note opens in a pop-up beside its marker. Any other jump inside the book offers **↩ Back to where you were**.
 - **Book styling.** Each book keeps its own centred titles, italics, small caps and poem indents. Its fonts, colours and spacing are replaced with the reader's.
 - **Ask and Explain.** Select text to ask a question about it, or to get a definition, translation or short explanation in context. This uses Claude and needs `ANTHROPIC_API_KEY`.
-- **Your place everywhere.** Progress is saved as you read and synced across devices when you're signed in.
+- **Your place everywhere.** Progress is saved as you read and synced across devices when you're signed in; on opening, the paragraph you stopped at is briefly marked. The screen stays awake while a book is open.
 
 ![The reader, with a footnote open](images/reader-2026-10.png)
+
+![Pages as a two-page spread, in Sepia, with the reading settings open](images/reader-pages-2026-10.png)
 
 ### Phones and offline
 
