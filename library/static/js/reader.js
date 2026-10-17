@@ -1047,8 +1047,13 @@ function jumpScroll(top) {
 // into the text sends it away (unless the Aa panel or contents are open).
 // The pointer itself hides after a moment of stillness.
 if (HOVER_CAPABLE) {
-    let idle = null;
+    let idle = null, lastX = null, lastY = null;
     document.addEventListener('mousemove', (e) => {
+        // Browsers also fire this when the page moves under a still pointer.
+        if (e.clientX === lastX && e.clientY === lastY) return;
+        const first = lastX === null;
+        lastX = e.clientX; lastY = e.clientY;
+        if (first) return;   // where the pointer happened to be at load
         const bar = document.querySelector('.top-controls');
         if (e.clientY < 28) applyChrome(true);
         else if (e.clientY > bar.offsetHeight + 60 && !bar.contains(e.target)
