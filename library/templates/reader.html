@@ -5,12 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <script>
         (function() {
-          if (localStorage.getItem('darkMode') === 'enabled') {
-            document.documentElement.classList.add('dark-mode');
-          }
-          if (localStorage.getItem('readingMode') === 'paginate') {
-            document.documentElement.classList.add('paginated');
-          }
+          // Reading settings, applied before the first paint (see the Aa
+          // panel in reader.js). The theme follows the app's day/night switch.
+          var root = document.documentElement, get = function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } };
+          var dark = get('darkMode') === 'enabled';
+          var theme = get('readerTheme') || (dark ? 'night' : 'day');
+          if (dark && (theme === 'day' || theme === 'sepia')) theme = 'night';
+          if (!dark && (theme === 'night' || theme === 'black')) theme = 'day';
+          if (dark) root.classList.add('dark-mode');
+          if (theme === 'sepia' || theme === 'black') root.classList.add('theme-' + theme);
+          var leading = {tight: '1.5', normal: '1.7', loose: '1.9'}[get('readerLeading')];
+          if (leading) root.style.setProperty('--reader-leading', leading);
+          var measure = {narrow: '60ch', normal: '70ch', wide: '80ch'}[get('readerWidth')];
+          if (measure) root.style.setProperty('--reader-measure', measure);
+          if (get('readingMode') === 'paginate') root.classList.add('paginated');
         })();
     </script>
     <script src="{{ url_for('static', filename='js/app_root.js') }}"></script>
@@ -42,7 +50,6 @@
     <div class="reading-progress" aria-hidden="true"><div id="chapter-progress"></div></div>
     <div class="running-head" id="running-head" aria-hidden="true"></div>
     <div class="running-foot" id="running-foot"></div>
-    <div class="top-trigger"></div>
     <div class="top-controls">
         <div class="d-flex align-items-center gap-3">
             <button class="btn btn-secondary" id="menu-toggle" aria-label="Contents" title="Contents">
@@ -53,18 +60,50 @@
             </a>
         </div>
         <div class="display-controls">
-            <button class="btn btn-secondary" id="reading-mode-toggle" onclick="toggleReadingMode()" title="Switch to paginated view" aria-label="Switch to paginated view">
-                <i class="fas fa-book-open"></i>
-            </button>
-            <button class="btn btn-secondary" onclick="toggleDarkMode()" aria-label="Night mode" title="Night mode">
-                <i id="dark-mode-icon" class="fas fa-moon"></i>
-            </button>
-            <button class="btn btn-secondary" onclick="adjustFontSize(-1)" aria-label="Smaller text" title="Smaller text">
-                <i class="fas fa-magnifying-glass-minus"></i>
-            </button>
-            <button class="btn btn-secondary" onclick="adjustFontSize(1)" aria-label="Larger text" title="Larger text">
-                <i class="fas fa-magnifying-glass-plus"></i>
-            </button>
+            <button class="btn btn-secondary aa-button" id="settings-toggle" aria-label="Reading settings" title="Reading settings" aria-expanded="false" aria-controls="reader-settings">Aa</button>
+        </div>
+        {# Reading settings: one place for size, spacing, width, theme and layout. #}
+        <div class="reader-settings" id="reader-settings" role="dialog" aria-label="Reading settings" hidden>
+            <div class="rs-row">
+                <span class="rs-label">Text size</span>
+                <div class="rs-stepper">
+                    <button type="button" data-size="-1" aria-label="Smaller text">A−</button>
+                    <span id="rs-size">17</span>
+                    <button type="button" data-size="1" aria-label="Larger text">A+</button>
+                </div>
+            </div>
+            <div class="rs-row">
+                <span class="rs-label">Line spacing</span>
+                <div class="rs-seg" data-setting="leading">
+                    <button type="button" data-value="tight">Tight</button>
+                    <button type="button" data-value="normal">Normal</button>
+                    <button type="button" data-value="loose">Loose</button>
+                </div>
+            </div>
+            <div class="rs-row">
+                <span class="rs-label">Width</span>
+                <div class="rs-seg" data-setting="width">
+                    <button type="button" data-value="narrow">Narrow</button>
+                    <button type="button" data-value="normal">Normal</button>
+                    <button type="button" data-value="wide">Wide</button>
+                </div>
+            </div>
+            <div class="rs-row">
+                <span class="rs-label">Theme</span>
+                <div class="rs-seg rs-themes" data-setting="theme">
+                    <button type="button" data-value="day"><i class="rs-swatch rs-swatch--day"></i>Day</button>
+                    <button type="button" data-value="sepia"><i class="rs-swatch rs-swatch--sepia"></i>Sepia</button>
+                    <button type="button" data-value="night"><i class="rs-swatch rs-swatch--night"></i>Night</button>
+                    <button type="button" data-value="black"><i class="rs-swatch rs-swatch--black"></i>Black</button>
+                </div>
+            </div>
+            <div class="rs-row">
+                <span class="rs-label">Layout</span>
+                <div class="rs-seg" data-setting="layout">
+                    <button type="button" data-value="scroll">Scroll</button>
+                    <button type="button" data-value="paginate">Pages</button>
+                </div>
+            </div>
         </div>
     </div>
     <div class="container">
