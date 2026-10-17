@@ -55,7 +55,7 @@ a {
    hyphenation), and slightly thinner text at night to stop it blooming. */
 #chapter-content {
     margin: 0 auto var(--space-8);
-    max-width: 58ch;   /* paginated columns; scroll mode is wider, below */
+    max-width: 58ch;
     font-size: var(--reader-font-size, 17px);
     line-height: 1.7;
     letter-spacing: 0.005em;
@@ -470,8 +470,12 @@ html.paginated, html.paginated body {
     position: relative;
 }
 .paginated #chapter-content {
+    /* The page geometry comes from layoutPaginatedChapter (--col-w, the
+       reading area's width); the scroll layout's column cap must not apply
+       here, or page turns step by the wrong width. */
+    max-width: none;
+    margin: 0;
     height: 100%;
-    margin-bottom: 0;
     column-width: var(--col-w);
     column-gap: var(--col-gap, 40px);
     column-fill: auto;
@@ -480,6 +484,8 @@ html.paginated, html.paginated body {
     overflow-x: hidden;
     overflow-y: hidden;
 }
+/* The blank right-hand page added after a chapter that ends on a left page. */
+.paginated #chapter-content > .page-filler { break-before: column; height: 1px; }
 /* Keep figures and large elements from straddling a page break. */
 .paginated #chapter-content img,
 .paginated #chapter-content figure,

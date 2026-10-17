@@ -78,19 +78,90 @@ function layoutPaginatedChapter() {
     void content.offsetHeight;
 
     const step = colW + PAGE_GAP;
-    const totalCols = Math.max(1, Math.round(content.scrollWidth / step));
+    // A chapter that ends on a left-hand page can't scroll a full spread
+    // further, so the last spread would slide back and repeat a column. Give
+    // it a blank right-hand page instead, as a printed book would.
+    content.querySelector(':scope > .page-filler')?.remove();
+    let totalCols = Math.max(1, Math.round(content.scrollWidth / step));
+    if (spreadCount > 1 && totalCols % spreadCount) {
+        const filler = document.createElement('div');
+        filler.className = 'page-filler';
+        filler.setAttribute('aria-hidden', 'true');
+        content.appendChild(filler);
+        void content.offsetHeight;
+        totalCols = Math.max(1, Math.round(content.scrollWidth / step));
+    }
     totalPages = Math.max(1, Math.ceil(totalCols / spreadCount));
     currentPageIndex = Math.max(0, Math.min(currentPageIndex, totalPages - 1));
     applyPageTransform(false);
 }
 
-// Recompute the paginated layout and land back on the same content.
-function relayoutPreservingPosition(fraction = currentPositionFraction()) {
+// Recompute the paginated layout and land back on the same content: the
+// paragraph that was first on the page (a resize, a font change, an image
+// arriving), or, when restoring a saved place, a fraction of the chapter.
+function relayoutPreservingPosition(fraction) {
+    // The paragraph remembered when the page last settled: by now a resize or
+    // font change has already reflowed the columns, so measuring now would
+    // find whatever slid onto the page instead.
+    const content = document.getElementById('chapter-content');
+    const remembered = _pageAnchor && content && content.contains(_pageAnchor) ? _pageAnchor : null;
+    const anchor = fraction === undefined ? remembered : null;
+    const fallback = fraction === undefined ? currentPositionFraction() : fraction;
     layoutPaginatedChapter();
-    currentPageIndex = Math.round(fraction * Math.max(0, totalPages - 1));
+    currentPageIndex = anchor
+        ? Math.min(pageOfText(anchor), Math.max(0, totalPages - 1))
+        : Math.round(fallback * Math.max(0, totalPages - 1));
     applyPageTransform(false);
+    // Keep the same paragraph across repeated relayouts (resizing through
+    // several widths), rather than whatever now starts the page.
+    if (anchor) _pageAnchor = anchor;
     updateProgressBar();
     updateChapterNumberLabel();
+}
+
+// The page holding an element's first line of text. (A paragraph split
+// across pages has a box that starts on the earlier page, but the reader
+// was at its first visible line.)
+function pageOfText(el) {
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+        if (!n.textContent.trim()) continue;
+        const range = document.createRange();
+        range.selectNodeContents(n);
+        const rect = range.getClientRects()[0];
+        if (!rect) break;
+        const content = document.getElementById('chapter-content');
+        const x = rect.left - content.getBoundingClientRect().left + content.scrollLeft;
+        const step = spreadStep();
+        return step > 0 ? Math.max(0, Math.floor(x / step)) : 0;
+    }
+    return pageOfElement(el);
+}
+
+// The first paragraph showing when the page last settled (see
+// relayoutPreservingPosition).
+let _pageAnchor = null;
+function rememberPageAnchor() { _pageAnchor = firstVisibleBlock(); }
+
+// The first paragraph (innermost text block) showing on the current page.
+function firstVisibleBlock() {
+    if (!isPaginated()) return null;
+    const content = document.getElementById('chapter-content');
+    if (!content) return null;
+    const box = content.getBoundingClientRect();
+    const blocks = content.querySelectorAll(':is(p, div):not(:has(p, div))');
+    for (const b of blocks) {
+        if (!b.textContent.trim()) continue;
+        const r = b.getBoundingClientRect();
+        if (!(r.right > box.left + 1 && r.left < box.right - 1 && r.bottom > box.top)) continue;
+        // Its box overlaps the page; is any of its text actually on it?
+        const range = document.createRange();
+        range.selectNodeContents(b);
+        for (const line of range.getClientRects()) {
+            if (line.width > 1 && line.left >= box.left - 1 && line.right <= box.right + 1) return b;
+        }
+    }
+    return null;
 }
 
 const PAGE_FLIP_MS = 140;
@@ -110,6 +181,7 @@ function applyPageTransform(animate = true) {
     }
     if (!animate) {
         content.scrollLeft = targetLeft;
+        rememberPageAnchor();
         return;
     }
 
@@ -117,6 +189,7 @@ function applyPageTransform(animate = true) {
     const delta = targetLeft - startLeft;
     if (Math.abs(delta) < 1) {
         content.scrollLeft = targetLeft;
+        rememberPageAnchor();
         return;
     }
     const startTime = performance.now();
@@ -129,6 +202,7 @@ function applyPageTransform(animate = true) {
             _pageFlipRaf = requestAnimationFrame(step);
         } else {
             _pageFlipRaf = null;
+            rememberPageAnchor();
         }
     }
     _pageFlipRaf = requestAnimationFrame(step);
@@ -168,6 +242,23 @@ function applyBookStyle(css) {
 // - Short blocks the book sets noticeably larger than its body text are
 //   headings ("II", "Retribution"), even when they're plain <div>s: mark them
 //   so they get heading weight and spacing.
+// Paginated mode lays out a whole chapter as columns at once, so every image's
+// size must be known: lazy images (sized 0 until scrolled to) would load as
+// you turn pages and push the text along, changing the page count under you.
+// Load them all now, and re-lay out (keeping your place) as each arrives.
+let _imageRelayoutTimer = null;
+function watchChapterImages(root) {
+    root.querySelectorAll('img').forEach((img) => {
+        if (isPaginated()) img.loading = 'eager';
+        if (img.complete) return;
+        img.addEventListener('load', () => {
+            if (!isPaginated()) return;
+            clearTimeout(_imageRelayoutTimer);
+            _imageRelayoutTimer = setTimeout(() => relayoutPreservingPosition(), 120);
+        }, {once: true});
+    });
+}
+
 function tidyChapter(root) {
     const base = parseFloat(getComputedStyle(root).fontSize) || 16;
     root.querySelectorAll('p, div, h1, h2, h3, h4, h5, h6').forEach((el) => {
@@ -787,6 +878,7 @@ function displayChapter() {
     const chapterEl = document.getElementById('chapter-content');
     chapterEl.innerHTML = content;
     tidyChapter(chapterEl);
+    watchChapterImages(chapterEl);
 
     // Set bars before layout (paginated geometry depends on them): scroll mode
     // re-shows both each chapter; paginated keeps the current state.
@@ -1093,7 +1185,8 @@ function closeShortcutHelp() {
 // Interactive chrome that page-level clicks, taps, and swipes ignore.
 const CHROME_SELECTOR =
     'button, a, input, textarea, .toc-menu, .top-controls, .controls, ' +
-    '.selection-menu, .search-overlay, .temp-highlight';
+    '.selection-menu, .search-overlay, .temp-highlight, .note-popover, .back-pill, ' +
+    '.finish-offer, .shortcut-help';
 
 // Click left third of the reader to go back a page, right third forward.
 // Middle third is a no-op so text selection still works freely.
