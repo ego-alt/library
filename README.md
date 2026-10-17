@@ -2,48 +2,35 @@
 
 A self-hosted EPUB library and reader. It runs on its own or behind the home stack's [dashboard](../dashboard), which handles sign-in.
 
-![The library by day](images/shelves-2026-10.png)
-
 ## Features
 
 ### Library
 
-- **Cover gallery.** Covers keep their original 2:3 shape, five per row on a laptop and fewer as the window narrows. Each label shows the title, the author and, for books in progress, how far you've read. A bookshelf view of spines is also available.
-- **Opens on Reading.** When you have books in progress, the library opens on *Reading*, most recent first.
-- **Search and filter.** One search box matches titles, authors, genres and your tags. Filters cover *All*, *Unread*, *Reading* and *Finished*.
-- **Book management.**
-  - Add EPUBs with **+** or by dropping files onto the page; a single book opens a review panel before it's added.
-  - Edit details and covers, tag books, and mark books private (admins only).
-  - Deleting moves a book to a 30-day trash with **Undo**.
-- **Day and night themes.** At night, covers are dimmed until you hover over them.
+- Cover gallery with title, author and reading progress; a bookshelf view of spines is also available.
+- Search across titles, authors, genres and tags; filter by *Unread*, *Reading* or *Finished*.
+- Add EPUBs by upload or drag and drop; edit details and covers, tag books, mark them private.
+- Deleted books go to a 30-day trash with **Undo**.
+- Day and night themes.
 
-![The library at night](images/shelves-night-2026-10.png)
+![The library by day](images/shelves-2026-10.png)
 
 ### Reader
 
-- **No toolbars while you read.** The chapter title and time left sit in the page margins, like a book's running head. The top bar appears when you move the pointer to the top edge or tap the middle of the page.
-- **Layout.**
-  - Flat page colour with softened contrast: about 10:1 by day and 8.6:1 at night.
-  - Continuous scroll, with a link on to the next chapter at the end of each; or pages, as two-page spreads of about 60 characters a line on wide screens.
-  - Hyphenation, a blank line between paragraphs, extra space at chapter openings.
-- **Reading settings (Aa).** Text size, line spacing, column width, theme (Day, Sepia, Night, Black) and layout, remembered per device.
-- **Time left.** Minutes left in the chapter and the book, estimated from your own reading speed on that device.
-- **Footnotes in place.** A note opens in a pop-up beside its marker. Any other jump inside the book offers **↩ Back to where you were**.
-- **Book styling.** Each book keeps its own centred titles, italics, small caps and poem indents. Its fonts, colours and spacing are replaced with the reader's.
-- **Ask and Explain.** Select text to ask a question about it, or to get a definition, translation or short explanation in context. This uses Claude and needs `ANTHROPIC_API_KEY`.
-- **Your place everywhere.** Progress is saved as you read and synced across devices when you're signed in; on opening, the paragraph you stopped at is briefly marked. The screen stays awake while a book is open.
+- Continuous scroll or two-page spreads, with no toolbars while reading.
+- Reading settings for text size, line spacing, column width, theme (Day, Sepia, Night, Black) and layout.
+- Time left in the chapter and the book, based on your reading speed.
+- Footnotes open in a pop-up beside their marker.
+- **Ask and Explain**: select text to ask about it or get a definition or translation (needs `ANTHROPIC_API_KEY`).
+- Reading position syncs across devices.
 
 ![The reader, with a footnote open](images/reader-2026-10.png)
 
-![Pages as a two-page spread, in Sepia, with the reading settings open](images/reader-pages-2026-10.png)
-
 ### Phones and offline
 
-- Touch layout: large tap targets, bottom sheets, and press-and-hold for a book's details.
-- Installable as an app. The last 12 books you opened stay readable offline.
-- Keyboard shortcuts on desktop; press `?` in the reader for the full list.
+- Touch layout, installable as an app; the last 12 books opened stay readable offline.
+- Keyboard shortcuts on desktop; press `?` in the reader for the list.
 
-![On a phone: the library by day and night, a footnote, and a chapter opening](images/phone-2026-10.png)
+![On a phone](images/phone-2026-10.png)
 
 ## Getting started
 
