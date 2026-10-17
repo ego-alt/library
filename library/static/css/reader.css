@@ -10,6 +10,8 @@
     --reader-bg: #f6f1e7;
     --reader-ink: #3d3730;
     --reader-heading: #2b2722;
+    --reader-leading: 1.7;
+    --reader-measure: 70ch;
     --controls-background: var(--reader-bg);   /* toolbars in the page colour */
     --toc-item-color: var(--color-text-primary);
     --toc-item-highlight: var(--color-accent);
@@ -21,6 +23,22 @@
     --reader-heading: #d8ccb4;
     --color-text-primary: #c4b7a0;
     --toc-item-color: #d5c4a1;
+}
+/* Sepia: a day theme for evenings with the lights on — warmer, less glare
+   (ink 8.9:1). Black: a night theme for OLED phones in bed (ink 9.5:1). */
+.theme-sepia {
+    --reader-bg: #efe4cc;
+    --reader-ink: #46392a;
+    --reader-heading: #33281c;
+    --color-border: #d8c8a6;
+    --color-text-muted: #85745a;
+}
+.theme-black {
+    --reader-bg: #000;
+    --reader-ink: #b9ad97;
+    --reader-heading: #cfc3ab;
+    --color-text-primary: #b9ad97;
+    --color-border: #2a2724;
 }
 body {
     background-color: var(--reader-bg);
@@ -56,7 +74,7 @@ a {
     margin: 0 auto var(--space-8);
     max-width: 58ch;
     font-size: var(--reader-font-size, 17px);
-    line-height: 1.7;
+    line-height: var(--reader-leading, 1.7);
     letter-spacing: 0.005em;
     color: var(--reader-ink);
     hyphens: auto;
@@ -67,7 +85,7 @@ a {
 }
 /* Scroll mode reads as one continuous column, so it can be a little wider:
    about 85 characters of Inter. */
-html:not(.paginated) #chapter-content { max-width: 70ch; }
+html:not(.paginated) #chapter-content { max-width: var(--reader-measure, 70ch); }
 .dark-mode #chapter-content {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -139,20 +157,79 @@ html:not(.paginated) #chapter-content { max-width: 70ch; }
     align-items: center;
     transition: top 0.3s ease;
 }
-.top-controls.visible {
+.top-controls.visible,
+.top-controls.pinned {
     top: 0;
 }
-.top-trigger {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 20px;
-    z-index: 99;
+.aa-button {
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    min-width: 44px;
 }
-.top-trigger:hover + .top-controls, .top-controls:hover {
-    top: 0;
+
+/* The Aa panel. */
+.reader-settings {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: calc(var(--space-3) + env(safe-area-inset-right, 0px));
+    width: min(340px, calc(100vw - 24px));
+    padding: var(--space-4);
+    display: grid;
+    gap: var(--space-4);
+    background: var(--reader-bg);
+    color: var(--reader-ink);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    box-shadow: 0 16px 40px -12px rgba(0, 0, 0, 0.35);
+    font-size: 0.875rem;
 }
+.reader-settings[hidden] { display: none; }
+.rs-row { display: grid; gap: 6px; }
+.rs-label {
+    color: var(--color-text-muted);
+    font-size: 0.6875rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+.rs-seg { display: flex; gap: 4px; }
+.rs-seg button,
+.rs-stepper button {
+    flex: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 36px;
+    padding: 0 8px;
+    background: transparent;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    color: var(--reader-ink);
+    font: inherit;
+    cursor: pointer;
+}
+.rs-seg button:hover,
+.rs-stepper button:hover { border-color: var(--color-accent); }
+.rs-seg button[aria-pressed="true"] {
+    border-color: var(--color-accent);
+    box-shadow: inset 0 0 0 1px var(--color-accent);
+    color: var(--reader-heading);
+    font-weight: 600;
+}
+.rs-stepper { display: flex; align-items: center; gap: 8px; }
+.rs-stepper span { min-width: 3ch; text-align: center; font-variant-numeric: tabular-nums; }
+.rs-swatch {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 1px solid color-mix(in srgb, var(--color-text-muted) 60%, transparent);
+    flex: 0 0 auto;
+}
+.rs-swatch--day { background: #f6f1e7; }
+.rs-swatch--sepia { background: #efe4cc; }
+.rs-swatch--night { background: #1e1c19; }
+.rs-swatch--black { background: #000; }
+.rs-themes button { padding: 0 4px; }
 .toc-menu {
     position: fixed;
     top: 60px;
@@ -277,6 +354,9 @@ html:not(.paginated) #chapter-content { max-width: 70ch; }
     pointer-events: auto;   /* its tooltip has the % and reading speed */
 }
 @media (max-width: 640px) { .running-long { display: none; } }
+/* The bar takes the top margin's place while it's down. */
+.running-head { transition: opacity 0.2s ease; }
+html.bar-visible .running-head { opacity: 0; }
 html.pointer-idle, html.pointer-idle * { cursor: none !important; }
 
 /* End of a chapter in scroll mode: on to the next. */

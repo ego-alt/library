@@ -22,7 +22,7 @@ let spreadCount = 1;         // 1 (one page) or 2 (two-page spread)
 const PAGE_GAP = 72;           // the centre gap of a two-page spread
 // A page holds about 62 characters a line: its width is capped in ems, so it
 // scales with the text size. Wider screens get wider margins, not longer lines.
-const PAGE_MAX_EM = 29;
+const PAGE_MAX_EM = {narrow: 25, normal: 29, wide: 33};
 const SPREAD_WIDTH_THRESHOLD = 1000; // px — show 2-up when viewport is at least this wide
 
 function isPaginated() { return readingMode === 'paginate'; }
@@ -32,12 +32,7 @@ function applyReadingModeClass() {
 }
 
 function updateReadingModeButton() {
-    const btn = document.getElementById('reading-mode-toggle');
-    if (!btn) return;
-    const icon = btn.querySelector('i');
-    if (icon) icon.className = isPaginated() ? 'fas fa-scroll' : 'fas fa-book-open';
-    btn.title = isPaginated() ? 'Switch to scroll view' : 'Switch to paginated view';
-    btn.setAttribute('aria-label', btn.title);
+    if (typeof syncSettingsPanel === 'function') syncSettingsPanel();
 }
 
 function computeSpreadCount() {
@@ -63,7 +58,7 @@ function layoutPaginatedChapter() {
 
     spreadCount = computeSpreadCount();
     const fontPx = parseFloat(getComputedStyle(content).fontSize) || 17;
-    const pageMax = PAGE_MAX_EM * fontPx;
+    const pageMax = (PAGE_MAX_EM[readerSetting('readerWidth', 'normal')] || 29) * fontPx;
     const container = reader.closest('.reader-container');
     const cs = container ? getComputedStyle(container) : null;
     const padX = cs ? parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) : 60;
@@ -1013,6 +1008,7 @@ function adjustFontSize(delta) {
     document.documentElement.style.setProperty('--reader-font-size', currentFontSize + 'px');
     localStorage.setItem('readerFontSize', currentFontSize);
     if (isPaginated()) relayoutPreservingPosition();
+    syncSettingsPanel();
 }
 
 window.addEventListener('scroll', () => {
@@ -1028,7 +1024,10 @@ const HOVER_CAPABLE = window.matchMedia('(hover: hover)').matches;
 // the mouse at the top edge (CSS), a tap in the middle of the page, or the
 // contents panel. It never changes the page's layout.
 function applyChrome(show) {
-    document.querySelector('.top-controls').classList.toggle('visible', show);
+    const bar = document.querySelector('.top-controls');
+    if (!show && bar.classList.contains('pinned')) return;   // the Aa panel is open
+    bar.classList.toggle('visible', show);
+    document.documentElement.classList.toggle('bar-visible', show);
 }
 
 function isChromeVisible() {
@@ -1044,10 +1043,16 @@ function jumpScroll(top) {
     window.scrollTo({top, behavior: 'instant'});
 }
 
-// The pointer hides after a moment of stillness, so it doesn't sit on the text.
+// Desktop: the pointer at the top edge brings the bar down; moving well down
+// into the text sends it away (unless the Aa panel or contents are open).
+// The pointer itself hides after a moment of stillness.
 if (HOVER_CAPABLE) {
     let idle = null;
-    document.addEventListener('mousemove', () => {
+    document.addEventListener('mousemove', (e) => {
+        const bar = document.querySelector('.top-controls');
+        if (e.clientY < 28) applyChrome(true);
+        else if (e.clientY > bar.offsetHeight + 60 && !bar.contains(e.target)
+                 && !document.getElementById('toc-menu')?.classList.contains('visible')) applyChrome(false);
         document.documentElement.classList.remove('pointer-idle');
         clearTimeout(idle);
         idle = setTimeout(() => document.documentElement.classList.add('pointer-idle'), 2000);
@@ -1079,7 +1084,7 @@ document.addEventListener('keydown', (e) => {
     if (!e.shiftKey && !hasSelection) {
         const k = e.key.toLowerCase();
         if (k === 't') { e.preventDefault(); document.getElementById('menu-toggle').click(); return; }
-        if (k === 'n') { e.preventDefault(); toggleDarkMode(); return; }
+        if (k === 'n') { e.preventDefault(); toggleNight(); return; }
     }
     if (e.key === '+' || e.key === '=') { e.preventDefault(); adjustFontSize(1); return; }
     if (e.key === '-' || e.key === '_') { e.preventDefault(); adjustFontSize(-1); return; }
@@ -1163,7 +1168,7 @@ function closeShortcutHelp() {
 // Interactive chrome that page-level clicks, taps, and swipes ignore.
 const CHROME_SELECTOR =
     'button, a, input, textarea, .toc-menu, .top-controls, ' +
-    '.selection-menu, .search-overlay, .temp-highlight, .note-popover, .back-pill, ' +
+    '.selection-menu, .search-overlay, .temp-highlight, .note-popover, .back-pill, .reader-settings, ' +
     '.finish-offer, .shortcut-help';
 
 // Click left third of the reader to go back a page, right third forward.
@@ -1746,3 +1751,107 @@ function alignRunningLines() {
     root.setProperty('--text-right', `${Math.max(16, Math.round(window.innerWidth - r.right))}px`);
 }
 window.addEventListener('resize', alignRunningLines);
+
+
+// <== READING SETTINGS (the Aa panel) ==>
+// Size, line spacing, width, theme and layout, remembered per device. The
+// <head> script applies them before the first paint; this keeps them in sync.
+const LEADING = {tight: '1.5', normal: '1.7', loose: '1.9'};
+const MEASURE = {narrow: '60ch', normal: '70ch', wide: '80ch'};
+const THEMES = ['day', 'sepia', 'night', 'black'];
+
+function readerSetting(key, fallback) {
+    try { return localStorage.getItem(key) || fallback; } catch { return fallback; }
+}
+function storeSetting(key, value) {
+    try { localStorage.setItem(key, value); } catch { /* storage blocked */ }
+}
+
+// The theme follows the app's day/night switch (the library shares it):
+// Day and Sepia are day themes, Night and Black are night ones.
+function currentTheme() {
+    const dark = document.documentElement.classList.contains('dark-mode');
+    const t = readerSetting('readerTheme', dark ? 'night' : 'day');
+    if (dark && (t === 'day' || t === 'sepia')) return 'night';
+    if (!dark && (t === 'night' || t === 'black')) return 'day';
+    return t;
+}
+function setTheme(theme) {
+    const root = document.documentElement;
+    const dark = theme === 'night' || theme === 'black';
+    root.classList.toggle('dark-mode', dark);
+    root.classList.toggle('theme-sepia', theme === 'sepia');
+    root.classList.toggle('theme-black', theme === 'black');
+    storeSetting('darkMode', dark ? 'enabled' : 'disabled');
+    storeSetting('readerTheme', theme);
+    syncSettingsPanel();
+}
+// N: day ↔ night, keeping a Sepia or Black preference within its half.
+function toggleNight() {
+    const t = currentTheme();
+    setTheme(t === 'night' || t === 'black' ? 'day' : 'night');
+}
+
+function setLeading(value) {
+    storeSetting('readerLeading', value);
+    document.documentElement.style.setProperty('--reader-leading', LEADING[value]);
+    if (isPaginated()) relayoutPreservingPosition();
+}
+function setWidth(value) {
+    storeSetting('readerWidth', value);
+    document.documentElement.style.setProperty('--reader-measure', MEASURE[value]);
+    if (isPaginated()) relayoutPreservingPosition();
+    alignRunningLines();
+}
+
+function syncSettingsPanel() {
+    const panel = document.getElementById('reader-settings');
+    if (!panel) return;
+    const size = document.getElementById('rs-size');
+    if (size) size.textContent = currentFontSize;
+    const values = {
+        leading: readerSetting('readerLeading', 'normal'),
+        width: readerSetting('readerWidth', 'normal'),
+        theme: currentTheme(),
+        layout: isPaginated() ? 'paginate' : 'scroll',
+    };
+    panel.querySelectorAll('.rs-seg').forEach((seg) => {
+        seg.querySelectorAll('button').forEach((b) =>
+            b.setAttribute('aria-pressed', b.dataset.value === values[seg.dataset.setting] ? 'true' : 'false'));
+    });
+}
+
+function openSettings(open) {
+    const panel = document.getElementById('reader-settings');
+    const btn = document.getElementById('settings-toggle');
+    if (!panel || !btn) return;
+    panel.hidden = !open;
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    document.querySelector('.top-controls').classList.toggle('pinned', open);
+    if (open) document.documentElement.classList.add('bar-visible');
+    if (open) syncSettingsPanel();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const panel = document.getElementById('reader-settings');
+    const btn = document.getElementById('settings-toggle');
+    if (!panel || !btn) return;
+    btn.addEventListener('click', (e) => { e.stopPropagation(); openSettings(panel.hidden); });
+    panel.addEventListener('click', (e) => {
+        const b = e.target.closest('button');
+        if (!b) return;
+        if (b.dataset.size) { adjustFontSize(Number(b.dataset.size)); return; }
+        const setting = b.closest('.rs-seg')?.dataset.setting;
+        const v = b.dataset.value;
+        if (setting === 'leading') setLeading(v);
+        else if (setting === 'width') setWidth(v);
+        else if (setting === 'theme') setTheme(v);
+        else if (setting === 'layout' && v !== (isPaginated() ? 'paginate' : 'scroll')) toggleReadingMode();
+        syncSettingsPanel();
+    });
+    document.addEventListener('pointerdown', (e) => {
+        if (!panel.hidden && !panel.contains(e.target) && !btn.contains(e.target)) openSettings(false);
+    });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !panel.hidden) openSettings(false); });
+    syncSettingsPanel();
+});
