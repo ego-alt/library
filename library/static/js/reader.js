@@ -273,6 +273,13 @@ function tidyChapter(root) {
         const size = parseFloat(getComputedStyle(el).fontSize) || base;
         if (/^H[1-6]$/.test(el.tagName) || size >= base * 1.08) el.classList.add('reader-heading');
     });
+    // A heading before any running text opens the chapter: give it room.
+    const firstText = Array.from(root.querySelectorAll(':is(p, div):not(:has(p, div))'))
+        .find((el) => el.textContent.trim().length > 200);
+    const opener = root.querySelector('.reader-heading');
+    if (opener && (!firstText || (opener.compareDocumentPosition(firstText) & Node.DOCUMENT_POSITION_FOLLOWING))) {
+        opener.classList.add('chapter-opening');
+    }
 }
 
 // Whole-book progress in [0, 1]: chapters weighted by size, matching the
@@ -304,7 +311,7 @@ function updateChapterNumberLabel() {
     const head = document.getElementById('running-head');
     const foot = document.getElementById('running-foot');
     const chapter = allChapters[currentChapterNum];
-    const title = tocTitles[currentChapterNum]
+    const title = tocTitles[currentChapterNum] || tocTitles[chapterStart(currentChapterNum)]
         || (chapter && chapter.title) || `Section ${currentChapterNum + 1}`;
     const pct = Math.floor(bookProgressFraction() * 100);
     // The chapter in the top margin, time left in the bottom one, like a
@@ -718,6 +725,7 @@ window.addEventListener('DOMContentLoaded', async () => {
                                 jumpScroll(currentPagePosition * document.documentElement.scrollHeight);
                             }
                             updateChapterNumberLabel();
+                            if (currentPagePosition > 0.01) setTimeout(markYourPlace, 250);
                         });
                     }
                     break;
@@ -945,18 +953,18 @@ function maybeOfferFinished() {
     document.body.append(offer);
 }
 
-function prevChapter() {
+// Back a chapter. Turning back past a chapter's first page (or scrolling
+// past its top) lands at the end of the one before, like a book; Shift+←
+// (toStart) jumps to its beginning, matching Shift+→.
+function prevChapter(toStart = false) {
     if (currentChapterNum > 0) {
         currentChapterNum--;
         displayChapter();
         if (isPaginated()) {
-            // Land on the last page so "prev" from page 1 of chapter N lands
-            // at the end of chapter N-1, mirroring the scroll-mode behaviour
-            // of jumping to the bottom of the previous chapter.
-            currentPageIndex = Math.max(0, totalPages - 1);
+            currentPageIndex = toStart ? 0 : Math.max(0, totalPages - 1);
             applyPageTransform(false);
         } else {
-            jumpScroll(document.body.scrollHeight);
+            jumpScroll(toStart ? 0 : document.body.scrollHeight);
         }
         updateProgressBar();
         updateChapterNumberLabel();
@@ -1101,7 +1109,7 @@ document.addEventListener('keydown', (e) => {
             nextChapter();
         } else if (e.key === 'ArrowLeft') {
             e.preventDefault();
-            prevChapter();
+            prevChapter(true);
         }
         return;
     }
@@ -1278,7 +1286,7 @@ document.addEventListener('DOMContentLoaded', () => {
 function handleChapterLink(element) {
     const href = element.getAttribute('chapter-link');
     const sectionId = element.getAttribute('section-link');
-    const targetChapter = hrefChapterMapping[href];
+    const targetChapter = chapterForHref(href);
     if (targetChapter === undefined) return;
     jumpToChapter(targetChapter, sectionId);
 }
@@ -1470,11 +1478,13 @@ function chapterChars(index) {
         return (_chapterChars[index] = (doc.body.textContent || '').replace(/\s+/g, ' ').trim().length);
     }
     // Not streamed in yet: estimate from its file size, scaled by how much of
-    // the loaded chapters' bytes turned out to be text.
+    // the loaded chapters' bytes turned out to be text — once there's enough
+    // loaded to judge (a cover page alone is nearly all markup).
     const sizes = (currentBook && currentBook.chapter_sizes) || [];
     let text = 0, bytes = 0;
     Object.keys(_chapterChars).forEach((i) => { text += _chapterChars[i]; bytes += sizes[i] || 0; });
-    return Math.round((sizes[index] || 0) * (bytes > 0 ? text / bytes : 0.5));
+    const ratio = bytes >= 40000 ? text / bytes : 0.6;
+    return Math.round((sizes[index] || 0) * ratio);
 }
 
 function positionInChapter() {
@@ -1499,10 +1509,41 @@ function timeLeft() {
     if (!currentBook || !allChapters[currentChapterNum]) return null;
     const wpm = readingSpeed();
     const here = chapterChars(currentChapterNum) * (1 - positionInChapter());
-    let ahead = 0;
-    for (let i = currentChapterNum + 1; i < currentBook.spine_length; i++) ahead += chapterChars(i);
+    // A "chapter" runs to the next entry in the contents: some books split one
+    // chapter across several files.
+    const end = chapterEnd(currentChapterNum);
+    let restOfChapter = 0, ahead = 0;
+    for (let i = currentChapterNum + 1; i < currentBook.spine_length; i++) {
+        const c = chapterChars(i);
+        if (i < end) restOfChapter += c;
+        ahead += c;
+    }
     const minutes = (chars) => chars / CHARS_PER_WORD / wpm;
-    return {chapter: minutes(here), book: minutes(here + ahead)};
+    return {chapter: minutes(here + restOfChapter), book: minutes(here + ahead)};
+}
+
+// The section that starts the contents chapter `index` belongs to.
+function chapterStart(index) {
+    const starts = Object.keys(tocTitles).map(Number).filter((i) => i <= index);
+    return starts.length ? Math.max(...starts) : index;
+}
+
+// The first section after `index` that starts a new chapter in the contents
+// (or the next section, for books whose contents don't cover their files).
+function chapterEnd(index) {
+    const starts = Object.keys(tocTitles).map(Number);
+    if (!starts.length) return index + 1;
+    const next = starts.filter((i) => i > index).sort((a, b) => a - b)[0];
+    return next === undefined ? currentBook.spine_length : next;
+}
+
+// A link's target file, however the book wrote the path ("../Text/x.xhtml",
+// "x.xhtml#id"): chapters are keyed by file name.
+function chapterForHref(href) {
+    if (href == null) return undefined;
+    if (href in hrefChapterMapping) return hrefChapterMapping[href];
+    const name = decodeURIComponent(String(href).split('#')[0].split('/').pop());
+    return hrefChapterMapping[name];
 }
 
 function formatMinutes(m) {
@@ -1573,7 +1614,7 @@ document.addEventListener('click', (e) => {
     if (chapterHref == null && !raw.startsWith('#')) return;   // an outside link
     e.preventDefault();
     e.stopPropagation();   // capture phase: beats the link's inline handler
-    const index = chapterHref != null ? hrefChapterMapping[chapterHref] : currentChapterNum;
+    const index = chapterHref != null ? chapterForHref(chapterHref) : currentChapterNum;
     const id = chapterHref != null ? link.getAttribute('section-link') : raw.slice(1);
     if (index === undefined) return;
     const target = findInChapter(index, id);
@@ -1860,3 +1901,33 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !panel.hidden) openSettings(false); });
     syncSettingsPanel();
 });
+
+
+// <== SMALL COMFORTS ==>
+// On opening a book, softly mark the paragraph you stopped at so your eyes
+// find it; the mark fades on its own.
+function markYourPlace() {
+    let block = null;
+    if (isPaginated()) block = firstVisibleBlock();
+    else {
+        const place = currentPlace();
+        block = place.block >= 0 ? readingBlocks()[place.block] : null;
+    }
+    if (!block) return;
+    block.classList.add('your-place');
+    setTimeout(() => block.classList.remove('your-place'), 2600);
+}
+
+// Keep the screen awake while a book is open and visible (phones would
+// otherwise dim mid-page). The browser drops the lock when the tab hides.
+let _wakeLock = null;
+async function keepAwake() {
+    if (!('wakeLock' in navigator) || document.hidden || _wakeLock) return;
+    try {
+        _wakeLock = await navigator.wakeLock.request('screen');
+        _wakeLock.addEventListener('release', () => { _wakeLock = null; });
+    } catch { /* not allowed (battery saver, no gesture yet): fine */ }
+}
+document.addEventListener('visibilitychange', keepAwake);
+['click', 'keydown', 'touchend'].forEach((ev) => document.addEventListener(ev, keepAwake, {passive: true}));
+keepAwake();

@@ -96,19 +96,32 @@ html:not(.paginated) #chapter-content { max-width: var(--reader-measure, 70ch); 
 /* A "paragraph" is any block of running text: EPUBs use <p> or plain <div>s
    (class names only, their stylesheets aren't loaded), so match blocks that
    hold no other blocks. Empty spacer blocks get no gap, or they'd stack up. */
-#chapter-content :is(p, div):not(:empty):not(:has(p, div, h1, h2, h3, h4, h5, h6, figure, img, table, ul, ol, blockquote)) {
+#chapter-content :where(p, div):where(:not(:empty):not(:has(p, div, h1, h2, h3, h4, h5, h6, figure, img, table, ul, ol, blockquote))) {
     margin-top: 0;      /* only vertical: the book's own left indents (poems,   */
     margin-bottom: 1em; /* quotes) come through from its style subset          */
     text-indent: 0;
 }
 /* Headings the book marks only by size ("II", "Retribution"); see tidyChapter. */
-#chapter-content .reader-heading {
+#chapter-content :is(p, div, h1, h2, h3, h4, h5, h6).reader-heading {
     font-weight: 600;
     line-height: 1.3;
     color: var(--reader-heading);
     margin: 1.4em 0 0.6em;
 }
-#chapter-content .reader-heading + .reader-heading { margin-top: 0; }
+#chapter-content :is(p, div, h1, h2, h3, h4, h5, h6).reader-heading + .reader-heading { margin-top: 0; }
+/* A chapter's opening heading sits lower, with room after it, like a book. */
+#chapter-content :is(p, div, h1, h2, h3, h4, h5, h6).chapter-opening { margin-top: 3.5em; }
+#chapter-content :is(p, div, h1, h2, h3, h4, h5, h6).reader-heading:has(+ :not(.reader-heading)) { margin-bottom: 1.4em; }
+/* Where you stopped, marked briefly when the book opens. */
+#chapter-content .your-place {
+    border-radius: 4px;
+    animation: your-place 2.6s ease-out;
+}
+@keyframes your-place {
+    0%, 35% { background: color-mix(in srgb, var(--color-accent) 14%, transparent); }
+    100% { background: transparent; }
+}
+@media (prefers-reduced-motion: reduce) { #chapter-content .your-place { animation: none; } }
 #chapter-content :is(h1, h2, h3, h4, h5, h6) {
     font-weight: 600;
     line-height: 1.25;
