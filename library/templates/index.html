@@ -12,6 +12,7 @@
     </script>
     <!-- Expose the current user's role to client-side scripts -->
     <script src="{{ url_for('static', filename='js/app_root.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/signed_out.js') }}"></script>
     <script>
         window.APP_ROOT = "{{ request.script_root }}";
         window.isAuthenticated = {{ 'true' if current_user.is_authenticated else 'false' }};
@@ -28,10 +29,8 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="Library">
     <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400..700&display=swap" rel="stylesheet">
+    <link href="{{ url_for('static', filename='vendor/fontawesome-6.0.0/css/all.min.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='fonts/inter/inter.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/base.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/structural.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/tokens.css') }}" rel="stylesheet">
@@ -172,7 +171,7 @@
     <!-- Hidden input for cover image uploads -->
     <input type="file" id="coverUploadInput" style="display: none;" onchange="handleCoverUpload(this.files)">
 
-    <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+    <script src="{{ url_for('static', filename='vendor/jquery-3.6.0.min.js') }}"></script>
     <script src="{{ url_for('static', filename='js/darkmode.js') }}"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     <script src="{{ url_for('static', filename='js/pwa.js') }}"></script>
