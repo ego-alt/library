@@ -1,7 +1,7 @@
 // Offline support for the library.
 //
 // Two caches:
-//   shell — pages, our static files, CDN assets, and small JSON responses.
+//   shell — pages, our static files (fonts and vendor scripts included), and small JSON responses.
 //           Network-first for pages and JSON (fresh when online, cached when
 //           not); cache-first for versioned assets.
 //   books — the streamed book data (/load_book) and its images. A book's
@@ -13,19 +13,12 @@
 // Served from the app root (see routes/pwa.py), so the scope is the whole
 // mount: "/" standalone, "/library/" behind the dashboard proxy.
 
-const SHELL_CACHE = 'shell-v9';
+const SHELL_CACHE = 'shell-v10';
 const BOOKS_CACHE = 'books-v1';
 const COVERS_CACHE = 'covers-v1';
 const MAX_BOOKS = 12;
 const MAX_COVERS = 400;
 const ROOT = new URL(self.registration.scope).pathname;  // always ends in "/"
-
-const CDN_HOSTS = new Set([
-    'cdn.jsdelivr.net',
-    'cdnjs.cloudflare.com',
-    'fonts.googleapis.com',
-    'fonts.gstatic.com',
-]);
 
 // Never cached: auth, file downloads, and the worker itself.
 const PASSTHROUGH = ['auth/', 'download/', 'sw.js', 'healthz'];
@@ -57,13 +50,7 @@ self.addEventListener('fetch', (event) => {
     if (request.method !== 'GET') return;
     const url = new URL(request.url);
 
-    if (url.origin !== self.location.origin) {
-        if (CDN_HOSTS.has(url.hostname)) {
-            event.respondWith(cacheFirst(request, SHELL_CACHE));
-        }
-        return;
-    }
-    if (!url.pathname.startsWith(ROOT)) return;
+    if (url.origin !== self.location.origin || !url.pathname.startsWith(ROOT)) return;
     const path = url.pathname.slice(ROOT.length);
 
     if (PASSTHROUGH.some((p) => path.startsWith(p))) return;
@@ -119,16 +106,6 @@ function offlineBookPage() {
 <p><a href="${ROOT}">Back to library</a></p>
 </main></body></html>`;
     return new Response(html, {status: 503, headers: {'Content-Type': 'text/html; charset=utf-8'}});
-}
-
-async function cacheFirst(request, cacheName) {
-    const cache = await caches.open(cacheName);
-    const cached = await cache.match(request);
-    if (cached) return cached;
-    const response = await fetch(request);
-    // Opaque (status 0) CDN responses are fine to keep: their URLs are pinned.
-    if (response.ok || response.type === 'opaque') cache.put(request, response.clone());
-    return response;
 }
 
 async function staleWhileRevalidate(request, cacheName) {
