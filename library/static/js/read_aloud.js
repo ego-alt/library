@@ -246,7 +246,9 @@
         return builtChapter !== currentChapterNum || !sentences[0]?.range.startContainer.isConnected;
     }
 
-    function speak(i) {
+    const STALL_MS = 1000;   // a sentence that hasn't started by then was dropped: say it again, once
+
+    function speak(i, retried = false) {
         if (stale()) {
             // You went somewhere else while it was reading: carry on from what's on screen.
             buildSentences();
@@ -262,8 +264,10 @@
         if (voice) u.voice = voice;
         u.rate = rate;
         showMissing(s.key, voice);
+        let started = false;
         u.onstart = () => {
             if (mine !== token) return;
+            started = true;
             mark(s);
             follow(s);
         };
@@ -282,6 +286,14 @@
             if (playing) speak(index + 1);                       // a sentence it can't say: move on
         };
         synth.speak(u);
+        if (!retried) {
+            setTimeout(() => {
+                if (started || mine !== token || !playing) return;
+                cancelSpeech();
+                const again = token;
+                setTimeout(() => { if (again === token && playing) speak(index, true); }, RESTART_MS);
+            }, STALL_MS);
+        }
     }
 
     /** The word at charIndex in a sentence, as a range in the page. Some voices
@@ -312,14 +324,25 @@
         }
     }
 
+    // Chrome on desktop drops an utterance spoken straight after cancel(), so
+    // starting over while it's talking waits this long for the cancel to settle.
+    const RESTART_MS = 120;
+
     function startAt(i) {
+        const busy = synth.speaking || synth.pending;
         cancelSpeech();
         if (stale()) buildSentences();
         playing = true;
         following = true;
         $('read-aloud-back').hidden = true;
         setPlayButton();
-        speak(i === null ? firstVisible() : i);
+        const at = i === null ? firstVisible() : i;
+        if (!busy) return speak(at);
+        // Show where it's going at once; the voice follows a moment later.
+        index = at;
+        if (sentences[at]) { mark(sentences[at]); follow(sentences[at]); }
+        const mine = token;
+        setTimeout(() => { if (mine === token && playing) speak(at); }, RESTART_MS);
     }
 
     function pause() {
