@@ -442,7 +442,7 @@
         row(section.querySelector('[data-setting="chinese"]')).hidden = !chinese;
         for (const select of section.querySelectorAll('select[data-voice]')) {
             const key = select.dataset.voice;
-            row(select).hidden = !(keys.has(key) || (key === 'zh-CN' && keys.has('zh-TW')));
+            row(select).hidden = !keys.has(key);
         }
     }
 
