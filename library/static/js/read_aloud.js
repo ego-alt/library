@@ -25,8 +25,10 @@
         'zh-TW': 'Mandarin (Taiwan)',
         'zh-HK': 'Cantonese',
     };
-    const HAN = /[㐀-鿿豈-﫿]/;
-    // Blocks of text to read (innermost only), and what inside them isn't read.
+    const HAN = /[\u3400-\u9fff\uf900-\ufaff]/;   // Chinese characters (CJK unified and compatibility)
+    // A device without a voice for one kind of Chinese reads with the nearest it has.
+    const FALLBACK = {'zh-HK': ['zh-CN', 'zh-TW'], 'zh-TW': ['zh-CN'], 'zh-CN': ['zh-TW']};
+    // Elements that start a new run of text (see textRuns), and what isn't read.
     const BLOCKS = 'p, li, blockquote, h1, h2, h3, h4, h5, h6, figcaption, dt, dd, td, th, pre, div';
     const SKIP = 'nav.chapter-end, script, style, [aria-hidden="true"], aside[epub\\:type~="footnote"], ' +
         'aside[epub\\:type~="endnote"], [epub\\:type~="footnotes"], [epub\\:type~="endnotes"], ' +
@@ -95,22 +97,30 @@
 
     // ---------- sentences ----------
 
-    function innermostBlocks(root) {
-        return [...root.querySelectorAll(BLOCKS)].filter((b) => !b.querySelector(BLOCKS) && !b.closest(SKIP));
-    }
-
-    /** A block's readable text, with where each character lives in the page. */
-    function textOf(block) {
-        const walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT, {
-            acceptNode: (n) => (n.parentElement.closest(SKIP) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
+    /** The chapter's text in runs read as a unit, each with where its characters live
+     * in the page. A run is the text of one block, ended by a <br> or the start of
+     * another block, so a chapter of loose lines in one <div> (as Haodoo's are)
+     * reads line by line, not just its heading. */
+    function textRuns(root) {
+        const runs = [];
+        let run = null;
+        const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, {
+            acceptNode: (n) => (n.nodeType === 1 && n.matches(SKIP) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
         });
-        const pieces = [];
-        let text = '';
         for (let n = walker.nextNode(); n; n = walker.nextNode()) {
-            pieces.push({node: n, start: text.length});
-            text += n.data;
+            if (n.nodeType === 1) {
+                if (n.tagName === 'BR') run = null;
+                continue;
+            }
+            const block = n.parentElement.closest(BLOCKS) || root;
+            if (!run || run.block !== block) {
+                run = {block, text: '', pieces: []};
+                runs.push(run);
+            }
+            run.pieces.push({node: n, start: run.text.length});
+            run.text += n.data;
         }
-        return {text, pieces};
+        return runs.filter((r) => r.text.trim());
     }
 
     function pointAt(pieces, i) {
@@ -141,9 +151,7 @@
         sentences = [];
         builtChapter = currentChapterNum;
         if (!root) return;
-        for (const block of innermostBlocks(root)) {
-            const {text, pieces} = textOf(block);
-            if (!text.trim() || !pieces.length) continue;
+        for (const {block, text, pieces} of textRuns(root)) {
             const tag = block.closest('[lang], [xml\\:lang]');
             const lang = tag ? (tag.getAttribute('lang') || tag.getAttribute('xml:lang')) : '';
             const segmenter = new Intl.Segmenter(keyOf(lang) || undefined, {granularity: 'sentence'});
@@ -247,7 +255,7 @@
         const s = sentences[index];
         const mine = ++token;
         const u = new SpeechSynthesisUtterance(s.text);
-        const voice = voiceFor(s.key) || (s.key === 'zh-HK' ? voiceFor('zh-CN') : null);
+        const voice = voiceFor(s.key) || (FALLBACK[s.key] || []).map(voiceFor).find(Boolean) || null;
         u.lang = voice?.lang || s.key;
         if (voice) u.voice = voice;
         u.rate = rate;
