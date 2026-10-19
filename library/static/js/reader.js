@@ -882,6 +882,8 @@ function displayChapter() {
     const content = allChapters[currentChapterNum].content;
     const chapterEl = document.getElementById('chapter-content');
     chapterEl.innerHTML = content;
+    // Its language (for reading aloud): the chapter's own, else the book's.
+    chapterEl.lang = allChapters[currentChapterNum].lang || currentBook?.language || '';
     tidyChapter(chapterEl);
     watchChapterImages(chapterEl);
 
@@ -1143,6 +1145,7 @@ const SHORTCUTS = [
     ['T', 'Contents'],
     ['+ −', 'Text size'],
     ['N', 'Night mode'],
+    ['L', 'Read aloud: start or pause'],
     ['A', 'Ask about the selected text'],
     ['E', 'Explain it: define, translate or gloss'],
     ['Esc', 'Close'],
@@ -1183,7 +1186,7 @@ function closeShortcutHelp() {
 const CHROME_SELECTOR =
     'button, a, input, textarea, .toc-menu, .top-controls, ' +
     '.selection-menu, .search-overlay, .temp-highlight, .note-popover, .back-pill, .reader-settings, ' +
-    '.finish-offer, .shortcut-help';
+    '.finish-offer, .shortcut-help, .read-aloud';
 
 // Click left third of the reader to go back a page, right third forward.
 // Middle third is a no-op so text selection still works freely.
@@ -1863,6 +1866,7 @@ function syncSettingsPanel() {
         layout: isPaginated() ? 'paginate' : 'scroll',
     };
     panel.querySelectorAll('.rs-seg').forEach((seg) => {
+        if (!(seg.dataset.setting in values)) return;   // read aloud keeps its own (read_aloud.js)
         seg.querySelectorAll('button').forEach((b) =>
             b.setAttribute('aria-pressed', b.dataset.value === values[seg.dataset.setting] ? 'true' : 'false'));
     });

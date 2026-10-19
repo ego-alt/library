@@ -135,6 +135,7 @@ def stream_book_content(
                     "image_count": structure["image_count"],
                     "toc": structure["toc"],
                     "spine_length": structure["spine_length"],
+                    "language": structure["language"],
                     "chapter_sizes": structure["chapter_sizes"],
                     "start_chapter": start_chapter,
                     "chapter_pos": chapter_pos,
@@ -165,6 +166,7 @@ def stream_book_content(
                         "href": chapter_content["href"],
                         "title": chapter_content["title"] or f"Chapter {index + 1}",
                         "content": chapter_content["content"],
+                        "lang": chapter_content["lang"],
                     }
                 )
                 + "\n"

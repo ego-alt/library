@@ -941,9 +941,15 @@ def get_epub_structure(epub_path: str) -> dict:
                 for i in range(len(chapters))
             ]
 
+        # The book's language (dc:language, e.g. "en", "zh-HK"): read aloud
+        # picks a voice by it.
+        language = next((t.strip() for t in root.xpath("//dc:language/text()", namespaces=namespaces)
+                         if t.strip()), "")
+
         return {
             "chapters": chapters,
             "images": images,
+            "language": language,
             "image_count": len(images),
             "toc": toc,
             "spine_length": len(chapters),
@@ -992,8 +998,17 @@ def process_chapter_content(
                     except Exception as e:
                         logger.warning(f"Failed to process image {image_path}: {e}")
 
+        # A chapter can declare its own language on <html> or <body>.
+        lang = ""
+        for el in (soup.body, soup.html):
+            if el is not None:
+                lang = el.get("xml:lang") or el.get("lang") or ""
+                if lang:
+                    break
+
         return {
             "title": title,
             "href": chapter_path.split("/")[-1],
             "content": str(soup.body) if soup.body else str(soup),
+            "lang": lang,
         }
