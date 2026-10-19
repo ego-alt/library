@@ -856,7 +856,7 @@ html.paginated, html.paginated body {
 
 .read-aloud {
     position: fixed;
-    z-index: 110;
+    z-index: 99;                      /* under the top bar and its Aa panel */
     bottom: calc(16px + env(safe-area-inset-bottom, 0px));
     left: 50%;
     transform: translateX(-50%);
@@ -865,6 +865,7 @@ html.paginated, html.paginated body {
     align-items: center;
     justify-content: center;
     gap: 2px var(--space-1);
+    width: max-content;               /* centred from the middle: size to the buttons, not half the screen */
     max-width: calc(100vw - 2 * var(--space-4));
     padding: 4px 6px;
     background: var(--reader-bg);
