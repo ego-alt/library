@@ -196,9 +196,14 @@ html:not(.paginated) #chapter-content { max-width: var(--reader-measure, 70ch); 
     border-radius: var(--radius-md);
     box-shadow: 0 16px 40px -12px rgba(0, 0, 0, 0.35);
     font-size: 0.875rem;
+    /* Never taller than the screen below the bar: scroll inside instead. */
+    max-height: calc(100dvh - 96px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));   /* below the bar, with a margin */
+    overflow-y: auto;
+    overscroll-behavior: contain;
 }
 .reader-settings[hidden] { display: none; }
 .rs-row { display: grid; gap: 6px; }
+.rs-row[hidden] { display: none; }
 .rs-label {
     color: var(--color-text-muted);
     font-size: 0.6875rem;

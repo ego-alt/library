@@ -423,9 +423,33 @@
 
     // ---------- settings (in the Aa panel) ----------
 
+    /** The voice languages this book needs: what's in the chapter open, else the book's language. */
+    function languagesHere() {
+        if (stale()) buildSentences();
+        const keys = new Set(sentences.map((s) => s.key));
+        if (!keys.size && currentBook?.language) {
+            const declared = keyOf(currentBook.language);
+            keys.add(declared.startsWith('zh') && chineseAs() !== 'auto' ? chineseAs() : declared);
+        }
+        return keys;
+    }
+
+    /** Only the settings that matter for this book: no Chinese options for an English one. */
+    function showRelevant(section) {
+        const keys = languagesHere();
+        const chinese = [...keys].some((k) => k.startsWith('zh'));
+        const row = (el) => el.closest('.rs-row');
+        row(section.querySelector('[data-setting="chinese"]')).hidden = !chinese;
+        for (const select of section.querySelectorAll('select[data-voice]')) {
+            const key = select.dataset.voice;
+            row(select).hidden = !(keys.has(key) || (key === 'zh-CN' && keys.has('zh-TW')));
+        }
+    }
+
     function fillVoiceSettings() {
         const section = $('rs-read-aloud');
         if (!section) return;
+        if (currentBook) showRelevant(section);
         const seg = section.querySelector('[data-setting="chinese"]');
         seg.querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.value === chineseAs())));
         for (const select of section.querySelectorAll('select[data-voice]')) {
@@ -447,6 +471,8 @@
         const section = $('rs-read-aloud');
         if (!section) return;
         section.hidden = false;
+        // Fill it in each time it opens: the voices may have loaded since, and the chapter may differ.
+        $('settings-toggle')?.addEventListener('click', () => setTimeout(fillVoiceSettings));
         section.querySelector('[data-setting="chinese"]').addEventListener('click', (e) => {
             const b = e.target.closest('button[data-value]');
             if (!b) return;
