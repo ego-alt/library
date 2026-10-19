@@ -210,6 +210,7 @@
             if (page !== currentPageIndex) {
                 currentPageIndex = page;
                 applyPageTransform(true);
+                applyChrome(false);
                 updateProgressBar();
                 updateChapterNumberLabel();
                 saveBookmark();
@@ -218,6 +219,7 @@
             const topBar = document.querySelector('.top-controls.visible')?.offsetHeight || 0;
             if (r.top < topBar + 8 || r.bottom > window.innerHeight * 0.75) {
                 window.scrollTo({top: window.scrollY + r.top - window.innerHeight * 0.3, behavior: 'smooth'});
+                applyChrome(false);
             }
         }
     }
@@ -417,6 +419,7 @@
         open = true;
         $('read-aloud').hidden = false;
         document.body.classList.add('reading-aloud');
+        applyChrome(false);            // listening: the text gets the whole screen
         startAt(null);
     }
 
@@ -520,8 +523,9 @@
             }
         });
 
-        // While reading aloud, a tap on the text reads from that sentence
-        // (instead of turning the page or toggling the bars).
+        // While reading aloud, a double-tap (or double-click) on the text reads
+        // from that sentence. A single tap still shows or hides the bars, as
+        // everywhere in the reader; it waits a moment to see if a second follows.
         const seek = (x, y) => {
             let node, offset;
             if (document.caretPositionFromPoint) {
@@ -539,19 +543,35 @@
             startAt(i);
             return true;
         };
-        const onText = (e) => open && !e.target.closest(CHROME_SELECTOR) && e.target.closest('#chapter-content')
-            && !window.getSelection().toString().trim();
-        window.addEventListener('click', (e) => {
-            if (onText(e) && seek(e.clientX, e.clientY)) { e.stopPropagation(); e.preventDefault(); }
-        }, true);
+        const DOUBLE_TAP_MS = 300;
+        const onText = (e) => open && !e.target.closest(CHROME_SELECTOR) && e.target.closest('#chapter-content');
+        let lastTouch = 0;
+        document.addEventListener('dblclick', (e) => {
+            if (!onText(e) || performance.now() - lastTouch < 800) return;   // a double-tap is handled below
+            if (seek(e.clientX, e.clientY)) window.getSelection().removeAllRanges();   // not the word it selected
+        });
         let tap = null;
+        let pending = null;            // a single tap waiting to see if it's a double
         window.addEventListener('touchstart', (e) => {
             tap = e.touches.length === 1 ? {x: e.touches[0].clientX, y: e.touches[0].clientY, t: e.timeStamp} : null;
         }, {capture: true, passive: true});
         window.addEventListener('touchend', (e) => {
             const t = e.changedTouches[0];
-            if (!tap || !onText(e) || Math.hypot(t.clientX - tap.x, t.clientY - tap.y) > 10 || e.timeStamp - tap.t > 350) return;
-            if (seek(t.clientX, t.clientY)) e.stopPropagation();   // not also the bars or a page turn
+            if (!tap || !onText(e) || window.getSelection().toString().trim()) return;
+            if (Math.hypot(t.clientX - tap.x, t.clientY - tap.y) > 10 || e.timeStamp - tap.t > 350) return;
+            // Pages mode's side thirds turn the page, as always.
+            if (isPaginated() && (t.clientX < window.innerWidth * 0.35 || t.clientX > window.innerWidth * 0.65)) return;
+            lastTouch = performance.now();
+            e.stopPropagation();       // the reader's own tap toggle waits for us
+            if (pending && Math.hypot(t.clientX - pending.x, t.clientY - pending.y) < 40) {
+                clearTimeout(pending.timer);
+                pending = null;
+                seek(t.clientX, t.clientY);
+                return;
+            }
+            clearTimeout(pending?.timer);
+            pending = {x: t.clientX, y: t.clientY,
+                timer: setTimeout(() => { pending = null; applyChrome(!isChromeVisible()); }, DOUBLE_TAP_MS)};
         }, true);
 
         // Leaving the page stops the voice (it would carry on otherwise on some browsers).
