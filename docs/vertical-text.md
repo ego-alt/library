@@ -37,7 +37,7 @@ Space and Page Down still go onwards in both.
 
 ## Typography
 
-- **Font:** a Traditional Chinese serif (`Songti TC` on Apple devices, `Noto Serif TC` elsewhere), with a little more line spacing than horizontal text. The `Aa` line-spacing choices still apply.
+- **Font:** a Traditional Chinese serif (`Songti TC` on Apple devices, `Noto Serif TC` elsewhere), with a little more line spacing than horizontal text. Chinese and Japanese chapters use the same serif in horizontal text too (`.cjk`, set by `isCjkChapter`); an English passage inside keeps Inter. The `Aa` line-spacing choices still apply.
 - **Punctuation:** `text-orientation: mixed` with the font's vertical forms puts 。，、 in place and turns 「」 and ⋯⋯.
 - **Numbers:** a run of one or two digits stands upright in one cell ("第1段", "12月"), wrapped in a `text-combine-upright` span when the chapter renders (`uprightDigits`). Longer numbers ("2024年"), decimals and Latin words ("A4") run sideways, as in print.
 - **Paragraphs:** no space between them; they open with their own two-character indent. The book's margins, made for horizontal text, are dropped. Headings get space before and after.

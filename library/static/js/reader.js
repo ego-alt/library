@@ -45,6 +45,16 @@ function verticalAvailable() {
     return (sample.match(HAN_TEXT) || []).length > sample.replace(/\s/g, '').length * 0.5;
 }
 
+// This chapter is Chinese or Japanese: by its own language tag, else the
+// book's, else (untagged) its text.
+function isCjkChapter() {
+    const chapter = allChapters[currentChapterNum];
+    const tag = (chapter && chapter.lang) || (currentBook && currentBook.language) || '';
+    if (tag) return CJK_LANG.test(tag);
+    const sample = (document.getElementById('chapter-content')?.textContent || '').slice(0, 2000);
+    return (sample.match(HAN_TEXT) || []).length > sample.replace(/\s/g, '').length * 0.5;
+}
+
 function isVertical() {
     if (!verticalAvailable()) return false;
     const chosen = readerSetting(VERTICAL_KEY, '');
@@ -1071,6 +1081,7 @@ function displayChapter() {
     // Its language (for reading aloud): the chapter's own, else the book's.
     chapterEl.lang = allChapters[currentChapterNum].lang || currentBook?.language || '';
     applyReadingModeClass();   // an untagged book is known to be Chinese only from its text
+    chapterEl.classList.toggle('cjk', isCjkChapter());   // set in a Chinese serif (reader.css)
     tidyChapter(chapterEl);
     watchChapterImages(chapterEl);
 
