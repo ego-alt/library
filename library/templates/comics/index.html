@@ -1,0 +1,42 @@
+{% extends "comics/base.html" %}
+{% block title %}Series{% endblock %}
+{% block page %}series{% endblock %}
+{% block content %}
+{% if cards %}
+<div class="library-toolbar">
+    <div class="library-search">
+        <i class="fas fa-magnifying-glass" aria-hidden="true"></i>
+        <input type="search" id="seriesFilter" class="library-search__input" placeholder="Filter series" aria-label="Filter series" autocomplete="off">
+    </div>
+    <div class="status-filter" role="radiogroup" aria-label="Sort series">
+        <button type="button" role="radio" data-sort="name" aria-checked="true">A–Z</button>
+        <button type="button" role="radio" data-sort="added" aria-checked="false">Recently added</button>
+    </div>
+</div>
+<div class="library row comics-grid" id="seriesGrid">
+    {% for card in cards %}
+    {% set s = card.series %}
+    <div data-name="{{ s.name|lower }}" data-added="{{ card.added.isoformat() if card.added else '' }}">
+        <div class="book">
+            <a href="{{ url_for('comics.series_page', series_id=s.id) }}" aria-label="{{ s.display_name }}">
+                {% if card.cover %}<img src="{{ card.cover }}" alt="" loading="lazy" referrerpolicy="no-referrer">{% else %}<span class="cover-blank">{{ s.name }}</span>{% endif %}
+            </a>
+            {% if card.upcoming %}<span class="cover-badge" title="{{ card.upcoming }} not out yet">{{ card.upcoming }} upcoming</span>{% endif %}
+        </div>
+        <div class="book-caption">
+            <span class="book-caption__title">{{ s.name }}</span>
+            <span class="book-caption__author">{{ s.start_year or '' }}{% if s.start_year %} · {% endif %}{{ card.have }}/{{ card.total }}</span>
+            <span class="have-meter" aria-hidden="true"><span style="width: {{ (100 * card.have / card.total)|round|int if card.total else 0 }}%"></span></span>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+    <h3>No series yet</h3>
+    <p>Follow a series to see its issues, get new ones as they come out, and read them here.</p>
+    <a class="btn btn-primary" href="{{ url_for('comics.add_page') }}">Follow a series</a>
+    <p class="mt-3"><a href="{{ url_for('comics.import_page') }}">Or import files you already have</a></p>
+</div>
+{% endif %}
+{% endblock %}

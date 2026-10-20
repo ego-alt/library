@@ -13,15 +13,15 @@
 // Served from the app root (see routes/pwa.py), so the scope is the whole
 // mount: "/" standalone, "/library/" behind the dashboard proxy.
 
-const SHELL_CACHE = 'shell-v17';
+const SHELL_CACHE = 'shell-v18';
 const BOOKS_CACHE = 'books-v1';
 const COVERS_CACHE = 'covers-v1';
 const MAX_BOOKS = 12;
 const MAX_COVERS = 400;
 const ROOT = new URL(self.registration.scope).pathname;  // always ends in "/"
 
-// Never cached: auth, file downloads, and the worker itself.
-const PASSTHROUGH = ['auth/', 'download/', 'sw.js', 'healthz'];
+// Never cached: auth, file downloads, comics (pages are big and change), and the worker itself.
+const PASSTHROUGH = ['auth/', 'download/', 'comics/', 'sw.js', 'healthz'];
 // JSON the library and reader read; cached so the last view works offline.
 const JSON_ROUTES = ['load_more/', 'book_metadata/', 'tags', 'bookmark/'];
 

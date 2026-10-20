@@ -1,0 +1,21 @@
+{% extends "comics/base.html" %}
+{% block title %}Follow a series{% endblock %}
+{% block page %}add{% endblock %}
+{% block content %}
+<form class="library-toolbar" id="lookupForm" role="search">
+    <div class="library-search">
+        <i class="fas fa-magnifying-glass" aria-hidden="true"></i>
+        <input type="search" id="lookupQuery" name="q" class="library-search__input" placeholder="Find a series, e.g. Saga or Absolute Batman" aria-label="Series name" value="{{ query }}" autocomplete="off" enterkeyhint="search" {% if providers_ready %}autofocus{% else %}disabled{% endif %}>
+    </div>
+    <div class="add-options">
+        <label for="monitorChoice">Get</label>
+        <select id="monitorChoice" class="input">
+            <option value="future" selected>new issues from now on</option>
+            <option value="all">every issue I don't have</option>
+            <option value="none">nothing (I'll pick)</option>
+        </select>
+    </div>
+</form>
+<p class="comics-hint" id="lookupStatus" aria-live="polite">{% if providers_ready %}Type a name and press Enter.{% endif %}</p>
+<ol class="lookup-results" id="lookupResults"></ol>
+{% endblock %}

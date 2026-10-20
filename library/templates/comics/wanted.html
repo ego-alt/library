@@ -1,0 +1,28 @@
+{% extends "comics/base.html" %}
+{% block title %}Wanted{% endblock %}
+{% block page %}wanted{% endblock %}
+{% block content %}
+<div class="page-head">
+    <p class="comics-hint">Issues that are out and that you want, newest first. They're searched for every few hours{% if not can_search %}, once there's an indexer in Settings{% endif %}.</p>
+    {% if can_search and issues %}<button type="button" class="btn btn-secondary" data-action="search-all">Search all now</button>{% endif %}
+</div>
+{% if issues %}
+<table class="issue-table issue-table--wanted">
+    <thead><tr><th>Issue</th><th class="col-date">Out</th><th class="col-actions"><span class="visually-hidden">Actions</span></th></tr></thead>
+    <tbody>
+    {% for issue in issues %}
+        <tr data-issue-id="{{ issue.id }}">
+            <td><a href="{{ url_for('comics.series_page', series_id=issue.series_id) }}">{{ issue.series }}</a> <span class="issue-num">#{{ issue.number }}</span>{% if issue.title %} <span class="text-muted">{{ issue.title }}</span>{% endif %}</td>
+            <td class="col-date">{{ issue.date or '' }}</td>
+            <td class="col-actions">
+                {% if can_search %}<button type="button" class="link-button" data-action="search-issue">Search</button>{% endif %}
+                <button type="button" class="link-button" data-action="skip-issue">Skip</button>
+            </td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<div class="empty-state"><h3>Nothing wanted</h3><p>New issues of the series you follow show up here when they come out.</p></div>
+{% endif %}
+{% endblock %}

@@ -9,6 +9,7 @@ from flask_migrate import Migrate
 from werkzeug.exceptions import HTTPException
 from werkzeug.middleware.proxy_fix import ProxyFix
 
+from .comics import init_comics
 from .commands import init_commands
 from .config import DATA_DIR, Config
 from .models import db
@@ -121,6 +122,8 @@ def create_app(config_overrides: dict | None = None):
     app.register_blueprint(pwa_blueprint)
     app.register_blueprint(read_blueprint)
     app.register_blueprint(upload_blueprint)
+
+    init_comics(app)
 
     db.init_app(app)
     Migrate(app, db, render_as_batch=True)

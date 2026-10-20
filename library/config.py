@@ -13,6 +13,9 @@ class Config:
     # Database configuration
     SQLALCHEMY_DATABASE_URI = "sqlite:///" + os.path.join(DATA_DIR, "library.db")
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    # The comics worker writes alongside requests; wait for a lock rather
+    # than failing with "database is locked".
+    SQLALCHEMY_ENGINE_OPTIONS = {"connect_args": {"timeout": 30}}
 
     # Compression configuration
     COMPRESS_ALGORITHM = "gzip"  # or 'br' for Brotli
@@ -27,6 +30,15 @@ class Config:
 
     # Book directory
     BOOK_DIR = os.getenv("BOOK_DIR", os.path.join(BASE_DIR, "books"))
+
+    # Comics: the library's CBZs, and a folder whose files get imported
+    # (downloads that finished, or anything you drop in).
+    # The default sits in instance/, which survives redeploys; on the Pi
+    # COMIC_DIR points at the big disk.
+    COMIC_DIR = os.getenv("COMIC_DIR", os.path.join(DATA_DIR, "comics"))
+    COMIC_IMPORT_DIR = os.getenv("COMIC_IMPORT_DIR") or None  # default: COMIC_DIR/_import
+    # Run the comics jobs (search, downloads, imports) in this process.
+    COMICS_WORKER = os.getenv("COMICS_WORKER", "1") == "1"
 
     # Generated cover thumbnails (safe to delete; rebuilt on demand)
     THUMB_DIR = os.path.join(DATA_DIR, "thumbs")

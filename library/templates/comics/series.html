@@ -1,0 +1,73 @@
+{% extends "comics/base.html" %}
+{% block title %}{{ series.display_name }}{% endblock %}
+{% block page %}series-detail{% endblock %}
+{% block content %}
+<section class="series-head" data-series-id="{{ series.id }}">
+    <div class="series-head__cover book">
+        {% if cover %}<img src="{{ cover }}" alt="" referrerpolicy="no-referrer">{% else %}<span class="cover-blank">{{ series.name }}</span>{% endif %}
+    </div>
+    <div class="series-head__text">
+        <h2 class="series-head__title">{{ series.name }}</h2>
+        <p class="series-head__meta">
+            {{ [series.publisher, series.start_year, ('Vol. ' ~ series.volume) if series.volume, (series.issue_count ~ ' issues') if series.issue_count]|select|join(' · ') }}
+            {% if series.provider == 'comicvine' %} · <a href="https://comicvine.gamespot.com/volume/4050-{{ series.provider_id }}/" target="_blank" rel="noopener noreferrer">ComicVine</a>
+            {% elif series.provider == 'metron' %} · <a href="https://metron.cloud/series/{{ series.provider_id }}/" target="_blank" rel="noopener noreferrer">Metron</a>
+            {% else %} · from your files{% endif %}
+        </p>
+        {% if series.description %}<p class="series-head__desc">{{ series.description|truncate(600) }}</p>{% endif %}
+        <div class="series-head__actions">
+            {% if series.provider != 'local' %}
+            <label class="monitor-pick">Get
+                <select id="monitorSelect" class="input">
+                    <option value="future"{% if series.monitor == 'future' %} selected{% endif %}>new issues</option>
+                    <option value="all"{% if series.monitor == 'all' %} selected{% endif %}>every missing issue</option>
+                    <option value="none"{% if series.monitor == 'none' %} selected{% endif %}>nothing</option>
+                </select>
+            </label>
+            <button type="button" class="btn btn-secondary" data-action="search-series">Search wanted</button>
+            <button type="button" class="btn btn-secondary" data-action="refresh">Refresh details</button>
+            {% endif %}
+            {% if is_admin %}<button type="button" class="btn btn-ghost danger-text" data-action="delete-series">Stop following</button>{% endif %}
+        </div>
+    </div>
+</section>
+
+<div class="issue-toolbar">
+    <div class="status-filter" role="radiogroup" aria-label="Show issues">
+        <button type="button" role="radio" data-filter="all" aria-checked="true">All</button>
+        <button type="button" role="radio" data-filter="have" aria-checked="false">Have</button>
+        <button type="button" role="radio" data-filter="missing" aria-checked="false">Missing</button>
+    </div>
+    <div class="bulk" id="bulkBar" hidden>
+        <span id="bulkCount"></span>
+        <button type="button" class="btn btn-secondary" data-bulk="wanted">Want</button>
+        <button type="button" class="btn btn-secondary" data-bulk="skipped">Skip</button>
+    </div>
+</div>
+
+<table class="issue-table" id="issueTable">
+    <thead>
+        <tr>
+            <th class="col-check"><input type="checkbox" id="checkAll" aria-label="Select all"></th>
+            <th class="col-num">#</th>
+            <th>Title</th>
+            <th class="col-date">Out</th>
+            <th class="col-status">Status</th>
+            <th class="col-actions"><span class="visually-hidden">Actions</span></th>
+        </tr>
+    </thead>
+    <tbody></tbody>
+</table>
+<script id="issuesData" type="application/json">{{ issues|tojson }}</script>
+
+<input type="file" id="issueUpload" accept=".cbz,.cbr,.cb7,.zip,.rar,.7z" hidden>
+
+<div class="metadata-overlay" id="releasesOverlay" role="dialog" aria-modal="true" aria-labelledby="releasesTitle">
+    <div class="metadata-content releases-panel">
+        <button class="close-metadata btn btn-ghost" data-close aria-label="Close">&times;</button>
+        <h3 id="releasesTitle">Releases</h3>
+        <p class="comics-hint" id="releasesStatus"></p>
+        <ol class="release-list" id="releaseList"></ol>
+    </div>
+</div>
+{% endblock %}

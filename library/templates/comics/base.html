@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <script>
+        (function() {
+        if (localStorage.getItem('darkMode') === 'enabled') {
+            document.documentElement.classList.add('dark-mode');
+        }
+        })();
+    </script>
+    <script src="{{ url_for('static', filename='js/app_root.js') }}"></script>
+    <script>
+        window.APP_ROOT = "{{ request.script_root }}";
+        window.isAdmin = {{ 'true' if is_admin else 'false' }};
+    </script>
+    <title>{% block title %}Comics{% endblock %} · Shelves</title>
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link rel="manifest" href="{{ url_for('pwa.manifest') }}">
+    <meta name="theme-color" content="#f6f4ef" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#141210" media="(prefers-color-scheme: dark)">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
+    <link href="{{ url_for('static', filename='vendor/fontawesome-6.0.0-subset/icons.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='fonts/inter/inter.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/base.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/structural.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/tokens.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/index.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/comics.css') }}" rel="stylesheet">
+</head>
+<body data-page="{% block page %}{% endblock %}">
+    <header class="lib-bar">
+        <div class="lib-bar__inner container">
+            <div class="lib-bar__where">
+                <h1 class="lib-bar__title">Shelves</h1>
+                <nav class="shelf-switch" aria-label="Library">
+                    <a href="{{ url_for('index_routes.index') }}">Books</a>
+                    <a href="{{ url_for('comics.index') }}" aria-current="page">Comics</a>
+                </nav>
+            </div>
+            <div class="lib-bar__actions">
+                <button class="dark-mode-toggle btn btn-ghost" onclick="toggleDarkMode()" aria-label="Night mode" title="Night mode">
+                    <i id="dark-mode-icon" class="fas fa-moon" aria-hidden="true"></i>
+                </button>
+                <a class="btn btn-ghost" href="{{ url_for('comics.add_page') }}" aria-label="Follow a series" title="Follow a series">
+                    <i class="fas fa-plus" aria-hidden="true"></i>
+                </a>
+            </div>
+        </div>
+    </header>
+    <div class="container">
+        <nav class="comics-nav" aria-label="Comics">
+            <a href="{{ url_for('comics.index') }}"{% if active == 'series' %} aria-current="page"{% endif %}>Series</a>
+            <a href="{{ url_for('comics.wanted_page') }}"{% if active == 'wanted' %} aria-current="page"{% endif %}>Wanted{% if counts.wanted %} <span class="count">{{ counts.wanted }}</span>{% endif %}</a>
+            <a href="{{ url_for('comics.upcoming_page') }}"{% if active == 'upcoming' %} aria-current="page"{% endif %}>Upcoming</a>
+            <a href="{{ url_for('comics.activity_page') }}"{% if active == 'activity' %} aria-current="page"{% endif %}>Activity{% if counts.active %} <span class="count">{{ counts.active }}</span>{% endif %}</a>
+            <a href="{{ url_for('comics.import_page') }}"{% if active == 'import' %} aria-current="page"{% endif %}>Import{% if counts.import %} <span class="count">{{ counts.import }}</span>{% endif %}</a>
+            {% if is_admin %}<a href="{{ url_for('comics.settings_page') }}"{% if active == 'settings' %} aria-current="page"{% endif %}>Settings</a>{% endif %}
+        </nav>
+        {% if not providers_ready and active not in ('settings',) %}
+        <p class="comics-banner">
+            Series details come from ComicVine or Metron, and neither is set up yet.
+            {% if is_admin %}<a href="{{ url_for('comics.settings_page') }}#metadata">Add a key in Settings</a>.{% else %}An admin can add one in Settings.{% endif %}
+            Until then you can still import and read files.
+        </p>
+        {% endif %}
+        {% block content %}{% endblock %}
+    </div>
+
+    <div id="toastContainer" class="notice-stack" aria-live="polite" aria-atomic="false"></div>
+
+    <script src="{{ url_for('static', filename='js/darkmode.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/comics.js') }}"></script>
+</body>
+</html>

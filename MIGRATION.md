@@ -1,5 +1,11 @@
 # Migrating an Existing Deployment
 
+## October 2026: comics
+
+1. **Rebuild the image**: it now installs `libarchive-tools` (bsdtar, for CBR and CB7 files).
+2. Migration `c4d8e1f2a9b6` adds the comics tables (applied on start behind the dashboard).
+3. Optional: set `COMIC_DIR` to where comics should live and mount it (the default, `instance/comics`, is on the same disk as the database). Add a ComicVine key or Metron account, indexers and a download client in Comics → Settings.
+
 ## October 2026: audit fixes (`audit-fixes` branch)
 
 Upgrade steps:

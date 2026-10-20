@@ -32,6 +32,18 @@ A personal EPUB library and reader for the home stack: covers hung on a warmly l
 - **Safe edits**: deletes go to a 30-day trash with Undo.
 - **Installable**, and the last 12 books you opened stay readable offline. `?` lists the keyboard shortcuts.
 
+## Comics
+
+A Mylar-style comics manager under **Comics** (`/comics/`):
+
+- **Follow series** found on ComicVine or Metron (a free key or account, set in Comics → Settings). Choose to get new issues from now on, every missing issue, or only the ones you pick.
+- **Wanted issues are searched for** every few hours on your Newznab (usenet) and Torznab (torrent, via Prowlarr or Jackett) indexers. The best release goes to SABnzbd or qBittorrent, or is saved to a blackhole folder. Releases are matched on series, issue number and year; collections, rejected words and oversized files are skipped, and a release that failed isn't grabbed again for that issue. **Pick** shows every release and why each one fits or doesn't.
+- **Imports**: finished downloads, and any CBZ/CBR/CB7 dropped into the import folder or uploaded, are matched to their issue (by ComicInfo.xml or filename) and written as CBZs with WebP pages, a ComicInfo.xml and a MetronInfo.xml (the original filename is kept in the notes), under `<Publisher>/<Series (Year)>/<Series> #001 (Year).cbz`. Files that match nothing wait on the Import page to be matched by hand, or made into a series of their own.
+- **Upcoming** lists the next two months by shop date; **Activity** shows downloads, their history, and the background jobs.
+- **The reader**: one page, two-page spreads (the cover alone, wide pages alone) or one long scroll; fit to height or width; right to left for manga; tap, swipe or the arrow keys. Your page is saved, and the next issue is a tap away at the end.
+
+The background jobs run in one gunicorn process (a file lock picks it). They start with the first request after a restart.
+
 ## Run it
 
 ```sh
@@ -55,6 +67,9 @@ Tests and lint: `uv run pytest` and `uvx ruff check .`
 | `BOOK_DIR` | Where the EPUBs live (must exist) |
 | `ANTHROPIC_API_KEY` | Turns on Ask and Explain (optional) |
 | `TRASH_RETENTION_DAYS` | How long deleted books are kept (default 30) |
+| `COMIC_DIR` | Where comics live (default `instance/comics`) |
+| `COMIC_IMPORT_DIR` | Folder whose comics get imported (default `COMIC_DIR/_import`) |
+| `COMICVINE_API_KEY`, `METRON_USERNAME`, `METRON_PASSWORD` | Metadata, if not set in the app |
 
 ## Home stack
 

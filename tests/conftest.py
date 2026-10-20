@@ -102,3 +102,31 @@ def book(app, book_dir, sample_epub_bytes):
     db.session.add(book)
     db.session.commit()
     return book
+
+
+@pytest.fixture
+def comic_dir(app, tmp_path):
+    """COMIC_DIR (with its _import folder) for comics tests."""
+    d = tmp_path / "comics"
+    d.mkdir()
+    app.config["COMIC_DIR"] = str(d)
+    app.config["COMIC_IMPORT_DIR"] = None
+    app.config["COMICS_STATE_DIR"] = str(tmp_path / "state")
+    return d
+
+
+def make_cbz(path, pages=3, comicinfo=None, size=(60, 90)):
+    """A small CBZ of solid-colour PNG pages (named out of order on purpose)."""
+    import io
+    import zipfile
+
+    from PIL import Image
+
+    with zipfile.ZipFile(path, "w") as zf:
+        for i in reversed(range(pages)):
+            buf = io.BytesIO()
+            Image.new("RGB", size, (40 * i % 255, 80, 120)).save(buf, "PNG")
+            zf.writestr(f"page{i + 1}.png", buf.getvalue())
+        if comicinfo:
+            zf.writestr("ComicInfo.xml", comicinfo)
+    return path

@@ -2,6 +2,9 @@
 FROM python:3.10-slim
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
+# bsdtar (libarchive) unpacks CBR and CB7 comics, RAR5 included.
+RUN apt-get update && apt-get install -y --no-install-recommends libarchive-tools && rm -rf /var/lib/apt/lists/*
+
 # Set the working directory inside the container
 WORKDIR /app
 

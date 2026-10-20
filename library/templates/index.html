@@ -43,6 +43,10 @@
         <div class="lib-bar__inner container">
             <div class="lib-bar__where">
                 <h1 class="lib-bar__title">Shelves</h1>
+                <nav class="shelf-switch" aria-label="Library">
+                    <a href="{{ url_for('index_routes.index') }}" aria-current="page">Books</a>
+                    {% if current_user.is_authenticated %}<a href="{{ url_for('comics.index') }}">Comics</a>{% endif %}
+                </nav>
             </div>
             <div class="lib-bar__actions">
                 <button class="layout-toggle btn btn-ghost" id="layoutToggle" onclick="toggleLayout()" aria-pressed="false" aria-label="Bookshelf view" title="Switch to bookshelf view">
