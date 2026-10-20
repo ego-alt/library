@@ -1,62 +1,61 @@
-# Vertical text (直排): plan
+# Vertical text (直排)
 
-Chinese books read top to bottom, in lines from right to left, with pages turning to the left, like a printed Traditional Chinese book. A per-book reader setting, built on the reader's existing Pages mode.
+Chinese and Japanese books can read top to bottom, in lines from right to left, with pages turning to the left, like a printed Traditional Chinese book. Built October 2026; this note says how it works and what's left.
 
 ## When it's offered
 
-- **Only for Chinese (and Japanese) books**: the book's or the chapter's language is `zh*`, `yue*` or `ja*` (the same language data read aloud uses).
-- **Only in Pages mode.** Vertical text flows sideways, so Scroll mode would mean scrolling through a chapter sideways: clumsy on a desktop, worse on a phone. Choosing Vertical switches to Pages. Scroll mode is greyed out while vertical is on, with a one-line reason.
-- **Setting:** `Aa → Text direction: Horizontal / Vertical`, remembered per book.
-- **Default:** vertical when the EPUB asks for it: `page-progression-direction="rtl"` in its spine, or `writing-mode: vertical-rl` in its CSS (Haodoo's 直式 editions). Horizontal otherwise. The book's own `writing-mode` is otherwise dropped by the style filter (`utils.book_style_subset`), and stays dropped; the reader decides.
+- **Only for Chinese and Japanese books**: the book's or the chapter's language is `zh*`, `yue*`, `cmn*` or `ja*`, or, for a book with no language at all, its text is mostly Chinese or Japanese characters (`verticalAvailable` in `reader.js`).
+- **Setting:** `Aa → Text direction: Horizontal / Vertical`, remembered per book on each device (`textDirection:<file>` in local storage).
+- **Default:** vertical when the book asks for it: `page-progression-direction="rtl"` on its spine, or `writing-mode: vertical-rl` (or the old `tb-rl`, with or without a prefix) in its CSS. `utils.get_epub_structure` sends this as `vertical` with the book's metadata. A right-to-left Arabic or Hebrew book isn't affected, since only Chinese and Japanese books are offered vertical text. The book's own `writing-mode` is still dropped by the style filter (`utils.book_style_subset`); the reader decides.
+- **Always in pages.** Vertical text would scroll sideways, so while it's on the Scroll button is greyed out, with "Vertical text reads in pages." Your Scroll/Pages choice for other books isn't changed.
 
 ## How the page works
 
-Measured in Chrome (October 2026): with `writing-mode: vertical-rl`, CSS columns stack top to bottom, so columns, which the horizontal Pages mode uses, page *downwards*. Instead:
+With `writing-mode: vertical-rl`, CSS columns stack downwards, so the horizontal Pages mode's columns can't be used. Instead (`layoutVerticalChapter`):
 
-- The chapter is one `vertical-rl` block of fixed height (the screen, less the margins). It overflows to the **left**, and `scrollLeft` runs from 0 to negative, as standardised.
-- **A page is one screen of lines**, and the next page is further left. Single pages only at first. A two-page spread would need a gutter in the middle of a single flowing block, which this layout can't make; see the open questions.
-- **Pages break between lines.** A fixed step cuts lines in half wherever paragraph spacing knocks them off the grid (seen in the test). So the page starts are worked out from the lines themselves: walk the text's line boxes (`Range.getClientRects`) and start each page at the first line that didn't fully fit on the one before. The same list then gives the page count, "page n of m", and which page holds any element or sentence.
-- **On wide screens** the page is capped (around 40 lines) and centred, so it doesn't become a wall of columns.
-- **Your place** is saved as before, a fraction through the chapter, now measured from the right: `-scrollLeft / (scrollWidth - clientWidth)`. Switching direction keeps you on the same paragraph, as changing the text size already does.
+- The chapter is one `vertical-rl` block a page high. It overflows to the **left**, and `scrollLeft` runs from 0 to negative.
+- **A page is a screen of whole lines.** `verticalLines` collects every line (and picture) as a span measured from the chapter's right edge; a new page starts at the first line that wouldn't fit on the one before, midway between the two lines. The part of the next page's first line that would show at the left edge is clipped (`clip-path`). A fixed step would cut lines in half wherever paragraph spacing knocks them off a grid.
+- **Wide screens:** a page is at most 40 lines, centred.
+- An empty filler a page wide ends the chapter, so the last page can be brought to the right edge.
+
+## Your place
+
+Where a page starts is kept as **a character offset into the chapter's text** (`firstVisibleTextOffset`), not a paragraph: in books whose chapters are one long block of lines (as Haodoo's are), a paragraph is the whole chapter. Text size, line spacing, resizing and switching direction all land back on the page holding that character. This also fixed horizontal Pages mode for those books, which used to jump back to the chapter's first page on a text-size change.
+
+The saved bookmark is still a fraction of the chapter's pages, as in horizontal Pages mode.
 
 ## Turning pages
-
-Everything mirrors, as in a printed vertical book:
 
 | | Horizontal | Vertical |
 |---|---|---|
 | Next page | → key, tap the right side, swipe left | ← key, tap the **left** side, swipe **right** |
 | Previous page | ← key, tap the left side, swipe right | → key, tap the right side, swipe left |
 | Next / previous section | Shift + → / ← | Shift + ← / → |
-| Progress bar | fills left to right | fills right to left |
+| Progress hairline | fills left to right | fills right to left |
+
+Space and Page Down still go onwards in both.
 
 ## Typography
 
-- **Font:** a Traditional Chinese serif (`Songti TC` on Apple devices, `Noto Serif TC` elsewhere), with line spacing around 1.8–2. The Aa line-spacing choices still apply.
-- **Punctuation:** `text-orientation: mixed`, plus the font's vertical forms, puts 。，、 in the right place and turns 「」『』 and ⋯⋯ correctly; checked in Chrome. Traditional (TC) fonts centre punctuation, the Taiwan convention, which suits these books.
-- **Numbers and short Latin runs:** one or two digits stand upright, combined into one cell ("第1段" → upright 1; "12月" → upright 12). Longer numbers and English words run sideways, as in print. This is done by wrapping digit runs of 1–2 in a `text-combine-upright: all` span when the chapter is rendered, since `digits 2` isn't supported widely enough.
-- **Paragraphs:** no space between them; Chinese books open each one with a two-character indent (　　), which most, including Haodoo's, already have. Headings keep their space.
-- **Images** stay upright, sized to the page height. A full-page image gets its own page.
+- **Font:** a Traditional Chinese serif (`Songti TC` on Apple devices, `Noto Serif TC` elsewhere), with a little more line spacing than horizontal text. The `Aa` line-spacing choices still apply.
+- **Punctuation:** `text-orientation: mixed` with the font's vertical forms puts 。，、 in place and turns 「」 and ⋯⋯.
+- **Numbers:** a run of one or two digits stands upright in one cell ("第1段", "12月"), wrapped in a `text-combine-upright` span when the chapter renders (`uprightDigits`). Longer numbers ("2024年"), decimals and Latin words ("A4") run sideways, as in print.
+- **Paragraphs:** no space between them; they open with their own two-character indent. The book's margins, made for horizontal text, are dropped. Headings get space before and after.
+- **Pictures** stay upright, sized to fit the page.
 
 ## Everything else that knows about pages
 
-- **Running head and foot:** the chapter title along the right edge, and the page and time left along the bottom, in the reader's mono style.
-- **Footnote popovers, the Ask/Explain selection menu, search results, the "Back" pill, the chapter-end button and the "Finished?" offer:** each placed relative to its text, so each gets checked in vertical mode; most should just work.
-- **Read aloud:** sentence and word highlighting work unchanged. The page-following needs the line-based page list to find a sentence's page.
-- **Text size and line-spacing changes** relayout and keep your paragraph, as now.
+- **Read aloud** follows the sentence onto its page, using the same page list (`pageOfRect`, `visiblePageRect`).
+- **Contents, footnote links, "Back", time left and the "Finished?" offer** work unchanged.
+- **Running head and foot** stay in the top and bottom margins; the chapter title is set to the right, where the text begins.
 
-## Steps
+## Testing
 
-1. **Layout and paging:** the vertical block, the line-based page list, page turns in every direction, saving and restoring your place. Behind the setting, Chinese books only.
-2. **Typography:** numbers upright, paragraph spacing, font and punctuation checks, images.
-3. **The rest of the reader:** running head and foot, notes, selection, search, read-aloud following, chapter ends.
-4. **Defaults:** vertical when the EPUB asks for it, the per-book setting, and Scroll mode greyed out.
+Checked in Chrome at desktop and phone sizes, on 吶喊 (a horizontal edition, switched under `Aa`) and on a copy marked right-to-left (vertical by default): paging by whole lines, turning by keys and taps, keeping your place through text size, resizing and direction switches, numbers, night mode, and English books unchanged. Server tests: `tests/test_vertical_text.py`.
 
-Testing: automated in Chrome and WebKit, Safari's engine (`playwright install webkit`), on 吶喊 and a vertical Haodoo edition; then on your iPhone. iOS Safari is where vertical layout is most likely to differ.
+Not yet checked on an iPhone. iOS Safari is where vertical layout is most likely to differ (negative `scrollLeft`, line measuring, `text-combine-upright`).
 
-Effort: step 1 is the bulk; the reader's paging assumes left-to-right columns in about a dozen places. Steps 2–4 are smaller.
+## Not done
 
-## Open questions
-
-- **Two-page spreads on a laptop?** Not possible with one flowing block. Rendering the chapter twice, side by side and offset by a page, would work, at the cost of selection and read aloud seeing two copies. Single pages first; see whether a laptop wants more.
-- **Vertical by default for every Chinese book,** or only when the EPUB asks for it? Starting with "when it asks", plus the setting.
+- **Two-page spreads on a laptop.** One flowing block can't make a gutter in the middle. Rendering the chapter twice, side by side and offset by a page, would work, at the cost of selection and read aloud seeing two copies. Single pages first; see whether a laptop wants more.
+- **The chapter title along the right edge** instead of the top margin, as some vertical books print it.

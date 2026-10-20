@@ -19,6 +19,8 @@
           var measure = {narrow: '60ch', normal: '70ch', wide: '80ch'}[get('readerWidth')];
           if (measure) root.style.setProperty('--reader-measure', measure);
           if (get('readingMode') === 'paginate') root.classList.add('paginated');
+          // A book you've set to vertical text (reader.js decides the rest once the book loads).
+          if (get('textDirection:' + location.pathname.split('/').pop()) === 'vertical') root.classList.add('paginated', 'vertical');
         })();
     </script>
     <script src="{{ url_for('static', filename='js/app_root.js') }}"></script>
@@ -100,6 +102,14 @@
                     <button type="button" data-value="black"><i class="rs-swatch rs-swatch--black"></i>Black</button>
                 </div>
             </div>
+            {# Chinese and Japanese books only (reader.js shows it). #}
+            <div class="rs-row" id="rs-direction" hidden>
+                <span class="rs-label">Text direction</span>
+                <div class="rs-seg" data-setting="direction">
+                    <button type="button" data-value="horizontal">Horizontal</button>
+                    <button type="button" data-value="vertical">Vertical</button>
+                </div>
+            </div>
             <div class="rs-row">
                 <span class="rs-label">Layout</span>
                 <div class="rs-seg" data-setting="layout">
@@ -107,6 +117,7 @@
                     <button type="button" data-value="paginate">Pages</button>
                 </div>
             </div>
+            <p class="rs-note" id="rs-layout-note" hidden>Vertical text reads in pages.</p>
             {# Read aloud: voices are this device's own, so the choices differ per device. #}
             <div class="rs-read-aloud" id="rs-read-aloud" hidden>
                 <div class="rs-row">

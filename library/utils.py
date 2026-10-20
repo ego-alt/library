@@ -301,6 +301,8 @@ def fallback_cover_svg(title: str, author: str) -> bytes:
 
 
 _HTML_EXTENSIONS = (".html", ".xhtml", ".htm")
+# writing-mode: vertical-rl, with or without a -webkit-/-epub- prefix, or the old tb-rl.
+_VERTICAL_CSS = re.compile(r"writing-mode\s*:\s*(?:vertical-rl|tb-rl)", re.I)
 
 
 def epub_text_size(epub_file_path: str) -> int:
@@ -946,10 +948,20 @@ def get_epub_structure(epub_path: str) -> dict:
         language = next((t.strip() for t in root.xpath("//dc:language/text()", namespaces=namespaces)
                          if t.strip()), "")
 
+        # Whether the book asks to be read in vertical lines (Chinese and
+        # Japanese editions set right-to-left page turns, or vertical-rl in
+        # their CSS). The reader offers vertical text only for those
+        # languages, so a right-to-left Arabic book isn't affected.
+        vertical = (spine_elem.get("page-progression-direction") or "").lower() == "rtl" or any(
+            _VERTICAL_CSS.search(z.read(n).decode("utf-8", "ignore"))
+            for n in z.namelist() if n.lower().endswith(".css")
+        )
+
         return {
             "chapters": chapters,
             "images": images,
             "language": language,
+            "vertical": vertical,
             "image_count": len(images),
             "toc": toc,
             "spine_length": len(chapters),

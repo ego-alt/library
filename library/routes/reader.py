@@ -136,6 +136,8 @@ def stream_book_content(
                     "toc": structure["toc"],
                     "spine_length": structure["spine_length"],
                     "language": structure["language"],
+                    # The book asks for vertical text (see get_epub_structure).
+                    "vertical": structure["vertical"],
                     "chapter_sizes": structure["chapter_sizes"],
                     "start_chapter": start_chapter,
                     "chapter_pos": chapter_pos,

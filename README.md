@@ -26,6 +26,7 @@ A personal EPUB library and reader for the home stack: covers hung on a warmly l
 - **Footnotes** open beside their marker, and any jump inside the book offers a way back.
 - **Ask and Explain**: select text to ask about it, or for a definition or translation in context (Claude; needs `ANTHROPIC_API_KEY`).
 - **Read aloud** with your device's own voices (free, no account): the sentence being read is highlighted, and the pages turn or scroll to keep up. English, Mandarin and Cantonese, each from the book's language tags; a book's Chinese can be set to read as Mandarin or Cantonese, and each language's voice chosen, under `Aa`. Tap a sentence to read from there; `L` starts and pauses.
+- **Vertical text** for Chinese and Japanese books (直排): lines top to bottom, right to left, pages turning leftwards, with one- and two-digit numbers upright. On by default when the book asks for it, and set per book under `Aa`.
 - **Your place everywhere**: progress syncs across devices, and the paragraph you stopped at is marked when you return.
 - **Managing books**: add EPUBs by upload or drag and drop, edit details and covers, tag books, mark them private.
 - **Safe edits**: deletes go to a 30-day trash with Undo.

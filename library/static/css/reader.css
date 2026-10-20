@@ -235,6 +235,9 @@ html:not(.paginated) #chapter-content { max-width: var(--reader-measure, 70ch); 
     color: var(--reader-heading);
     font-weight: 600;
 }
+.rs-seg button:disabled { opacity: 0.4; cursor: default; border-color: var(--color-border); }
+.rs-note { margin: -6px 0 0; color: var(--color-text-muted); font-size: 0.75rem; }
+.rs-note[hidden] { display: none; }
 .rs-stepper { display: flex; align-items: center; gap: 8px; }
 .rs-stepper span { min-width: 3ch; text-align: center; font-variant-numeric: tabular-nums; }
 .rs-swatch {
@@ -624,6 +627,48 @@ html.paginated, html.paginated body {
     width: auto;
     object-fit: contain;
 }
+
+/* ============================================================
+   Vertical text (直排): Chinese and Japanese books read top to
+   bottom, in lines from right to left. One vertical-rl block a
+   page high that overflows to the left; reader.js pages it by
+   whole lines (layoutVerticalChapter) and clips the last.
+   ============================================================ */
+html.vertical #chapter-content {
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    column-width: auto;
+    column-gap: normal;
+    width: 100%;
+    font-family: "Songti TC", "Noto Serif TC", "Source Han Serif TC", "Songti SC", "Noto Serif CJK TC", serif;
+    line-height: calc(var(--reader-leading, 1.7) + 0.2);
+    letter-spacing: 0.02em;
+    hyphens: none;
+    -webkit-hyphens: none;
+    text-wrap: wrap;
+}
+/* Room to bring the last page to the right edge. */
+html.vertical #chapter-content > .page-filler { width: var(--col-w, 100vw); height: 1px; break-before: auto; }
+/* No space between paragraphs: they open with their own two-character indent
+   (　　). The book's physical margins (made for horizontal text) are dropped. */
+html.vertical #chapter-content :where(p, div) { margin: 0; }
+html.vertical #chapter-content :is(p, div, h1, h2, h3, h4, h5, h6).reader-heading,
+html.vertical #chapter-content :is(h1, h2, h3, h4, h5, h6) {
+    margin: 0 1em 0 1.4em;   /* right: before it; left: after it */
+    line-height: 1.5;
+}
+html.vertical #chapter-content :is(p, div, h1, h2, h3, h4, h5, h6).chapter-opening { margin-top: 2em; margin-right: 0; }
+/* Pictures stay upright, sized to fit the page. */
+html.vertical #chapter-content img {
+    max-height: calc(var(--page-h, 600px) - 24px);
+    max-width: calc(var(--col-w, 600px) - 24px);
+    margin: 0 0.75em;
+}
+/* One or two digits stand upright in a single cell (reader.js uprightDigits). */
+#chapter-content .tcy { text-combine-upright: all; -webkit-text-combine: horizontal; }
+/* The progress hairline fills from the right, the way the pages go. */
+html.vertical .reading-progress { transform: scaleX(-1); }
+html.vertical .running-head { text-align: right; }
 
 /* A footnote, beside its marker. */
 .note-popover {

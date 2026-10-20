@@ -25,10 +25,37 @@ const PAGE_GAP = 72;           // the centre gap of a two-page spread
 const PAGE_MAX_EM = {narrow: 25, normal: 29, wide: 33};
 const SPREAD_WIDTH_THRESHOLD = 1000; // px — show 2-up when viewport is at least this wide
 
-function isPaginated() { return readingMode === 'paginate'; }
+// Vertical text (直排), for Chinese and Japanese books: lines run top to
+// bottom and follow each other leftwards, and the pages turn to the left, as
+// in a printed vertical book. Always in pages. Set per book under Aa; the
+// default is what the book asks for (metadata.vertical). See docs/vertical-text.md.
+const VERTICAL_KEY = `textDirection:${filename}`;
+const CJK_LANG = /^(zh|yue|cmn|ja)\b/i;
+const HAN_TEXT = /[㐀-鿿豈-﫿぀-ヿ]/g;
+const VERTICAL_MAX_LINES = 40;   // wide screens: a page of at most this many lines, centred
+let pageStarts = [0];            // vertical: where each page begins, px from the chapter's start (its right edge)
+
+// A Chinese or Japanese book: by its language tags, or (untagged) its text.
+function verticalAvailable() {
+    if (!currentBook) return false;
+    const chapter = allChapters[currentChapterNum];
+    if (CJK_LANG.test(currentBook.language || '') || CJK_LANG.test((chapter && chapter.lang) || '')) return true;
+    if (currentBook.language) return false;
+    const sample = (document.getElementById('chapter-content')?.textContent || '').slice(0, 2000);
+    return (sample.match(HAN_TEXT) || []).length > sample.replace(/\s/g, '').length * 0.5;
+}
+
+function isVertical() {
+    if (!verticalAvailable()) return false;
+    const chosen = readerSetting(VERTICAL_KEY, '');
+    return chosen ? chosen === 'vertical' : Boolean(currentBook.vertical);
+}
+
+function isPaginated() { return readingMode === 'paginate' || isVertical(); }
 
 function applyReadingModeClass() {
     document.documentElement.classList.toggle('paginated', isPaginated());
+    document.documentElement.classList.toggle('vertical', isVertical());
 }
 
 function updateReadingModeButton() {
@@ -55,6 +82,9 @@ function layoutPaginatedChapter() {
     const content = document.getElementById('chapter-content');
     const reader = document.getElementById('reader-content');
     if (!content || !reader) return;
+    content.querySelector(':scope > .page-filler')?.remove();
+    if (isVertical()) return layoutVerticalChapter(content, reader);
+    content.style.clipPath = '';
 
     spreadCount = computeSpreadCount();
     // Measured at the default text size, so changing the size reflows the
@@ -83,7 +113,6 @@ function layoutPaginatedChapter() {
     // A chapter that ends on a left-hand page can't scroll a full spread
     // further, so the last spread would slide back and repeat a column. Give
     // it a blank right-hand page instead, as a printed book would.
-    content.querySelector(':scope > .page-filler')?.remove();
     let totalCols = Math.max(1, Math.round(content.scrollWidth / step));
     if (spreadCount > 1 && totalCols % spreadCount) {
         const filler = document.createElement('div');
@@ -98,59 +127,185 @@ function layoutPaginatedChapter() {
     applyPageTransform(false);
 }
 
-// Recompute the paginated layout and land back on the same content: the
-// paragraph that was first on the page (a resize, a font change, an image
-// arriving), or, when restoring a saved place, a fraction of the chapter.
-function relayoutPreservingPosition(fraction) {
-    // The paragraph remembered when the page last settled: by now a resize or
-    // font change has already reflowed the columns, so measuring now would
-    // find whatever slid onto the page instead.
+// Vertical pages: the chapter is one vertical-rl block a page high, flowing
+// to the left (scrollLeft runs from 0 to negative). CSS columns can't page it
+// sideways (in vertical-rl they stack downwards), and a fixed step would cut
+// lines in half wherever paragraph spacing knocks them off a grid. So a page
+// is a screen of whole lines: each starts at the first line that didn't fit
+// on the one before, and anything past the page's last line is clipped.
+function layoutVerticalChapter(content, reader) {
+    spreadCount = 1;
+    const pitch = parseFloat(getComputedStyle(content).lineHeight) || currentFontSize * 1.9;
+    const container = reader.closest('.reader-container');
+    const cs = container ? getComputedStyle(container) : null;
+    const padX = cs ? parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) : 60;
+    document.documentElement.style.setProperty('--reader-max-w', Math.round(VERTICAL_MAX_LINES * pitch + padX) + 'px');
+
+    const w = reader.clientWidth;
+    const h = reader.clientHeight;
+    if (w <= 0 || h <= 0) return;
+    document.documentElement.style.setProperty('--col-w', w + 'px');
+    document.documentElement.style.setProperty('--page-h', h + 'px');
+    void content.offsetHeight;
+
+    pageStarts = [0];
+    let start = 0, prevEnd = 0;
+    for (const [a, b] of verticalLines(content)) {
+        // A new page starts midway between the last line that fit and this one.
+        if (b - start > w + 1 && a > start + 1) {
+            start = Math.round((prevEnd + a) / 2);
+            pageStarts.push(start);
+        }
+        prevEnd = b;
+    }
+    // Room to bring the last page to the right edge.
+    const filler = document.createElement('div');
+    filler.className = 'page-filler';
+    filler.setAttribute('aria-hidden', 'true');
+    content.appendChild(filler);
+
+    totalPages = pageStarts.length;
+    currentPageIndex = Math.max(0, Math.min(currentPageIndex, totalPages - 1));
+    applyPageTransform(false);
+}
+
+// The chapter's lines (and pictures) in order, as [start, end] in px from its
+// start (right) edge. Glyph boxes of one line overlap, so they're merged.
+function verticalLines(content) {
+    const origin = content.getBoundingClientRect().right - content.scrollLeft;
+    const spans = [];
+    const add = (r) => { if (r.width > 0 && r.height > 0) spans.push([origin - r.right, origin - r.left]); };
+    const range = document.createRange();
+    const walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT);
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+        if (!n.data.trim()) continue;
+        range.selectNodeContents(n);
+        for (const r of range.getClientRects()) add(r);
+    }
+    content.querySelectorAll('img, svg, hr, table').forEach((el) => add(el.getBoundingClientRect()));
+    spans.sort((x, y) => x[0] - y[0]);
+    const lines = [];
+    for (const [a, b] of spans) {
+        const last = lines[lines.length - 1];
+        if (last && a < last[1] - 1) last[1] = Math.max(last[1], b);
+        else lines.push([a, b]);
+    }
+    return lines;
+}
+
+// The page a box on screen is on.
+function pageOfRect(r) {
     const content = document.getElementById('chapter-content');
-    const remembered = _pageAnchor && content && content.contains(_pageAnchor) ? _pageAnchor : null;
+    const box = content.getBoundingClientRect();
+    if (isVertical()) {
+        const at = box.right - content.scrollLeft - r.right;
+        let page = 0;
+        while (page + 1 < pageStarts.length && pageStarts[page + 1] <= at + 1) page++;
+        return page;
+    }
+    const x = r.left - box.left + content.scrollLeft;
+    const step = spreadStep();
+    return step > 0 ? Math.max(0, Math.floor(x / step)) : 0;
+}
+
+// The part of the chapter's box that shows the current page (a vertical
+// page can be narrower than the screen: it ends with its last whole line).
+function visiblePageRect() {
+    const box = document.getElementById('chapter-content').getBoundingClientRect();
+    if (!isVertical()) return box;
+    const start = pageStarts[currentPageIndex] || 0;
+    const next = pageStarts[currentPageIndex + 1];
+    const width = next === undefined ? box.width : Math.min(box.width, next - start);
+    return {left: box.right - width, right: box.right, top: box.top, bottom: box.bottom, width, height: box.height};
+}
+
+// Recompute the paginated layout and land back on the same content: the
+// text that started the page (a resize, a font change, an image arriving),
+// or, when restoring a saved place, a fraction of the chapter.
+function relayoutPreservingPosition(fraction) {
+    // The place remembered when the page last settled: by now a resize or
+    // font change has already reflowed the pages, so measuring now would
+    // find whatever slid onto the page instead.
+    const remembered = _pageAnchor && _pageAnchor.chapter === currentChapterNum && _pageAnchor.offset >= 0
+        ? _pageAnchor : null;
     const anchor = fraction === undefined ? remembered : null;
     const fallback = fraction === undefined ? currentPositionFraction() : fraction;
     layoutPaginatedChapter();
-    currentPageIndex = anchor
-        ? Math.min(pageOfText(anchor), Math.max(0, totalPages - 1))
+    const rect = anchor && rectAtTextOffset(anchor.offset);
+    currentPageIndex = rect
+        ? Math.min(pageOfRect(rect), Math.max(0, totalPages - 1))
         : Math.round(fallback * Math.max(0, totalPages - 1));
     applyPageTransform(false);
-    // Keep the same paragraph across repeated relayouts (resizing through
+    // Keep the same place across repeated relayouts (resizing through
     // several widths), rather than whatever now starts the page.
     if (anchor) _pageAnchor = anchor;
     updateProgressBar();
     updateChapterNumberLabel();
 }
 
-// The page holding an element's first line of text. (A paragraph split
-// across pages has a box that starts on the earlier page, but the reader
-// was at its first visible line.)
-function pageOfText(el) {
-    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+// Where the page (or, scrolling, the screen) starts, as a character offset
+// into the chapter's text. Unlike a paragraph, it's exact in books whose
+// chapters are one long block of lines, and it survives re-rendering the
+// chapter (numbers set upright or not).
+function firstVisibleTextOffset() {
+    const content = document.getElementById('chapter-content');
+    if (!content) return -1;
+    const box = isPaginated() ? visiblePageRect() : null;
+    const topBar = document.querySelector('.top-controls.visible')?.offsetHeight || 0;
+    // Not on an earlier page (or above the screen): earlier pages lie to the
+    // left, a vertical book's to the right.
+    const notBefore = (r) => (!box ? r.bottom > topBar + 4
+        : isVertical() ? r.left < box.right - 1 : r.right > box.left + 1);
+    const range = document.createRange();
+    const walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT);
+    let offset = 0;
     for (let n = walker.nextNode(); n; n = walker.nextNode()) {
-        if (!n.textContent.trim()) continue;
-        const range = document.createRange();
         range.selectNodeContents(n);
-        const rect = range.getClientRects()[0];
-        if (!rect) break;
-        const content = document.getElementById('chapter-content');
-        const x = rect.left - content.getBoundingClientRect().left + content.scrollLeft;
-        const step = spreadStep();
-        return step > 0 ? Math.max(0, Math.floor(x / step)) : 0;
+        const rects = range.getClientRects();
+        if (n.data.trim() && rects.length && notBefore(rects[rects.length - 1])) {
+            // The first character of this text that's on the page.
+            let lo = 0, hi = n.data.length - 1;
+            while (lo < hi) {
+                const mid = (lo + hi) >> 1;
+                range.setStart(n, mid);
+                range.setEnd(n, mid + 1);
+                const r = range.getBoundingClientRect();
+                if (r.width || r.height ? notBefore(r) : false) hi = mid; else lo = mid + 1;
+            }
+            return offset + lo;
+        }
+        offset += n.data.length;
     }
-    return pageOfElement(el);
+    return -1;
 }
 
-// The first paragraph showing when the page last settled (see
-// relayoutPreservingPosition).
+// The box of the character at a text offset (see firstVisibleTextOffset).
+function rectAtTextOffset(offset) {
+    const content = document.getElementById('chapter-content');
+    const walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT);
+    const range = document.createRange();
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+        if (offset < n.data.length) {
+            range.setStart(n, offset);
+            range.setEnd(n, Math.min(offset + 1, n.data.length));
+            const r = range.getClientRects()[0];
+            return r || null;
+        }
+        offset -= n.data.length;
+    }
+    return null;
+}
+
+// Where the page started when it last settled (see relayoutPreservingPosition).
 let _pageAnchor = null;
-function rememberPageAnchor() { _pageAnchor = firstVisibleBlock(); }
+function rememberPageAnchor() { _pageAnchor = {chapter: currentChapterNum, offset: firstVisibleTextOffset()}; }
 
 // The first paragraph (innermost text block) showing on the current page.
 function firstVisibleBlock() {
     if (!isPaginated()) return null;
     const content = document.getElementById('chapter-content');
     if (!content) return null;
-    const box = content.getBoundingClientRect();
+    const box = visiblePageRect();
     const blocks = content.querySelectorAll(':is(p, div):not(:has(p, div))');
     for (const b of blocks) {
         if (!b.textContent.trim()) continue;
@@ -176,6 +331,16 @@ let _pageFlipRaf = null;
 function applyPageTransform(animate = true) {
     const content = document.getElementById('chapter-content');
     if (!content) return;
+    if (isVertical()) {
+        const start = pageStarts[currentPageIndex] || 0;
+        const next = pageStarts[currentPageIndex + 1];
+        content.scrollLeft = -start;
+        // Hide the next page's first line where it peeks in at the left edge.
+        const hidden = next === undefined ? 0 : Math.max(0, content.clientWidth - (next - start));
+        content.style.clipPath = hidden ? `inset(0 0 0 ${hidden}px)` : '';
+        rememberPageAnchor();
+        return;
+    }
     const targetLeft = currentPageIndex * spreadStep();
 
     if (_pageFlipRaf) {
@@ -211,17 +376,10 @@ function applyPageTransform(animate = true) {
     _pageFlipRaf = requestAnimationFrame(step);
 }
 
+// Measured by bounding rect; offsetLeft would be wrong if any intermediate
+// ancestor is positioned.
 function pageOfElement(el) {
-    if (!el) return 0;
-    const content = document.getElementById('chapter-content');
-    // Measure via bounding rect offset; offsetLeft would be wrong if any
-    // intermediate ancestor is positioned.
-    const contentRect = content.getBoundingClientRect();
-    const elRect = el.getBoundingClientRect();
-    // Add current scrollLeft because rects are viewport-relative.
-    const x = (elRect.left - contentRect.left) + content.scrollLeft;
-    const step = spreadStep();
-    return step > 0 ? Math.max(0, Math.floor(x / step)) : 0;
+    return el ? pageOfRect(el.getBoundingClientRect()) : 0;
 }
 
 // <== THE BOOK'S OWN DESIGN (a safe subset) ==>
@@ -262,7 +420,35 @@ function watchChapterImages(root) {
     });
 }
 
+// Vertical text: a number of one or two digits stands upright in one cell
+// ("第1段", "12月"), as in print; longer numbers and Latin words run sideways.
+// (text-combine-upright: digits 2 would do this alone, but few browsers have it.)
+function uprightDigits(root) {
+    const digits = /(?<![0-9A-Za-z.,])[0-9]{1,2}(?![0-9A-Za-z]|[.,][0-9])/g;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+        acceptNode: (n) => (n.parentElement.closest('script, style, .tcy') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT),
+    });
+    const nodes = [];
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) if (/[0-9]/.test(n.data)) nodes.push(n);
+    for (const n of nodes) {
+        const parts = [];
+        let last = 0;
+        for (const m of n.data.matchAll(digits)) {
+            if (m.index > last) parts.push(n.data.slice(last, m.index));
+            const cell = document.createElement('span');
+            cell.className = 'tcy';
+            cell.textContent = m[0];
+            parts.push(cell);
+            last = m.index + m[0].length;
+        }
+        if (!last) continue;
+        if (last < n.data.length) parts.push(n.data.slice(last));
+        n.replaceWith(...parts);
+    }
+}
+
 function tidyChapter(root) {
+    if (isVertical()) uprightDigits(root);
     const base = parseFloat(getComputedStyle(root).fontSize) || 16;
     root.querySelectorAll('p, div, h1, h2, h3, h4, h5, h6').forEach((el) => {
         const text = el.textContent.trim();
@@ -356,7 +542,7 @@ function prevPage() {
 }
 
 function toggleReadingMode() {
-    if (!currentBook) return;
+    if (!currentBook || isVertical()) return;   // vertical text is always in pages
     // Capture position before switching so we can land on roughly the same
     // content in the new mode.
     const fraction = currentPositionFraction();
@@ -884,6 +1070,7 @@ function displayChapter() {
     chapterEl.innerHTML = content;
     // Its language (for reading aloud): the chapter's own, else the book's.
     chapterEl.lang = allChapters[currentChapterNum].lang || currentBook?.language || '';
+    applyReadingModeClass();   // an untagged book is known to be Chinese only from its text
     tidyChapter(chapterEl);
     watchChapterImages(chapterEl);
 
@@ -1106,11 +1293,14 @@ document.addEventListener('keydown', (e) => {
     if (e.key === '-' || e.key === '_') { e.preventDefault(); adjustFontSize(-1); return; }
     if (e.key === '?') { e.preventDefault(); toggleShortcutHelp(); return; }
 
+    // Vertical books turn the other way: ← is onwards, as in a printed one.
+    const forward = isVertical() ? 'ArrowLeft' : 'ArrowRight';
+    const back = isVertical() ? 'ArrowRight' : 'ArrowLeft';
     if (e.shiftKey) {
-        if (e.key === 'ArrowRight') {
+        if (e.key === forward) {
             e.preventDefault();
             nextChapter();
-        } else if (e.key === 'ArrowLeft') {
+        } else if (e.key === back) {
             e.preventDefault();
             prevChapter(true);
         }
@@ -1130,10 +1320,10 @@ document.addEventListener('keydown', (e) => {
         }
         return;
     }
-    if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') {
+    if (e.key === forward || e.key === 'PageDown' || e.key === ' ') {
         e.preventDefault();
         nextPage();
-    } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+    } else if (e.key === back || e.key === 'PageUp') {
         e.preventDefault();
         prevPage();
     }
@@ -1197,11 +1387,12 @@ document.addEventListener('click', (e) => {
     if (e.target.closest(CHROME_SELECTOR)) return;
     if (window.getSelection().toString().trim()) return;
 
+    // A vertical book's next page is on the left.
     const w = window.innerWidth;
     if (e.clientX < w * 0.35) {
-        prevPage();
+        if (isVertical()) nextPage(); else prevPage();
     } else if (e.clientX > w * 0.65) {
-        nextPage();
+        if (isVertical()) prevPage(); else nextPage();
     }
 });
 
@@ -1229,7 +1420,8 @@ document.addEventListener('touchend', (e) => {
     // Paginated only: in scroll mode a slightly diagonal scroll would jump a
     // whole section. The bottom bar's buttons change section there.
     if (!isPaginated()) return;
-    if (dx < 0) nextPage(); else prevPage();
+    // Pull the page across as in a book: leftwards onwards, or rightwards in a vertical one.
+    if ((dx < 0) !== isVertical()) nextPage(); else prevPage();
 }, {passive: true});
 
 // <== BARS: hide on scroll down, show near the top, tap to toggle ==>
@@ -1854,6 +2046,39 @@ function setWidth(value) {
     alignRunningLines();
 }
 
+// Horizontal or vertical text, for this book. Re-renders the chapter (numbers
+// stand upright only in vertical text) and keeps your place in the text.
+function setDirection(value) {
+    const offset = firstVisibleTextOffset();
+    const fraction = currentPositionFraction();
+    storeSetting(VERTICAL_KEY, value);
+    const content = document.getElementById('chapter-content');
+    content.scrollLeft = 0;
+    content.style.clipPath = '';
+    jumpScroll(0);
+    displayChapter();
+    updateReadingModeButton();
+    requestAnimationFrame(() => {
+        const rect = offset >= 0 ? rectAtTextOffset(offset) : null;
+        if (isPaginated()) {
+            if (rect) {
+                currentPageIndex = Math.min(pageOfRect(rect), totalPages - 1);
+                applyPageTransform(false);
+            } else {
+                relayoutPreservingPosition(fraction);
+            }
+        } else if (rect) {
+            const topBar = document.querySelector('.top-controls.visible')?.offsetHeight || 0;
+            jumpScroll(window.scrollY + rect.top - topBar - currentFontSize * 2);
+        } else {
+            jumpScroll(fraction * document.documentElement.scrollHeight);
+        }
+        updateProgressBar();
+        updateChapterNumberLabel();
+        saveBookmark();
+    });
+}
+
 function syncSettingsPanel() {
     const panel = document.getElementById('reader-settings');
     if (!panel) return;
@@ -1864,7 +2089,19 @@ function syncSettingsPanel() {
         width: readerSetting('readerWidth', 'normal'),
         theme: currentTheme(),
         layout: isPaginated() ? 'paginate' : 'scroll',
+        direction: isVertical() ? 'vertical' : 'horizontal',
     };
+    // Text direction is offered for Chinese and Japanese books; vertical text
+    // reads in pages, so Scroll is greyed out while it's on.
+    const direction = document.getElementById('rs-direction');
+    if (direction) direction.hidden = !verticalAvailable();
+    const scroll = panel.querySelector('[data-setting="layout"] [data-value="scroll"]');
+    if (scroll) {
+        scroll.disabled = isVertical();
+        scroll.title = isVertical() ? 'Vertical text reads in pages' : '';
+    }
+    const note = document.getElementById('rs-layout-note');
+    if (note) note.hidden = !isVertical();
     panel.querySelectorAll('.rs-seg').forEach((seg) => {
         if (!(seg.dataset.setting in values)) return;   // read aloud keeps its own (read_aloud.js)
         seg.querySelectorAll('button').forEach((b) =>
@@ -1898,6 +2135,7 @@ document.addEventListener('DOMContentLoaded', () => {
         else if (setting === 'width') setWidth(v);
         else if (setting === 'theme') setTheme(v);
         else if (setting === 'layout' && v !== (isPaginated() ? 'paginate' : 'scroll')) toggleReadingMode();
+        else if (setting === 'direction' && v !== (isVertical() ? 'vertical' : 'horizontal')) setDirection(v);
         syncSettingsPanel();
     });
     document.addEventListener('pointerdown', (e) => {

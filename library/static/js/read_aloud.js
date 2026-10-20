@@ -3,7 +3,7 @@
  * highlighted, and the pages turning or scrolling to keep up.
  *
  * Works with reader.js's globals: currentBook, currentChapterNum,
- * allChapters, isPaginated(), spreadStep(), currentPageIndex,
+ * allChapters, isPaginated(), pageOfRect(), visiblePageRect(), currentPageIndex,
  * applyPageTransform(), nextChapter(), saveBookmark(), updateProgressBar(),
  * updateChapterNumberLabel(), CHROME_SELECTOR.
  *
@@ -171,8 +171,7 @@
 
     /** The first sentence showing on screen. */
     function firstVisible() {
-        const content = $('chapter-content');
-        const box = content.getBoundingClientRect();
+        const box = visiblePageRect();
         const topBar = document.querySelector('.top-controls.visible')?.offsetHeight || 0;
         const i = sentences.findIndex((s) => {
             const r = s.range.getClientRects()[0];
@@ -204,9 +203,7 @@
         const r = sentence.range.getClientRects()[0];
         if (!r) return;
         if (isPaginated()) {
-            const content = $('chapter-content');
-            const x = r.left - content.getBoundingClientRect().left + content.scrollLeft;
-            const page = Math.max(0, Math.floor(x / spreadStep()));
+            const page = pageOfRect(r);
             if (page !== currentPageIndex) {
                 currentPageIndex = page;
                 applyPageTransform(true);
