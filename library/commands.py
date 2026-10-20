@@ -62,8 +62,11 @@ def import_books_command(directory, access_level):
             metadata = extract_metadata(epub_book)
 
             if metadata:
-                # Get cover path within the epub
-                cover_path = get_epub_cover_path(full_path)
+                # Get cover path within the epub; without one the library draws a fallback cover, as on upload
+                try:
+                    cover_path = get_epub_cover_path(full_path)
+                except Exception:
+                    cover_path = None
 
                 # Create new book record
                 book = Book(

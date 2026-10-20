@@ -121,3 +121,15 @@ def test_purge_trash_command_removes_expired_books(file_backed_app):
     assert "Purged 1 book(s)" in result.output
     with app.app_context():
         assert Book.query.count() == 0
+
+
+def test_import_books_takes_a_book_without_a_cover(file_backed_app, tmp_path):
+    from library.commands import import_books_command
+    from tests._epub_builder import build_epub3
+
+    app, _ = file_backed_app
+    (tmp_path / "books" / "plain.epub").write_bytes(build_epub3(title="No Cover", include_cover=False))
+    app.test_cli_runner().invoke(import_books_command, ["--directory", str(tmp_path / "books")])
+    with app.app_context():
+        book = Book.query.filter_by(filename="plain.epub").one()
+        assert book.title == "No Cover" and book.cover_path is None
