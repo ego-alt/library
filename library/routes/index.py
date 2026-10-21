@@ -1,16 +1,7 @@
 import os
 from datetime import timedelta
 
-from flask import (
-    Blueprint,
-    abort,
-    current_app,
-    jsonify,
-    make_response,
-    render_template,
-    request,
-    send_from_directory,
-)
+from flask import Blueprint, abort, current_app, jsonify, make_response, render_template, request, send_from_directory
 from flask_login import current_user
 
 from ..choices import AccessLevelChoice, BookProgressChoice, UserRoleChoice
@@ -75,27 +66,17 @@ def _filtered_book_query(filters=None, view=VIEW_ALL):
     title, author, genre, or one of your tags."""
     query = Book.query.filter(Book.deleted_at.is_(None))
 
-    if (
-        not current_user.is_authenticated
-        or current_user.role == UserRoleChoice.STANDARD
-    ):
+    if not current_user.is_authenticated or current_user.role == UserRoleChoice.STANDARD:
         query = query.filter(Book.access_level == AccessLevelChoice.STANDARD.value)
 
     if current_user.is_authenticated:
-        query = query.outerjoin(
-            Book.bookmarks.and_(Bookmark.user_id == current_user.id)
-        )
+        query = query.outerjoin(Book.bookmarks.and_(Bookmark.user_id == current_user.id))
 
-    status_for_view = {
-        VIEW_READING: [BookProgressChoice.IN_PROGRESS],
-        VIEW_FINISHED: [BookProgressChoice.FINISHED],
-    }
+    status_for_view = {VIEW_READING: [BookProgressChoice.IN_PROGRESS], VIEW_FINISHED: [BookProgressChoice.FINISHED]}
     if view in status_for_view:
         query = query.filter(Bookmark.status.in_(status_for_view[view]))
     elif view == VIEW_UNREAD:
-        query = query.filter(db.or_(
-            Bookmark.id.is_(None), Bookmark.status == BookProgressChoice.UNREAD
-        ))
+        query = query.filter(db.or_(Bookmark.id.is_(None), Bookmark.status == BookProgressChoice.UNREAD))
 
     if not filters:
         return query
@@ -103,11 +84,7 @@ def _filtered_book_query(filters=None, view=VIEW_ALL):
     if q := filters.get("q"):
         for word in q.split():
             pattern = f"%{word}%"
-            matches = [
-                Book.title.ilike(pattern),
-                Book.author.ilike(pattern),
-                Book.genre.ilike(pattern),
-            ]
+            matches = [Book.title.ilike(pattern), Book.author.ilike(pattern), Book.genre.ilike(pattern)]
             if current_user.is_authenticated:
                 matches.append(_tag_match(Tag.name.ilike(pattern)))
             query = query.filter(db.or_(*matches))
@@ -135,10 +112,10 @@ def get_covers(offset=0, limit=BOOKS_PER_LOAD, filters=None, view=VIEW_ALL):
     # along so books you're reading can show how far in you are.
     if current_user.is_authenticated:
         rows = (
-            query.add_columns(
-                Bookmark.status, Bookmark.chapter_index, Bookmark.position
-            )
-            .offset(offset).limit(limit).all()
+            query.add_columns(Bookmark.status, Bookmark.chapter_index, Bookmark.position)
+            .offset(offset)
+            .limit(limit)
+            .all()
         )
     else:
         books = query.offset(offset).limit(limit).all()
@@ -213,13 +190,7 @@ def index():
     view = _requested_view(VIEW_READING if _has_books_in_progress() else VIEW_ALL)
     images = get_covers(0, BOOKS_PER_LOAD, view=view)
     total = count_books(view=view)
-    return render_template(
-        "index.html",
-        page_size=BOOKS_PER_LOAD,
-        images=images,
-        current_view=view,
-        total_books=total,
-    )
+    return render_template("index.html", page_size=BOOKS_PER_LOAD, images=images, current_view=view, total_books=total)
 
 
 @index_blueprint.route("/load_more/<int:offset>", methods=["GET"])
@@ -280,10 +251,7 @@ def cover(filename):
             cover_bytes = fallback_cover_svg(book.title, display_author(book.author))
         cache.set(cache_key, cover_bytes, timeout=86400)
 
-    mimetype = (
-        guess_cover_mimetype_from_bytes(cover_bytes)
-        or cover_mimetype(book.cover_path or "")
-    )
+    mimetype = guess_cover_mimetype_from_bytes(cover_bytes) or cover_mimetype(book.cover_path or "")
     if width and mimetype != "image/svg+xml":
         thumb = _cached_thumbnail(book, mtime, width, cover_bytes)
         if thumb is not None:
@@ -335,9 +303,7 @@ def download(filename):
     if not user_can_access_book(book):
         return jsonify({"error": "Forbidden"}), 403
 
-    return send_from_directory(
-        current_app.config["BOOK_DIR"], filename, as_attachment=True
-    )
+    return send_from_directory(current_app.config["BOOK_DIR"], filename, as_attachment=True)
 
 
 @index_blueprint.route("/book/<filename>", methods=["DELETE"])
@@ -371,25 +337,19 @@ def purge_trash(retention_days=None):
         retention_days = current_app.config.get("TRASH_RETENTION_DAYS", 30)
     # SQLite hands back naive datetimes, so compare against a naive UTC cutoff.
     cutoff = (_utcnow() - timedelta(days=retention_days)).replace(tzinfo=None)
-    expired = Book.query.filter(
-        Book.deleted_at.isnot(None), Book.deleted_at < cutoff
-    ).all()
+    expired = Book.query.filter(Book.deleted_at.isnot(None), Book.deleted_at < cutoff).all()
     for book in expired:
         epub_path = os.path.join(current_app.config["BOOK_DIR"], book.filename)
         with commit_or_rollback():
             # Defensively clear book_tags rows: existing DBs don't have ON DELETE
             # CASCADE on the join table, so the orphan rows would be left behind.
-            db.session.execute(
-                book_tags.delete().where(book_tags.c.book_id == book.id)
-            )
+            db.session.execute(book_tags.delete().where(book_tags.c.book_id == book.id))
             db.session.delete(book)
         if os.path.exists(epub_path):
             try:
                 os.remove(epub_path)
             except OSError as e:
-                current_app.logger.warning(
-                    f"Purged DB row but failed to unlink {epub_path}: {e}"
-                )
+                current_app.logger.warning(f"Purged DB row but failed to unlink {epub_path}: {e}")
     return len(expired)
 
 
@@ -410,18 +370,13 @@ def search_books():
     if current_user.role == UserRoleChoice.STANDARD:
         query = query.filter(Book.access_level == AccessLevelChoice.STANDARD.value)
 
-    threshold = current_app.config.get(
-        "LIBRARY_MATCH_THRESHOLD", DEFAULT_MATCH_THRESHOLD
-    )
+    threshold = current_app.config.get("LIBRARY_MATCH_THRESHOLD", DEFAULT_MATCH_THRESHOLD)
     matches = rank_matches(title, author, query.all(), threshold)
-    return jsonify({
-        "matches": [
-            {
-                "title": book.title,
-                "author": book.author,
-                "filename": book.filename,
-                "score": round(score, 3),
-            }
-            for book, score in matches
-        ]
-    })
+    return jsonify(
+        {
+            "matches": [
+                {"title": book.title, "author": book.author, "filename": book.filename, "score": round(score, 3)}
+                for book, score in matches
+            ]
+        }
+    )

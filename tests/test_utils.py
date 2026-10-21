@@ -12,12 +12,7 @@ from library.utils import (
     rotate_list,
     update_epub_cover,
 )
-from tests._epub_builder import (
-    build_epub2_ncx,
-    build_epub3,
-    build_epub3_xhtml_cover_wrapper,
-    build_epub_no_toc,
-)
+from tests._epub_builder import build_epub2_ncx, build_epub3, build_epub3_xhtml_cover_wrapper, build_epub_no_toc
 
 
 @pytest.fixture
@@ -74,9 +69,7 @@ def test_structure_epub3_uses_nav_doc(epub_path):
                 {
                     "title": "Part One",
                     "href": "ch1.xhtml",
-                    "children": [
-                        {"title": "Section A", "href": "ch1.xhtml#a", "children": []}
-                    ],
+                    "children": [{"title": "Section A", "href": "ch1.xhtml#a", "children": []}],
                 },
                 {"title": "Part Two", "href": "ch2.xhtml", "children": []},
             ],
@@ -102,9 +95,7 @@ def test_structure_epub2_falls_back_to_ncx(epub_path):
                 {
                     "title": "Foreword",
                     "href": "ch1.xhtml",
-                    "children": [
-                        {"title": "About", "href": "ch1.xhtml#about", "children": []}
-                    ],
+                    "children": [{"title": "About", "href": "ch1.xhtml#about", "children": []}],
                 },
                 {"title": "Chapter 1", "href": "ch2.xhtml", "children": []},
             ],
@@ -142,16 +133,18 @@ def test_structure_uses_in_content_contents_page_when_ncx_is_broken(epub_path):
         <p><a href="ch2.xhtml">Chapter 1: The Beginning</a></p>
         <p><a href="ch3.xhtml">Chapter 2: Middles</a></p>
     """
-    path = epub_path(build_epub2_ncx(
-        chapters=[
-            ("toc.xhtml", contents_html),
-            ("ch1.xhtml", "<h1>Foreword</h1><p>body</p>" * 20),
-            ("ch2.xhtml", "<h1>Chapter 1</h1><p>body</p>" * 20),
-            ("ch3.xhtml", "<h1>Chapter 2</h1><p>body</p>" * 20),
-        ],
-        # NCX points at a non-existent file → resolved TOC is empty → falls through
-        nav_entries=[{"title": "Start", "href": "doesnotexist.xhtml", "children": []}],
-    ))
+    path = epub_path(
+        build_epub2_ncx(
+            chapters=[
+                ("toc.xhtml", contents_html),
+                ("ch1.xhtml", "<h1>Foreword</h1><p>body</p>" * 20),
+                ("ch2.xhtml", "<h1>Chapter 1</h1><p>body</p>" * 20),
+                ("ch3.xhtml", "<h1>Chapter 2</h1><p>body</p>" * 20),
+            ],
+            # NCX points at a non-existent file → resolved TOC is empty → falls through
+            nav_entries=[{"title": "Start", "href": "doesnotexist.xhtml", "children": []}],
+        )
+    )
 
     s = get_epub_structure(path)
     titles = [e["title"] for e in s["toc"]]
@@ -169,14 +162,16 @@ def test_contents_page_with_too_few_links_does_not_trigger(epub_path):
         <h1>Contents</h1>
         <p><a href="ch1.xhtml">Only One Link</a></p>
     """
-    path = epub_path(build_epub2_ncx(
-        chapters=[
-            ("toc.xhtml", contents_html),
-            ("ch1.xhtml", "<h1>One</h1><p>body</p>" * 20),
-            ("ch2.xhtml", "<h1>Two</h1><p>body</p>" * 20),
-        ],
-        nav_entries=[{"title": "Missing", "href": "doesnotexist.xhtml", "children": []}],
-    ))
+    path = epub_path(
+        build_epub2_ncx(
+            chapters=[
+                ("toc.xhtml", contents_html),
+                ("ch1.xhtml", "<h1>One</h1><p>body</p>" * 20),
+                ("ch2.xhtml", "<h1>Two</h1><p>body</p>" * 20),
+            ],
+            nav_entries=[{"title": "Missing", "href": "doesnotexist.xhtml", "children": []}],
+        )
+    )
 
     s = get_epub_structure(path)
     # Synthetic fallback kicked in
@@ -192,15 +187,17 @@ def test_contents_page_recognised_via_inline_span_marker(epub_path):
         <p><a href="ch2.xhtml">PART TWO</a></p>
         <p><a href="ch3.xhtml">PART THREE</a></p>
     """
-    path = epub_path(build_epub2_ncx(
-        chapters=[
-            ("toc.xhtml", contents_html),
-            ("ch1.xhtml", "<p>body</p>" * 30),
-            ("ch2.xhtml", "<p>body</p>" * 30),
-            ("ch3.xhtml", "<p>body</p>" * 30),
-        ],
-        nav_entries=[{"title": "Missing", "href": "nope.xhtml", "children": []}],
-    ))
+    path = epub_path(
+        build_epub2_ncx(
+            chapters=[
+                ("toc.xhtml", contents_html),
+                ("ch1.xhtml", "<p>body</p>" * 30),
+                ("ch2.xhtml", "<p>body</p>" * 30),
+                ("ch3.xhtml", "<p>body</p>" * 30),
+            ],
+            nav_entries=[{"title": "Missing", "href": "nope.xhtml", "children": []}],
+        )
+    )
     s = get_epub_structure(path)
     titles = [e["title"] for e in s["toc"]]
     assert titles == ["PART ONE", "PART TWO", "PART THREE"]
@@ -216,14 +213,16 @@ def test_real_chapter_mentioning_contents_does_not_false_match(epub_path):
         <p>Or see <a href="mailto:reviewer@example.com">the reviewer</a></p>
         <p>Chapter cross-ref: <a href="ch3.xhtml">somewhere</a></p>
     """
-    path = epub_path(build_epub2_ncx(
-        chapters=[
-            ("ch1.xhtml", chapter_with_contents),
-            ("ch2.xhtml", "<h1>Chapter 2</h1><p>body</p>" * 20),
-            ("ch3.xhtml", "<h1>Chapter 3</h1><p>body</p>" * 20),
-        ],
-        nav_entries=[{"title": "Missing", "href": "doesnotexist.xhtml", "children": []}],
-    ))
+    path = epub_path(
+        build_epub2_ncx(
+            chapters=[
+                ("ch1.xhtml", chapter_with_contents),
+                ("ch2.xhtml", "<h1>Chapter 2</h1><p>body</p>" * 20),
+                ("ch3.xhtml", "<h1>Chapter 3</h1><p>body</p>" * 20),
+            ],
+            nav_entries=[{"title": "Missing", "href": "doesnotexist.xhtml", "children": []}],
+        )
+    )
 
     s = get_epub_structure(path)
     # Should NOT have used the chapter as a contents page (only 1/3 links resolve)
@@ -236,17 +235,20 @@ def test_real_chapter_mentioning_contents_does_not_false_match(epub_path):
 
 def _soup(html: str):
     from bs4 import BeautifulSoup
+
     return BeautifulSoup(f"<html><body>{html}</body></html>", "html.parser")
 
 
 def test_chapter_title_prefers_h1_over_h2_even_if_h2_appears_first():
     from library.utils import get_chapter_title
+
     html = "<h2>Subsection</h2><h1>The Real Title</h1>"
     assert get_chapter_title(None, _soup(html)) == "The Real Title"
 
 
 def test_chapter_title_normalizes_whitespace():
     from library.utils import get_chapter_title
+
     html = "<h1>\n  The   Title  \n</h1>"
     assert get_chapter_title(None, _soup(html)) == "The Title"
 
@@ -255,12 +257,14 @@ def test_chapter_title_falls_back_to_head_title_when_no_headings():
     from bs4 import BeautifulSoup
 
     from library.utils import get_chapter_title
+
     html = "<html><head><title>Chapter from head</title></head><body><p>body text</p></body></html>"
     assert get_chapter_title(None, BeautifulSoup(html, "html.parser")) == "Chapter from head"
 
 
 def test_chapter_title_loosened_short_paragraph_threshold():
     from library.utils import get_chapter_title
+
     # 50-char paragraph: previously rejected (limit was 25), now accepted
     html = "<p>A medium-length opening paragraph that fits in 50.</p>"
     title = get_chapter_title(None, _soup(html))
@@ -269,8 +273,9 @@ def test_chapter_title_loosened_short_paragraph_threshold():
 
 def test_chapter_title_skips_headings_inside_nav():
     from library.utils import get_chapter_title
+
     # Contents page with the only heading inside <nav> should not return "Contents"
-    html = '<nav><h1>Contents</h1></nav><p>some content paragraph here</p>'
+    html = "<nav><h1>Contents</h1></nav><p>some content paragraph here</p>"
     title = get_chapter_title(None, _soup(html))
     assert title != "Contents"
 
@@ -280,9 +285,7 @@ def test_structure_lists_images_with_paths(epub_path):
     s = get_epub_structure(path)
     assert s["image_count"] >= 1
     # The cover.png we put at OEBPS/cover.png should be discoverable
-    cover_entry = next(
-        (v for k, v in s["images"].items() if k.endswith("cover.png")), None
-    )
+    cover_entry = next((v for k, v in s["images"].items() if k.endswith("cover.png")), None)
     assert cover_entry is not None
     assert cover_entry["media-type"] == "image/png"
 
@@ -291,9 +294,7 @@ def test_normalize_internal_epub_path_percent_decodes():
     from library.utils import _normalize_internal_epub_path
 
     raw = "OEBPS/Images/Nabokov%2C%20Vladimir%20-%20Defense%20%28Vintage%2C%201990%29.jpg"
-    assert _normalize_internal_epub_path(raw) == (
-        "OEBPS/Images/Nabokov, Vladimir - Defense (Vintage, 1990).jpg"
-    )
+    assert _normalize_internal_epub_path(raw) == ("OEBPS/Images/Nabokov, Vladimir - Defense (Vintage, 1990).jpg")
 
 
 # --- read_epub_cover ------------------------------------------------------------
@@ -373,16 +374,12 @@ def test_extract_metadata_pulls_title_and_author(epub_path):
 
 
 def test_process_chapter_rewrites_image_to_asset_url(epub_path):
-    chapters = [
-        ("ch1.xhtml", '<p>before</p><img src="cover.png"/><p>after</p>'),
-    ]
+    chapters = [("ch1.xhtml", '<p>before</p><img src="cover.png"/><p>after</p>')]
     path = epub_path(build_epub3(chapters=chapters))
     s = get_epub_structure(path)
     chapter_path = next(c["path"] for c in s["chapters"] if c["path"].endswith("ch1.xhtml"))
 
-    result = process_chapter_content(
-        path, chapter_path, s["images"], asset_url_prefix="/book_asset/x.epub/"
-    )
+    result = process_chapter_content(path, chapter_path, s["images"], asset_url_prefix="/book_asset/x.epub/")
     assert "data:image/png;base64" not in result["content"]
     assert "/book_asset/x.epub/OEBPS/cover.png" in result["content"]
     assert 'loading="lazy"' in result["content"]
@@ -399,10 +396,7 @@ def test_process_chapter_extracts_h1_title(epub_path):
 
 
 def test_process_chapter_rewrites_internal_links(epub_path):
-    chapters = [
-        ("ch1.xhtml", '<a href="ch2.xhtml#scene">go</a>'),
-        ("ch2.xhtml", "<h1>Two</h1>"),
-    ]
+    chapters = [("ch1.xhtml", '<a href="ch2.xhtml#scene">go</a>'), ("ch2.xhtml", "<h1>Two</h1>")]
     path = epub_path(build_epub3(chapters=chapters))
     s = get_epub_structure(path)
     chapter_path = next(c["path"] for c in s["chapters"] if c["path"].endswith("ch1.xhtml"))
@@ -442,9 +436,7 @@ def test_spine_chapter_sizes_matches_structure(tmp_path):
 
     path = tmp_path / "b.epub"
     path.write_bytes(build_epub3())
-    assert spine_chapter_sizes(str(path)) == get_epub_structure(str(path))[
-        "chapter_sizes"
-    ]
+    assert spine_chapter_sizes(str(path)) == get_epub_structure(str(path))["chapter_sizes"]
 
 
 # --- author display ----------------------------------------------------------------

@@ -154,7 +154,12 @@ def _loop(app) -> None:
                     db.session.rollback()
                 finally:
                     db.session.remove()
-                state[job] = {"ts": time.time(), "at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "ok": ok, "message": message}
+                state[job] = {
+                    "ts": time.time(),
+                    "at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                    "ok": ok,
+                    "message": message,
+                }
             state["heartbeat"] = time.time()
             try:
                 _save_state(state)

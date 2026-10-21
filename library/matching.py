@@ -59,10 +59,7 @@ def rank_matches(query_title, query_author, books, threshold, limit=5):
     ``books`` is any iterable of objects exposing ``.title`` and ``.author``.
     Capped to ``limit`` so a loose threshold can't return the whole library.
     """
-    scored = [
-        (book, score_book(query_title, query_author, book.title, book.author))
-        for book in books
-    ]
+    scored = [(book, score_book(query_title, query_author, book.title, book.author)) for book in books]
     scored = [pair for pair in scored if pair[1] >= threshold]
     scored.sort(key=lambda pair: pair[1], reverse=True)
     return scored[:limit]

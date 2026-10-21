@@ -6,14 +6,10 @@ from flask_login import current_user
 from ..choices import AccessLevelChoice, UserRoleChoice
 from ..models import Bookmark, BookProgressChoice, Tag, book_tags, db
 from ..utils import display_author, update_epub_cover
-from ._helpers import (
-    commit_or_rollback,
-    cover_url,
-    get_accessible_book_or_404,
-    json_login_required,
-)
+from ._helpers import commit_or_rollback, cover_url, get_accessible_book_or_404, json_login_required
 
 metadata_blueprint = Blueprint("metadata_routes", __name__)
+
 
 def _book_status(book_id: int, user_id: int) -> str:
     bookmark = Bookmark.query.filter_by(book_id=book_id, user_id=user_id).first()
@@ -28,11 +24,7 @@ def _list_book_tags(book_id: int, user_id: int) -> list[str]:
         for (name,) in db.session.query(Tag.name)
         .join(
             book_tags,
-            db.and_(
-                book_tags.c.tag_id == Tag.id,
-                book_tags.c.book_id == book_id,
-                book_tags.c.user_id == user_id,
-            ),
+            db.and_(book_tags.c.tag_id == Tag.id, book_tags.c.book_id == book_id, book_tags.c.user_id == user_id),
         )
         .all()
     ]
@@ -47,9 +39,7 @@ def _set_bookmark_status(book_id: int, user_id: int, status_value: str):
     if bookmark is None:
         if new_status == BookProgressChoice.UNREAD:
             return
-        db.session.add(
-            Bookmark(user_id=user_id, book_id=book_id, status=new_status)
-        )
+        db.session.add(Bookmark(user_id=user_id, book_id=book_id, status=new_status))
     else:
         bookmark.status = new_status
 
@@ -83,9 +73,7 @@ def book_metadata(filename):
 
         custom_tag_names = [t.strip() for t in data.get("tags", []) if t.strip()]
         status_value = data.get("status")
-        if status_value is not None and status_value not in {
-            c.value for c in BookProgressChoice
-        }:
+        if status_value is not None and status_value not in {c.value for c in BookProgressChoice}:
             return jsonify({"error": "Unknown reading status"}), 400
 
         try:
@@ -93,26 +81,17 @@ def book_metadata(filename):
                 # Replace this user's custom tags for the book
                 db.session.execute(
                     book_tags.delete().where(
-                        db.and_(
-                            book_tags.c.book_id == book.id,
-                            book_tags.c.user_id == current_user.id,
-                        )
+                        db.and_(book_tags.c.book_id == book.id, book_tags.c.user_id == current_user.id)
                     )
                 )
                 for tag_name in custom_tag_names:
-                    tag = Tag.query.filter_by(
-                        name=tag_name, user_id=current_user.id
-                    ).first()
+                    tag = Tag.query.filter_by(name=tag_name, user_id=current_user.id).first()
                     if not tag:
                         tag = Tag(name=tag_name, user_id=current_user.id)
                         db.session.add(tag)
                         db.session.flush()
                     db.session.execute(
-                        book_tags.insert().values(
-                            book_id=book.id,
-                            tag_id=tag.id,
-                            user_id=current_user.id,
-                        )
+                        book_tags.insert().values(book_id=book.id, tag_id=tag.id, user_id=current_user.id)
                     )
                 if status_value is not None:
                     _set_bookmark_status(book.id, current_user.id, status_value)
@@ -180,10 +159,7 @@ def update_cover():
             db.session.commit()
         # The versioned URL changes with the file's mtime, so callers can swap
         # it into the grid and browsers fetch the new cover.
-        return jsonify({
-            "cover": cover_url(book),
-            "thumb": cover_url(book, width=400),
-        })
+        return jsonify({"cover": cover_url(book), "thumb": cover_url(book, width=400)})
     except Exception as e:
         current_app.logger.error(f"Error updating cover: {str(e)}")
         return jsonify({"error": "Couldn't change the cover. Try a JPG or PNG."}), 500

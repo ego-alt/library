@@ -17,21 +17,11 @@ def file_backed_app(tmp_path, monkeypatch):
     book_dir = tmp_path / "books"
     book_dir.mkdir()
     db_path = tmp_path / "library.db"
-    app = create_app({
-        "TESTING": True,
-        "SQLALCHEMY_DATABASE_URI": f"sqlite:///{db_path}",
-        "BOOK_DIR": str(book_dir),
-    })
+    app = create_app({"TESTING": True, "SQLALCHEMY_DATABASE_URI": f"sqlite:///{db_path}", "BOOK_DIR": str(book_dir)})
     with app.app_context():
         db.create_all()
         db.session.add(
-            Book(
-                title="X",
-                author="Y",
-                filename="x.epub",
-                cover_path="OEBPS/cover.png",
-                access_level="standard",
-            )
+            Book(title="X", author="Y", filename="x.epub", cover_path="OEBPS/cover.png", access_level="standard")
         )
         db.session.commit()
     return app, str(db_path)
@@ -78,11 +68,7 @@ def test_backup_db_refuses_in_memory_database(tmp_path, monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test")
     book_dir = tmp_path / "books"
     book_dir.mkdir()
-    app = create_app({
-        "TESTING": True,
-        "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
-        "BOOK_DIR": str(book_dir),
-    })
+    app = create_app({"TESTING": True, "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:", "BOOK_DIR": str(book_dir)})
     runner = CliRunner()
     with app.app_context():
         result = runner.invoke(backup_db_command, ["--to", str(tmp_path / "backups")])

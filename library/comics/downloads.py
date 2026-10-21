@@ -126,7 +126,14 @@ def find_releases(issue: ComicIssue, cache: dict | None = None) -> tuple[list[in
 
 def grab(issue: ComicIssue, release: indexers.Release) -> ComicDownload:
     """Send a release to its download client."""
-    download = ComicDownload(issue=issue, title=release.title, indexer=release.indexer, protocol=release.protocol, url=release.url, size=release.size)
+    download = ComicDownload(
+        issue=issue,
+        title=release.title,
+        indexer=release.indexer,
+        protocol=release.protocol,
+        url=release.url,
+        size=release.size,
+    )
     db.session.add(download)
     db.session.flush()
     try:
@@ -188,7 +195,10 @@ def _finish(download: ComicDownload, path: str | None) -> None:
     download.path = path
     db.session.commit()
     if not path or not os.path.exists(path):
-        _fail(download, f"The client says it's done, but {path or 'its folder'} isn't visible here. Check the path mapping in Settings.")
+        _fail(
+            download,
+            f"The client says it's done, but {path or 'its folder'} isn't visible here. Check the path mapping in Settings.",
+        )
         return
     found = [path] if os.path.isfile(path) else files.comic_files(path)
     found = [f for f in found if names.is_comic_file(f)]
@@ -253,7 +263,9 @@ def mark_imported(issue_ids: list[int]) -> None:
     """Downloads whose issue arrived another way (blackhole, or by hand) are done."""
     if not issue_ids:
         return
-    for download in ComicDownload.query.filter(ComicDownload.issue_id.in_(issue_ids), ComicDownload.status.in_(DL_ACTIVE)):
+    for download in ComicDownload.query.filter(
+        ComicDownload.issue_id.in_(issue_ids), ComicDownload.status.in_(DL_ACTIVE)
+    ):
         download.status = DL_DONE
         download.progress = 1.0
     db.session.commit()

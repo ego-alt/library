@@ -54,10 +54,7 @@ def test_load_book_404_for_unknown_book(client):
 
 
 def test_bookmark_post_creates_and_persists(standard_client, book, standard_user):
-    r = standard_client.post(
-        f"/bookmark/{book.filename}",
-        json={"chapter_index": 3, "position": 0.42},
-    )
+    r = standard_client.post(f"/bookmark/{book.filename}", json={"chapter_index": 3, "position": 0.42})
     assert r.status_code == 200
     bm = Bookmark.query.filter_by(user_id=standard_user.id, book_id=book.id).first()
     assert bm.chapter_index == 3
@@ -65,12 +62,8 @@ def test_bookmark_post_creates_and_persists(standard_client, book, standard_user
 
 
 def test_bookmark_post_updates_existing(standard_client, book, standard_user):
-    standard_client.post(
-        f"/bookmark/{book.filename}", json={"chapter_index": 1, "position": 0.1}
-    )
-    standard_client.post(
-        f"/bookmark/{book.filename}", json={"chapter_index": 5, "position": 0.9}
-    )
+    standard_client.post(f"/bookmark/{book.filename}", json={"chapter_index": 1, "position": 0.1})
+    standard_client.post(f"/bookmark/{book.filename}", json={"chapter_index": 5, "position": 0.9})
     bm = Bookmark.query.filter_by(user_id=standard_user.id, book_id=book.id).first()
     assert bm.chapter_index == 5
     assert bm.position == 0.9
@@ -86,6 +79,7 @@ def test_bookmark_anonymous_returns_401(client, book):
     r = client.get(f"/bookmark/{book.filename}")
     assert r.status_code == 401
     assert "Sign in" in r.get_json()["error"]
+
 
 def test_tag_finished_marks_bookmark(standard_client, book, standard_user):
     r = standard_client.post(f"/tag_finished/{book.filename}")
@@ -112,10 +106,7 @@ def test_book_asset_serves_cover_with_etag(client, book):
 
 def test_book_asset_returns_304_on_matching_etag(client, book):
     r1 = client.get(f"/book_asset/{book.filename}/OEBPS/cover.png")
-    r2 = client.get(
-        f"/book_asset/{book.filename}/OEBPS/cover.png",
-        headers={"If-None-Match": r1.headers["ETag"]},
-    )
+    r2 = client.get(f"/book_asset/{book.filename}/OEBPS/cover.png", headers={"If-None-Match": r1.headers["ETag"]})
     assert r2.status_code == 304
 
 
@@ -192,17 +183,13 @@ def test_read_book_exposes_book_version(client, book):
     assert b"<title>Test Book</title>" in r.data
 
 
-def test_bookmark_post_marks_unread_book_in_progress(
-    standard_client, book, standard_user
-):
+def test_bookmark_post_marks_unread_book_in_progress(standard_client, book, standard_user):
     """The reader may open a book from its offline copy without hitting
     load_book, so saving a position must also mark the book as started."""
     from library.choices import BookProgressChoice
     from library.models import Bookmark
 
-    standard_client.post(
-        f"/bookmark/{book.filename}", json={"chapter_index": 1, "position": 0.5}
-    )
+    standard_client.post(f"/bookmark/{book.filename}", json={"chapter_index": 1, "position": 0.5})
     bm = Bookmark.query.filter_by(user_id=standard_user.id, book_id=book.id).one()
     assert bm.status == BookProgressChoice.IN_PROGRESS
 
@@ -211,14 +198,9 @@ def test_bookmark_post_keeps_finished_status(standard_client, book, standard_use
     from library.choices import BookProgressChoice
     from library.models import Bookmark, db
 
-    db.session.add(Bookmark(
-        user_id=standard_user.id, book_id=book.id,
-        status=BookProgressChoice.FINISHED,
-    ))
+    db.session.add(Bookmark(user_id=standard_user.id, book_id=book.id, status=BookProgressChoice.FINISHED))
     db.session.commit()
-    standard_client.post(
-        f"/bookmark/{book.filename}", json={"chapter_index": 0, "position": 0.1}
-    )
+    standard_client.post(f"/bookmark/{book.filename}", json={"chapter_index": 0, "position": 0.1})
     bm = Bookmark.query.filter_by(user_id=standard_user.id, book_id=book.id).one()
     assert bm.status == BookProgressChoice.FINISHED
 

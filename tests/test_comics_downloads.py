@@ -63,7 +63,9 @@ def test_search_asks_for_comics():
         seen.update(parse_qs(request.url.query.decode()))
         return httpx.Response(200, text=FEED)
 
-    indexers.search({"name": "Geek", "url": "https://idx", "api_key": "k"}, "Saga", transport=httpx.MockTransport(handler))
+    indexers.search(
+        {"name": "Geek", "url": "https://idx", "api_key": "k"}, "Saga", transport=httpx.MockTransport(handler)
+    )
     assert seen["t"] == ["search"] and seen["cat"] == ["7030"] and seen["q"] == ["Saga"] and seen["apikey"] == ["k"]
 
 
@@ -102,8 +104,12 @@ def fake_client(monkeypatch):
     client = FakeClient()
     monkeypatch.setattr(clients, "client_for", lambda protocol, name=None: client)
     monkeypatch.setattr(clients, "can_download", lambda protocol: True)
-    monkeypatch.setattr(indexers, "search", lambda indexer, query, transport=None: indexers.parse_feed(FEED, indexer["name"], "usenet"))
-    settings.set_many({"indexers": [{"name": "Geek", "kind": "newznab", "url": "https://idx", "api_key": "k", "enabled": True}]})
+    monkeypatch.setattr(
+        indexers, "search", lambda indexer, query, transport=None: indexers.parse_feed(FEED, indexer["name"], "usenet")
+    )
+    settings.set_many(
+        {"indexers": [{"name": "Geek", "kind": "newznab", "url": "https://idx", "api_key": "k", "enabled": True}]}
+    )
     return client
 
 
@@ -162,9 +168,20 @@ def test_sabnzbd_client(app):
             return httpx.Response(200, json={"status": True, "nzo_ids": ["SABnzbd_nzo_1"]})
         if q["mode"] == "queue":
             return httpx.Response(200, json={"queue": {"slots": []}})
-        return httpx.Response(200, json={"history": {"slots": [{"nzo_id": "SABnzbd_nzo_1", "status": "Completed", "storage": "/downloads/complete/Saga 066"}]}})
+        return httpx.Response(
+            200,
+            json={
+                "history": {
+                    "slots": [
+                        {"nzo_id": "SABnzbd_nzo_1", "status": "Completed", "storage": "/downloads/complete/Saga 066"}
+                    ]
+                }
+            },
+        )
 
-    sab = clients.SABnzbd({"url": "http://sab:8080", "api_key": "k", "category": "comics"}, transport=httpx.MockTransport(handler))
+    sab = clients.SABnzbd(
+        {"url": "http://sab:8080", "api_key": "k", "category": "comics"}, transport=httpx.MockTransport(handler)
+    )
     assert sab.add("https://idx/a.nzb", "Saga 066", 7) == "SABnzbd_nzo_1"
     assert calls[0]["cat"] == "comics" and calls[0]["nzbname"] == "Saga 066 [shelves-7]"
     state = sab.state("SABnzbd_nzo_1")
@@ -186,10 +203,23 @@ def test_qbittorrent_client(app):
             assert b"tags=shelves-3" in request.content
             return httpx.Response(200, text="Ok.")
         if path.endswith("/torrents/info"):
-            return httpx.Response(200, json=[{"hash": "h", "name": "Saga 066", "progress": 1, "state": "stalledUP", "content_path": "/downloads/Saga 066.cbz"}])
+            return httpx.Response(
+                200,
+                json=[
+                    {
+                        "hash": "h",
+                        "name": "Saga 066",
+                        "progress": 1,
+                        "state": "stalledUP",
+                        "content_path": "/downloads/Saga 066.cbz",
+                    }
+                ],
+            )
         return httpx.Response(404)
 
-    qb = clients.QBittorrent({"url": "http://qb:8081", "username": "u", "password": "p"}, transport=httpx.MockTransport(handler))
+    qb = clients.QBittorrent(
+        {"url": "http://qb:8081", "username": "u", "password": "p"}, transport=httpx.MockTransport(handler)
+    )
     assert qb.add("magnet:?xt=1", "Saga 066", 3) == "shelves-3"
     state = qb.state("shelves-3")
     assert state.state == "done" and state.path == "/downloads/Saga 066.cbz"
@@ -199,9 +229,41 @@ def test_comicvine_provider():
     def handler(request):
         assert request.url.params["api_key"] == "key"
         if "/search/" in request.url.path:
-            return httpx.Response(200, json={"status_code": 1, "results": [{"id": 49901, "name": "Saga", "start_year": "2012", "publisher": {"name": "Image"}, "count_of_issues": 66, "image": {"medium_url": "https://cv/saga.jpg"}, "deck": "Space opera"}]})
+            return httpx.Response(
+                200,
+                json={
+                    "status_code": 1,
+                    "results": [
+                        {
+                            "id": 49901,
+                            "name": "Saga",
+                            "start_year": "2012",
+                            "publisher": {"name": "Image"},
+                            "count_of_issues": 66,
+                            "image": {"medium_url": "https://cv/saga.jpg"},
+                            "deck": "Space opera",
+                        }
+                    ],
+                },
+            )
         if "/issues/" in request.url.path:
-            return httpx.Response(200, json={"status_code": 1, "number_of_total_results": 1, "results": [{"id": 1, "issue_number": "1", "name": "Chapter One", "cover_date": "2012-03-01", "store_date": "2012-03-14", "image": {"medium_url": "https://cv/1.jpg"}}]})
+            return httpx.Response(
+                200,
+                json={
+                    "status_code": 1,
+                    "number_of_total_results": 1,
+                    "results": [
+                        {
+                            "id": 1,
+                            "issue_number": "1",
+                            "name": "Chapter One",
+                            "cover_date": "2012-03-01",
+                            "store_date": "2012-03-14",
+                            "image": {"medium_url": "https://cv/1.jpg"},
+                        }
+                    ],
+                },
+            )
         return httpx.Response(200, json={"status_code": 100, "error": "Invalid API Key"})
 
     cv = providers.ComicVine("key", transport=httpx.MockTransport(handler))
@@ -217,9 +279,17 @@ def test_comicvine_provider():
 def test_metron_provider_follows_pages():
     def handler(request):
         if request.url.path.endswith("/issue/") and "page" not in request.url.params:
-            return httpx.Response(200, json={"next": "https://metron.cloud/api/issue/?series_id=5&page=2", "results": [{"id": 1, "number": "1", "cover_date": "2020-01-01", "image": "https://m/1.jpg"}]})
+            return httpx.Response(
+                200,
+                json={
+                    "next": "https://metron.cloud/api/issue/?series_id=5&page=2",
+                    "results": [{"id": 1, "number": "1", "cover_date": "2020-01-01", "image": "https://m/1.jpg"}],
+                },
+            )
         if request.url.path.endswith("/issue/"):
-            return httpx.Response(200, json={"next": None, "results": [{"id": 2, "number": "2", "store_date": "2020-02-05"}]})
+            return httpx.Response(
+                200, json={"next": None, "results": [{"id": 2, "number": "2", "store_date": "2020-02-05"}]}
+            )
         return httpx.Response(401)
 
     metron = providers.Metron("u", "p", transport=httpx.MockTransport(handler))
@@ -230,7 +300,9 @@ def test_metron_provider_follows_pages():
 
 
 def test_settings_mask_secrets(app):
-    settings.set_many({"comicvine_api_key": "abcdef1234567890", "indexers": [{"name": "Geek", "api_key": "zzzzzzzz9999"}]})
+    settings.set_many(
+        {"comicvine_api_key": "abcdef1234567890", "indexers": [{"name": "Geek", "api_key": "zzzzzzzz9999"}]}
+    )
     shown = settings.for_browser()
     assert shown["comicvine_api_key"] == "••••••••7890"
     assert shown["indexers"][0]["api_key"].endswith("9999") and "zzzz" not in json.dumps(shown)

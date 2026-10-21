@@ -19,7 +19,16 @@ from xml.etree import ElementTree as ET
 from PIL import Image
 
 IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".avif", ".jxl")
-_MIMETYPES = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp", ".gif": "image/gif", ".bmp": "image/bmp", ".avif": "image/avif", ".jxl": "image/jxl"}
+_MIMETYPES = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".webp": "image/webp",
+    ".gif": "image/gif",
+    ".bmp": "image/bmp",
+    ".avif": "image/avif",
+    ".jxl": "image/jxl",
+}
 # WebP can't be wider or taller than this.
 WEBP_MAX_SIDE = 16383
 
@@ -93,7 +102,9 @@ def _unpack(src: str, dest: str) -> None:
     try:
         subprocess.run(["bsdtar", "-xf", src, "-C", dest], check=True, capture_output=True, timeout=300)
     except subprocess.CalledProcessError as e:
-        raise ArchiveError(f"Couldn't unpack {os.path.basename(src)}: {e.stderr.decode(errors='replace').strip()[:200]}") from e
+        raise ArchiveError(
+            f"Couldn't unpack {os.path.basename(src)}: {e.stderr.decode(errors='replace').strip()[:200]}"
+        ) from e
     except subprocess.TimeoutExpired as e:
         raise ArchiveError(f"Unpacking {os.path.basename(src)} took too long.") from e
 
@@ -110,7 +121,14 @@ def _to_webp(data: bytes, quality: int) -> bytes:
         return out.getvalue()
 
 
-def write_cbz(src: str, dest: str, *, webp: bool, quality: int = 82, metadata: Callable[[int], tuple[str | None, str | None]] | None = None) -> int:
+def write_cbz(
+    src: str,
+    dest: str,
+    *,
+    webp: bool,
+    quality: int = 82,
+    metadata: Callable[[int], tuple[str | None, str | None]] | None = None,
+) -> int:
     """Make the library's CBZ at `dest` from any comic archive at `src`.
 
     Pages are renamed to their reading order and, with `webp`, re-encoded
@@ -146,7 +164,11 @@ def write_cbz(src: str, dest: str, *, webp: bool, quality: int = 82, metadata: C
                         except Exception:
                             pass
                     # Images are already compressed: store them.
-                    out.writestr(zipfile.ZipInfo(f"{i:0{width}d}{ext}", date_time=(2000, 1, 1, 0, 0, 0)), data, compress_type=zipfile.ZIP_STORED)
+                    out.writestr(
+                        zipfile.ZipInfo(f"{i:0{width}d}{ext}", date_time=(2000, 1, 1, 0, 0, 0)),
+                        data,
+                        compress_type=zipfile.ZIP_STORED,
+                    )
                 comicinfo, metroninfo = metadata(len(pages)) if metadata else (None, None)
                 if comicinfo:
                     out.writestr("ComicInfo.xml", comicinfo, compress_type=zipfile.ZIP_DEFLATED)
@@ -193,7 +215,10 @@ def _add(parent: ET.Element, tag: str, value) -> ET.Element | None:
 
 def comicinfo_xml(issue, series, page_count: int, original_filename: str | None = None) -> str:
     """ComicInfo.xml (the Anansi v2.0 schema most readers use)."""
-    root = ET.Element("ComicInfo", {"xmlns:xsi": "http://www.w3.org/2001/XMLSchema-instance", "xmlns:xsd": "http://www.w3.org/2001/XMLSchema"})
+    root = ET.Element(
+        "ComicInfo",
+        {"xmlns:xsi": "http://www.w3.org/2001/XMLSchema-instance", "xmlns:xsd": "http://www.w3.org/2001/XMLSchema"},
+    )
     _add(root, "Title", issue.title)
     _add(root, "Series", series.name)
     _add(root, "Number", issue.number)
@@ -204,7 +229,9 @@ def comicinfo_xml(issue, series, page_count: int, original_filename: str | None 
     if original_filename:
         notes.append(f"Original filename: {original_filename}")
     if series.provider in ("comicvine", "metron"):
-        notes.append(f"Tagged by Shelves from {'ComicVine' if series.provider == 'comicvine' else 'Metron'} (series {series.provider_id}, issue {issue.provider_id}).")
+        notes.append(
+            f"Tagged by Shelves from {'ComicVine' if series.provider == 'comicvine' else 'Metron'} (series {series.provider_id}, issue {issue.provider_id})."
+        )
     _add(root, "Notes", " ".join(notes) or None)
     when = issue.cover_date or issue.store_date
     if when:
@@ -227,7 +254,13 @@ def metroninfo_xml(issue, series, page_count: int, original_filename: str | None
     """MetronInfo.xml (schema v1.0), for issues that came from a provider."""
     if series.provider not in ("comicvine", "metron") or not issue.provider_id:
         return None
-    root = ET.Element("MetronInfo", {"xmlns:xsi": "http://www.w3.org/2001/XMLSchema-instance", "xsi:noNamespaceSchemaLocation": "https://raw.githubusercontent.com/Metron-Project/metroninfo/master/schema/v1.0/MetronInfo.xsd"})
+    root = ET.Element(
+        "MetronInfo",
+        {
+            "xmlns:xsi": "http://www.w3.org/2001/XMLSchema-instance",
+            "xsi:noNamespaceSchemaLocation": "https://raw.githubusercontent.com/Metron-Project/metroninfo/master/schema/v1.0/MetronInfo.xsd",
+        },
+    )
     ids = ET.SubElement(root, "ID")
     source = "Comic Vine" if series.provider == "comicvine" else "Metron"
     _add(ids, "Primary", issue.provider_id).set("source", source)

@@ -57,7 +57,9 @@ class ComicSeries(db.Model):
     added_at = db.Column(db.DateTime, nullable=False, default=_utcnow)
     refreshed_at = db.Column(db.DateTime)
 
-    issues = db.relationship("ComicIssue", back_populates="series", cascade="all, delete-orphan", order_by="ComicIssue.sort_number")
+    issues = db.relationship(
+        "ComicIssue", back_populates="series", cascade="all, delete-orphan", order_by="ComicIssue.sort_number"
+    )
 
     __table_args__ = (db.UniqueConstraint("provider", "provider_id", name="uq_comic_series_provider"),)
 

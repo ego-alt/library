@@ -24,11 +24,7 @@ class LLMCaller:
         return self._client
 
     def _call_api(
-        self,
-        system: str,
-        user_content: str,
-        max_tokens: int = 1000,
-        temperature: float = DEFAULT_TEMPERATURE,
+        self, system: str, user_content: str, max_tokens: int = 1000, temperature: float = DEFAULT_TEMPERATURE
     ) -> str:
         try:
             message = self.client.messages.create(
@@ -67,4 +63,3 @@ class LLMCaller:
         )
         user_content = f"Selection: {text}\nContext: {context}"
         return self._call_api(system=system, user_content=user_content, max_tokens=400)
-

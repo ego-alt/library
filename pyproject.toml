@@ -56,13 +56,20 @@ dev = [
 ]
 
 [tool.ruff]
-line-length = 88
+line-length = 120
+
+[tool.ruff.format]
+# Join statements that fit on one line instead of keeping a trailing comma's early wrap.
+skip-magic-trailing-comma = true
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "N", "UP", "B", "TID"]
 # TID252 bans relative imports; we use them deliberately inside the `library`
 # package and inside `tests` to keep paths short and the package portable.
 ignore = ["TID252"]
+
+[tool.ruff.lint.isort]
+split-on-trailing-comma = false
 
 [tool.ruff.lint.per-file-ignores]
 # Ad-hoc test scripts and sys.path manipulation in conftest legitimately

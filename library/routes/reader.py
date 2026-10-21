@@ -20,12 +20,7 @@ from flask_login import current_user
 
 from ..llm_caller import LLMCaller, LLMError
 from ..models import Bookmark, BookProgressChoice, _utcnow, db
-from ..utils import (
-    display_author,
-    get_epub_structure,
-    process_chapter_content,
-    rotate_list,
-)
+from ..utils import display_author, get_epub_structure, process_chapter_content, rotate_list
 from ._helpers import (
     book_css,
     book_mtime,
@@ -63,9 +58,7 @@ def read_book(filename):
         abort(403, description="Forbidden")
     # The version keys the browser's offline copy of the book, so it changes
     # whenever the EPUB is rewritten.
-    return render_template(
-        "reader.html", book=book, book_version=book_mtime(book) or 0
-    )
+    return render_template("reader.html", book=book, book_version=book_mtime(book) or 0)
 
 
 @read_blueprint.route("/load_book/<filename>")
@@ -79,16 +72,12 @@ def load_book(filename):
     # Opening a book doesn't mark it as started; reading past the opening
     # does (see bookmark()). Just note when it was last opened.
     if current_user.is_authenticated:
-        bookmark = Bookmark.query.filter_by(
-            user_id=current_user.id, book_id=book.id
-        ).first()
+        bookmark = Bookmark.query.filter_by(user_id=current_user.id, book_id=book.id).first()
         if bookmark:
             bookmark.last_read = _utcnow()
             db.session.commit()
 
-    asset_url_prefix = url_for(
-        "read_routes.book_asset", filename=filename, asset_path=""
-    )
+    asset_url_prefix = url_for("read_routes.book_asset", filename=filename, asset_path="")
 
     try:
         return Response(
@@ -156,9 +145,7 @@ def stream_book_content(
         # Stream each chapter
         for i, chapter in enumerate(chapters):
             index = (i + start_chapter) % len(structure["chapters"])
-            chapter_content = process_chapter_content(
-                full_path, chapter["path"], structure["images"], asset_url_prefix
-            )
+            chapter_content = process_chapter_content(full_path, chapter["path"], structure["images"], asset_url_prefix)
 
             yield (
                 json.dumps(
@@ -221,9 +208,7 @@ def bookmark(filename):
     if request.method == "POST":
         data = request.get_json()
         with commit_or_rollback():
-            bookmark = Bookmark.query.filter_by(
-                user_id=current_user.id, book_id=book.id
-            ).first()
+            bookmark = Bookmark.query.filter_by(user_id=current_user.id, book_id=book.id).first()
             if not bookmark:
                 bookmark = Bookmark(user_id=current_user.id, book_id=book.id)
                 db.session.add(bookmark)
@@ -239,16 +224,12 @@ def bookmark(filename):
         return jsonify({"message": "Bookmark updated successfully"})
 
     # GET request - retrieve bookmark
-    bookmark = Bookmark.query.filter_by(
-        user_id=current_user.id, book_id=book.id
-    ).first()
+    bookmark = Bookmark.query.filter_by(user_id=current_user.id, book_id=book.id).first()
 
     if not bookmark:
         return jsonify({"chapter_index": 0, "position": 0})
 
-    return jsonify(
-        {"chapter_index": bookmark.chapter_index, "position": bookmark.position}
-    )
+    return jsonify({"chapter_index": bookmark.chapter_index, "position": bookmark.position})
 
 
 @read_blueprint.route("/tag_finished/<filename>", methods=["POST"])
@@ -257,16 +238,12 @@ def tag_finished(filename):
     """Tag the book as finished."""
     book = get_accessible_book_or_404(filename)
 
-    bookmark = Bookmark.query.filter_by(
-        user_id=current_user.id, book_id=book.id
-    ).first()
+    bookmark = Bookmark.query.filter_by(user_id=current_user.id, book_id=book.id).first()
     if not bookmark:
         bookmark = Bookmark(user_id=current_user.id, book_id=book.id)
         db.session.add(bookmark)
     bookmark.status = BookProgressChoice.FINISHED
-    logging.info(
-        f"Setting status to FINISHED for book {book.id} and user {current_user.id}"
-    )
+    logging.info(f"Setting status to FINISHED for book {book.id} and user {current_user.id}")
     db.session.commit()
     return jsonify({"message": "Marked as finished"})
 

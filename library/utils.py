@@ -136,9 +136,7 @@ def _might_be_markup(data: bytes) -> bool:
     return s.startswith(b"<") or s.startswith(b"\xef\xbb\xbf<")
 
 
-def _unwrap_html_cover_to_image(
-    z: zipfile.ZipFile, wrapper_internal_path: str, raw: bytes
-) -> bytes:
+def _unwrap_html_cover_to_image(z: zipfile.ZipFile, wrapper_internal_path: str, raw: bytes) -> bytes:
     """If the cover entry is an HTML/XHTML wrapper, follow the first image ref."""
     if not _might_be_markup(raw):
         return raw
@@ -198,12 +196,8 @@ def read_epub_cover(epub_file_path: str, cover_path: str | None = None) -> bytes
                 return data
 
         if last_error:
-            raise KeyError(
-                f"Cover not found in EPUB {epub_file_path!r} (tried {candidates!r})"
-            ) from last_error
-        raise ValueError(
-            f"No usable raster/SVG cover bytes in {epub_file_path!r} (tried {candidates!r})"
-        )
+            raise KeyError(f"Cover not found in EPUB {epub_file_path!r} (tried {candidates!r})") from last_error
+        raise ValueError(f"No usable raster/SVG cover bytes in {epub_file_path!r} (tried {candidates!r})")
 
 
 def display_author(author: str | None) -> str:
@@ -276,27 +270,25 @@ def fallback_cover_svg(title: str, author: str) -> bytes:
     serif = "Georgia, 'Times New Roman', serif"
     line_gap = round(title_size * 1.15)
     tspans = "".join(
-        f'<tspan x="40" dy="{0 if i == 0 else line_gap}">{escape(line)}</tspan>'
-        for i, line in enumerate(title_lines)
+        f'<tspan x="40" dy="{0 if i == 0 else line_gap}">{escape(line)}</tspan>' for i, line in enumerate(title_lines)
     )
     author_tspans = "".join(
-        f'<tspan x="40" dy="{0 if i == 0 else 28}">{escape(line)}</tspan>'
-        for i, line in enumerate(author_lines)
+        f'<tspan x="40" dy="{0 if i == 0 else 28}">{escape(line)}</tspan>' for i, line in enumerate(author_lines)
     )
-    svg = "\n".join([
-        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 600"'
-        ' width="400" height="600">',
-        f'<rect width="400" height="600" fill="{bg}"/>',
-        f'<rect x="20" y="20" width="360" height="560" fill="none" stroke="{ink}"'
-        ' stroke-opacity="0.35" stroke-width="2"/>',
-        f'<text x="40" y="{110 + title_size}" fill="{ink}" font-family="{serif}"'
-        f' font-size="{title_size}" font-weight="600">{tspans}</text>',
-        f'<line x1="40" x2="140" y1="470" y2="470" stroke="{ink}"'
-        ' stroke-opacity="0.6" stroke-width="2"/>',
-        f'<text x="40" y="510" fill="{ink}" fill-opacity="0.85" font-family="{serif}"'
-        f' font-size="22" font-style="italic">{author_tspans}</text>',
-        "</svg>",
-    ])
+    svg = "\n".join(
+        [
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 600" width="400" height="600">',
+            f'<rect width="400" height="600" fill="{bg}"/>',
+            f'<rect x="20" y="20" width="360" height="560" fill="none" stroke="{ink}"'
+            ' stroke-opacity="0.35" stroke-width="2"/>',
+            f'<text x="40" y="{110 + title_size}" fill="{ink}" font-family="{serif}"'
+            f' font-size="{title_size}" font-weight="600">{tspans}</text>',
+            f'<line x1="40" x2="140" y1="470" y2="470" stroke="{ink}" stroke-opacity="0.6" stroke-width="2"/>',
+            f'<text x="40" y="510" fill="{ink}" fill-opacity="0.85" font-family="{serif}"'
+            f' font-size="22" font-style="italic">{author_tspans}</text>',
+            "</svg>",
+        ]
+    )
     return svg.encode("utf-8")
 
 
@@ -334,15 +326,12 @@ def spine_chapter_sizes(epub_file_path: str) -> list[int]:
     """
     with zipfile.ZipFile(epub_file_path) as z:
         container = etree.fromstring(z.read("META-INF/container.xml"))
-        rootfile_path = container.xpath(
-            "/u:container/u:rootfiles/u:rootfile", namespaces=namespaces
-        )[0].get("full-path")
+        rootfile_path = container.xpath("/u:container/u:rootfiles/u:rootfile", namespaces=namespaces)[0].get(
+            "full-path"
+        )
         rootfile_dir = os.path.dirname(rootfile_path)
         root = etree.fromstring(z.read(rootfile_path))
-        manifest = {
-            item.get("id"): item
-            for item in root.xpath("//opf:manifest/opf:item", namespaces=namespaces)
-        }
+        manifest = {item.get("id"): item for item in root.xpath("//opf:manifest/opf:item", namespaces=namespaces)}
         sizes = []
         spine = root.xpath("//opf:spine/opf:itemref/@idref", namespaces=namespaces)
         for idref in spine:
@@ -375,8 +364,15 @@ def spine_chapter_sizes(epub_file_path: str) -> list[int]:
 # reader, which sets those for comfort.
 
 _KEYWORD_SIZES = {
-    "xx-small": 0.6, "x-small": 0.75, "small": 0.89, "medium": 1.0,
-    "large": 1.2, "x-large": 1.5, "xx-large": 2.0, "smaller": 0.83, "larger": 1.2,
+    "xx-small": 0.6,
+    "x-small": 0.75,
+    "small": 0.89,
+    "medium": 1.0,
+    "large": 1.2,
+    "x-large": 1.5,
+    "xx-large": 2.0,
+    "smaller": 0.83,
+    "larger": 1.2,
 }
 _SIMPLE_SELECTOR = re.compile(r"^(?:[a-z][a-z0-9]*)?(?:\.[A-Za-z_][\w-]*)+$")
 _EM_VALUE = re.compile(r"^(-?\d*\.?\d+)(em|rem|%)?$")
@@ -436,11 +432,7 @@ def book_style_subset(epub_file_path: str) -> str:
     try:
         with zipfile.ZipFile(epub_file_path) as z:
             names = z.namelist()
-            css = "\n".join(
-                z.read(n).decode("utf-8", "ignore")
-                for n in names
-                if n.lower().endswith(".css")
-            )
+            css = "\n".join(z.read(n).decode("utf-8", "ignore") for n in names if n.lower().endswith(".css"))
             # The book's body-text size is the size of its most-used class, so
             # "large" means large *relative to this book's paragraphs*.
             counts: dict[str, int] = {}
@@ -497,9 +489,7 @@ def book_style_subset(epub_file_path: str) -> str:
     return "\n".join(out)
 
 
-def book_progress(
-    chapter_sizes: list[int], chapter_index: int, position: float
-) -> float:
+def book_progress(chapter_sizes: list[int], chapter_index: int, position: float) -> float:
     """Whole-book progress in [0, 1] from a (chapter, fraction-through-chapter)
     bookmark, weighting each chapter by its size."""
     total = sum(chapter_sizes)
@@ -592,7 +582,7 @@ def get_chapter_title(item, soup):
         clean_name = basename.replace("_", " ").replace("-", " ")
         for prefix in ("chapter", "ch", "section", "part"):
             if clean_name.lower().startswith(prefix):
-                clean_name = clean_name[len(prefix):].strip()
+                clean_name = clean_name[len(prefix) :].strip()
         if clean_name:
             return clean_name.title()
 
@@ -637,7 +627,9 @@ def _add_cover_to_opf(opf_bytes: bytes, href: str, mimetype: str) -> bytes:
         raise ValueError("Package document has no manifest or metadata")
     ids = {item.get("id") for item in manifest}
     item_id = next(i for i in ("cover-image", "cover-image-1", "cover-image-2", "library-cover") if i not in ids)
-    etree.SubElement(manifest, f"{{{ns}}}item", {"id": item_id, "href": href, "media-type": mimetype, "properties": "cover-image"})
+    etree.SubElement(
+        manifest, f"{{{ns}}}item", {"id": item_id, "href": href, "media-type": mimetype, "properties": "cover-image"}
+    )
     etree.SubElement(metadata, f"{{{ns}}}meta", {"name": "cover", "content": item_id})
     return etree.tostring(opf, xml_declaration=True, encoding="utf-8")
 
@@ -652,7 +644,11 @@ def update_epub_cover(epub_file_path: str, new_cover_bytes: bytes) -> str:
         except ValueError:
             # No cover yet: put the image beside the package document and list it there
             container = etree.fromstring(zin.read("META-INF/container.xml"))
-            opf_path = container.xpath("/u:container/u:rootfiles/u:rootfile", namespaces=namespaces)[0].get("full-path").replace("\\", "/")
+            opf_path = (
+                container.xpath("/u:container/u:rootfiles/u:rootfile", namespaces=namespaces)[0]
+                .get("full-path")
+                .replace("\\", "/")
+            )
             mimetype = guess_cover_mimetype_from_bytes(new_cover_bytes) or "image/jpeg"
             href = "library-cover" + _COVER_EXTENSIONS.get(mimetype, ".jpg")
             new_opf = _add_cover_to_opf(zin.read(opf_path), href, mimetype)
@@ -737,9 +733,7 @@ def _walk_ncx_points(points, ncx_dir: str) -> list[dict]:
                 "title": (label.text or "").strip(),
                 "href": path,
                 "section_id": section,
-                "children": _walk_ncx_points(
-                    point.findall("ncx:navPoint", namespaces=_NCX_NS), ncx_dir
-                ),
+                "children": _walk_ncx_points(point.findall("ncx:navPoint", namespaces=_NCX_NS), ncx_dir),
             }
         )
     return entries
@@ -747,10 +741,7 @@ def _walk_ncx_points(points, ncx_dir: str) -> list[dict]:
 
 def _read_epub_toc(z, opf_root, rootfile_dir: str, manifest, spine_elem) -> list[dict]:
     """Return raw TOC entries (with full zip paths). Prefers EPUB3 nav doc, falls back to EPUB2 NCX."""
-    nav_item = next(
-        (m for m in manifest.values() if "nav" in (m.get("properties") or "").split()),
-        None,
-    )
+    nav_item = next((m for m in manifest.values() if "nav" in (m.get("properties") or "").split()), None)
     if nav_item:
         nav_path = os.path.normpath(os.path.join(rootfile_dir, nav_item["href"]))
         try:
@@ -761,18 +752,12 @@ def _read_epub_toc(z, opf_root, rootfile_dir: str, manifest, spine_elem) -> list
     ncx_id = spine_elem.get("toc")
     ncx_item = manifest.get(ncx_id) if ncx_id else None
     if not ncx_item:
-        ncx_item = next(
-            (m for m in manifest.values()
-             if m.get("media-type") == "application/x-dtbncx+xml"),
-            None,
-        )
+        ncx_item = next((m for m in manifest.values() if m.get("media-type") == "application/x-dtbncx+xml"), None)
     if ncx_item:
         ncx_path = os.path.normpath(os.path.join(rootfile_dir, ncx_item["href"]))
         try:
             return _parse_ncx_points(
-                etree.fromstring(z.read(ncx_path)).findall(
-                    "ncx:navMap/ncx:navPoint", namespaces=_NCX_NS
-                ),
+                etree.fromstring(z.read(ncx_path)).findall("ncx:navMap/ncx:navPoint", namespaces=_NCX_NS),
                 os.path.dirname(ncx_path),
             )
         except Exception as e:
@@ -788,7 +773,7 @@ def _parse_ncx_points(points, ncx_dir: str) -> list[dict]:
 _CONTENTS_KEYWORDS = {"contents", "table of contents", "toc"}
 _CONTENTS_SCAN_LIMIT = 15  # contents pages are always front matter
 _CONTENTS_MIN_RESOLVED = 3  # need at least this many spine matches to trust the page
-_CONTENTS_MIN_RATIO = 0.8   # and ≥80% of all <a href> on the page must resolve
+_CONTENTS_MIN_RATIO = 0.8  # and ≥80% of all <a href> on the page must resolve
 
 
 def _has_contents_marker(soup) -> bool:
@@ -853,20 +838,16 @@ def _find_contents_page(z, chapters, spine_paths) -> list[dict]:
             path, section = _split_toc_href(href, page_dir)
             text = " ".join((anchor.get_text() or "").split())
             if path and text:
-                entries.append({
-                    "title": text,
-                    "href": path,
-                    "section_id": section,
-                    "children": [],
-                })
+                entries.append({"title": text, "href": path, "section_id": section, "children": []})
 
         resolved_count = sum(1 for e in entries if e["href"] in spine_paths)
-        if resolved_count >= _CONTENTS_MIN_RESOLVED and total_with_href and (
-            resolved_count / total_with_href >= _CONTENTS_MIN_RATIO
+        if (
+            resolved_count >= _CONTENTS_MIN_RESOLVED
+            and total_with_href
+            and (resolved_count / total_with_href >= _CONTENTS_MIN_RATIO)
         ):
             logger.info(
-                f"Using in-content Contents page at {ch['path']} "
-                f"({resolved_count}/{total_with_href} links resolved)"
+                f"Using in-content Contents page at {ch['path']} ({resolved_count}/{total_with_href} links resolved)"
             )
             return entries
 
@@ -882,16 +863,9 @@ def _resolve_toc_to_spine(entries: list[dict], spine_paths: dict[str, int]) -> l
         children = _resolve_toc_to_spine(entry["children"], spine_paths)
         if spine_index < 0 and not children:
             continue
-        title = entry["title"] or (
-            f"Section {spine_index + 1}" if spine_index >= 0 else "Section"
-        )
+        title = entry["title"] or (f"Section {spine_index + 1}" if spine_index >= 0 else "Section")
         resolved.append(
-            {
-                "title": title,
-                "spine_index": spine_index,
-                "section_id": entry["section_id"],
-                "children": children,
-            }
+            {"title": title, "spine_index": spine_index, "section_id": entry["section_id"], "children": children}
         )
     return resolved
 
@@ -904,9 +878,9 @@ def get_epub_structure(epub_path: str) -> dict:
     """
     with zipfile.ZipFile(epub_path) as z:
         container = etree.fromstring(z.read("META-INF/container.xml"))
-        rootfile_path = container.xpath(
-            "/u:container/u:rootfiles/u:rootfile", namespaces=namespaces
-        )[0].get("full-path")
+        rootfile_path = container.xpath("/u:container/u:rootfiles/u:rootfile", namespaces=namespaces)[0].get(
+            "full-path"
+        )
         rootfile_dir = os.path.dirname(rootfile_path)
 
         root = etree.fromstring(z.read(rootfile_path))
@@ -936,22 +910,13 @@ def get_epub_structure(epub_path: str) -> dict:
         for itemref in spine:
             if manifest[itemref]["media-type"] != "application/xhtml+xml":
                 continue
-            chapter_path = os.path.normpath(
-                os.path.join(rootfile_dir, manifest[itemref]["href"])
-            )
+            chapter_path = os.path.normpath(os.path.join(rootfile_dir, manifest[itemref]["href"]))
             spine_paths[chapter_path] = len(chapters)
             try:
                 size = z.getinfo(chapter_path).file_size
             except KeyError:
                 size = 0
-            chapters.append(
-                {
-                    "id": itemref,
-                    "path": chapter_path,
-                    "index": len(chapters),
-                    "size": size,
-                }
-            )
+            chapters.append({"id": itemref, "path": chapter_path, "index": len(chapters), "size": size})
 
         # 1) Publisher's nav/NCX
         toc_raw = _read_epub_toc(z, root, rootfile_dir, manifest, spine_elem)
@@ -967,20 +932,13 @@ def get_epub_structure(epub_path: str) -> dict:
         # progressively replace placeholders with extracted titles.
         if not toc:
             toc = [
-                {
-                    "title": f"Section {i + 1}",
-                    "spine_index": i,
-                    "section_id": "",
-                    "children": [],
-                    "synthetic": True,
-                }
+                {"title": f"Section {i + 1}", "spine_index": i, "section_id": "", "children": [], "synthetic": True}
                 for i in range(len(chapters))
             ]
 
         # The book's language (dc:language, e.g. "en", "zh-HK"): read aloud
         # picks a voice by it.
-        language = next((t.strip() for t in root.xpath("//dc:language/text()", namespaces=namespaces)
-                         if t.strip()), "")
+        language = next((t.strip() for t in root.xpath("//dc:language/text()", namespaces=namespaces) if t.strip()), "")
 
         # Whether the book asks to be read in vertical lines (Chinese and
         # Japanese editions set right-to-left page turns, or vertical-rl in
@@ -988,7 +946,8 @@ def get_epub_structure(epub_path: str) -> dict:
         # languages, so a right-to-left Arabic book isn't affected.
         vertical = (spine_elem.get("page-progression-direction") or "").lower() == "rtl" or any(
             _VERTICAL_CSS.search(z.read(n).decode("utf-8", "ignore"))
-            for n in z.namelist() if n.lower().endswith(".css")
+            for n in z.namelist()
+            if n.lower().endswith(".css")
         )
 
         return {
@@ -1003,9 +962,7 @@ def get_epub_structure(epub_path: str) -> dict:
         }
 
 
-def process_chapter_content(
-    epub_path: str, chapter_path: str, images: dict, asset_url_prefix: str
-) -> dict:
+def process_chapter_content(epub_path: str, chapter_path: str, images: dict, asset_url_prefix: str) -> dict:
     """Process a single chapter's content, rewriting image refs to URLs under
     asset_url_prefix (e.g. '/book_asset/<filename>/')."""
     with zipfile.ZipFile(epub_path) as z:
@@ -1035,10 +992,7 @@ def process_chapter_content(
                     try:
                         normalized_path = normalize_path(unquote(image_path))
                         if normalized_path in images:
-                            element[attr] = (
-                                asset_url_prefix
-                                + images[normalized_path]["path"]
-                            )
+                            element[attr] = asset_url_prefix + images[normalized_path]["path"]
                             if element.name == "img":
                                 element["loading"] = "lazy"
                     except Exception as e:

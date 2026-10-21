@@ -36,7 +36,16 @@ class Release:
 
     def public(self) -> dict:
         """For the browser: everything but the link, which can hold the indexer's key."""
-        return {"title": self.title, "size": self.size, "indexer": self.indexer, "protocol": self.protocol, "published": self.published, "seeders": self.seeders, "score": round(self.score, 2), "note": self.note}
+        return {
+            "title": self.title,
+            "size": self.size,
+            "indexer": self.indexer,
+            "protocol": self.protocol,
+            "published": self.published,
+            "seeders": self.seeders,
+            "score": round(self.score, 2),
+            "note": self.note,
+        }
 
 
 def _attrs(item: ET.Element) -> dict:
@@ -62,22 +71,26 @@ def parse_feed(xml: bytes | str, indexer: str, protocol: str) -> list[Release]:
         if not title or not url:
             continue
         attrs = _attrs(item)
-        size = attrs.get("size") or (enclosure.get("length") if enclosure is not None else None) or item.findtext("size")
+        size = (
+            attrs.get("size") or (enclosure.get("length") if enclosure is not None else None) or item.findtext("size")
+        )
         published = item.findtext("pubDate")
         try:
             published = parsedate_to_datetime(published).date().isoformat() if published else None
         except (TypeError, ValueError):
             published = None
         seeders = attrs.get("seeders")
-        releases.append(Release(
-            title=title,
-            url=url.strip(),
-            size=int(size) if size and str(size).isdigit() else None,
-            indexer=indexer,
-            protocol=protocol,
-            published=published,
-            seeders=int(seeders) if seeders and seeders.isdigit() else None,
-        ))
+        releases.append(
+            Release(
+                title=title,
+                url=url.strip(),
+                size=int(size) if size and str(size).isdigit() else None,
+                indexer=indexer,
+                protocol=protocol,
+                published=published,
+                seeders=int(seeders) if seeders and seeders.isdigit() else None,
+            )
+        )
     return releases
 
 
@@ -88,9 +101,17 @@ def search(indexer: dict, query: str, transport: httpx.BaseTransport | None = No
     base = indexer["url"].rstrip("/")
     # Prowlarr/Jackett give the full .../api URL; a plain Newznab host doesn't.
     url = base if base.endswith("/api") else f"{base}/api"
-    params = {"t": "search", "q": query, "cat": indexer.get("categories") or COMICS_CATEGORY, "apikey": indexer.get("api_key", ""), "limit": 100}
+    params = {
+        "t": "search",
+        "q": query,
+        "cat": indexer.get("categories") or COMICS_CATEGORY,
+        "apikey": indexer.get("api_key", ""),
+        "limit": 100,
+    }
     try:
-        with httpx.Client(timeout=30, headers={"User-Agent": USER_AGENT}, follow_redirects=True, transport=transport) as http:
+        with httpx.Client(
+            timeout=30, headers={"User-Agent": USER_AGENT}, follow_redirects=True, transport=transport
+        ) as http:
             response = http.get(url, params=params)
     except httpx.HTTPError as e:
         raise IndexerError(f"{indexer.get('name', base)} didn't answer ({e.__class__.__name__}).") from e
@@ -107,7 +128,9 @@ def test(indexer: dict, transport: httpx.BaseTransport | None = None) -> str:
     base = indexer["url"].rstrip("/")
     url = base if base.endswith("/api") else f"{base}/api"
     try:
-        with httpx.Client(timeout=20, headers={"User-Agent": USER_AGENT}, follow_redirects=True, transport=transport) as http:
+        with httpx.Client(
+            timeout=20, headers={"User-Agent": USER_AGENT}, follow_redirects=True, transport=transport
+        ) as http:
             response = http.get(url, params={"t": "caps", "apikey": indexer.get("api_key", "")})
     except httpx.HTTPError as e:
         raise IndexerError(f"Didn't answer ({e.__class__.__name__}).") from e
@@ -119,5 +142,11 @@ def test(indexer: dict, transport: httpx.BaseTransport | None = None) -> str:
         raise IndexerError("That isn't a Newznab or Torznab API.") from e
     if root.tag == "error":
         raise IndexerError(root.get("description") or "It refused.")
-    comics = any(c.get("id") == COMICS_CATEGORY for c in root.iter("subcat")) or any(c.get("id") == COMICS_CATEGORY for c in root.iter("category"))
-    return f"Connected to a {'Torznab' if kind == 'torznab' else 'Newznab'} indexer" + ("" if comics else " (it doesn't list Comics, 7030: set the category it files comics under)") + "."
+    comics = any(c.get("id") == COMICS_CATEGORY for c in root.iter("subcat")) or any(
+        c.get("id") == COMICS_CATEGORY for c in root.iter("category")
+    )
+    return (
+        f"Connected to a {'Torznab' if kind == 'torznab' else 'Newznab'} indexer"
+        + ("" if comics else " (it doesn't list Comics, 7030: set the category it files comics under)")
+        + "."
+    )

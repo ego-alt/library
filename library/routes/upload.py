@@ -110,17 +110,12 @@ def upload_book():
             cover_bytes = read_epub_cover(path, cover_path)
             mimetype = guess_cover_mimetype_from_bytes(cover_bytes)
             mimetype = mimetype or cover_mimetype(cover_path)
-            cover = (
-                f"data:{mimetype};base64,{base64.b64encode(cover_bytes).decode('ascii')}"
-            )
+            cover = f"data:{mimetype};base64,{base64.b64encode(cover_bytes).decode('ascii')}"
         except Exception:
             cover_path = None
-            cover = (
-                "data:image/svg+xml;base64,"
-                + base64.b64encode(fallback_cover_svg(
-                    metadata.get("title", ""), metadata.get("author", "")
-                )).decode("ascii")
-            )
+            cover = "data:image/svg+xml;base64," + base64.b64encode(
+                fallback_cover_svg(metadata.get("title", ""), metadata.get("author", ""))
+            ).decode("ascii")
 
         # Cover comes back as an inline data URL because no Book row exists yet
         # to serve via the cached /cover route.
@@ -137,9 +132,7 @@ def upload_book():
         if os.path.exists(path):
             os.remove(path)
         current_app.logger.error(f"Failed to process EPUB file: {str(e)}")
-        return jsonify(
-            {"error": "Couldn't read this file. It may be damaged or not a real EPUB."}
-        ), 400
+        return jsonify({"error": "Couldn't read this file. It may be damaged or not a real EPUB."}), 400
 
 
 def _has_toc(path: str) -> bool:
@@ -170,9 +163,7 @@ def upload_book_metadata():
     data = request.get_json() or {}
     path = _incoming_path(data.get("upload_id"))
     if not path or not os.path.exists(path):
-        return jsonify(
-            {"error": "This upload has expired. Choose the file again."}
-        ), 400
+        return jsonify({"error": "This upload has expired. Choose the file again."}), 400
 
     title = (data.get("title") or "").strip() or "Untitled"
     author = (data.get("author") or "").strip() or "Unknown author"
@@ -203,25 +194,23 @@ def upload_book_metadata():
                     tag = Tag(name=name, user_id=current_user.id)
                     db.session.add(tag)
                     db.session.flush()
-                db.session.execute(book_tags.insert().values(
-                    book_id=book.id, tag_id=tag.id, user_id=current_user.id
-                ))
+                db.session.execute(book_tags.insert().values(book_id=book.id, tag_id=tag.id, user_id=current_user.id))
     except Exception as e:
         current_app.logger.error(f"Failed to add book: {e}")
         # Put the file back so the uploader can retry.
         os.replace(os.path.join(book_dir, filename), path)
-        return jsonify(
-            {"error": "Couldn't add the book to the library. Try again."}
-        ), 500
+        return jsonify({"error": "Couldn't add the book to the library. Try again."}), 500
 
-    return jsonify({
-        "message": "Book added",
-        "book": {
-            "filename": book.filename,
-            "title": book.title,
-            "author": display_author(book.author),
-            "cover": cover_url(book, width=400),
-            "length": epub_text_size(os.path.join(book_dir, filename)),
-            "access_level": book.access_level,
-        },
-    })
+    return jsonify(
+        {
+            "message": "Book added",
+            "book": {
+                "filename": book.filename,
+                "title": book.title,
+                "author": display_author(book.author),
+                "cover": cover_url(book, width=400),
+                "length": epub_text_size(os.path.join(book_dir, filename)),
+                "access_level": book.access_level,
+            },
+        }
+    )

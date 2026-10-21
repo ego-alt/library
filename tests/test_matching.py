@@ -24,8 +24,10 @@ def test_author_order_and_initials_still_match():
 
 def test_edition_title_difference_still_ranks_high():
     s = score_book(
-        "Harry Potter and the Sorcerer's Stone", "J. K. Rowling",
-        "Harry Potter and the Philosopher's Stone", "J. K. Rowling",
+        "Harry Potter and the Sorcerer's Stone",
+        "J. K. Rowling",
+        "Harry Potter and the Philosopher's Stone",
+        "J. K. Rowling",
     )
     assert s >= 0.6
 
@@ -51,8 +53,8 @@ def test_rank_matches_filters_and_sorts():
     ranked = rank_matches("Dune", "Frank Herbert", books, threshold=0.6)
 
     filenames = [b.filename for b, _ in ranked]
-    assert filenames[0] == "dune.epub"          # exact match ranks first
-    assert "hobbit.epub" not in filenames        # unrelated book filtered out
+    assert filenames[0] == "dune.epub"  # exact match ranks first
+    assert "hobbit.epub" not in filenames  # unrelated book filtered out
 
     scores = [s for _, s in ranked]
     assert scores == sorted(scores, reverse=True)

@@ -16,24 +16,9 @@ db = SQLAlchemy()
 # Junction table for book tags
 book_tags = db.Table(
     "book_tags",
-    db.Column(
-        "book_id",
-        db.Integer,
-        db.ForeignKey("books.id", ondelete="CASCADE"),
-        primary_key=True,
-    ),
-    db.Column(
-        "tag_id",
-        db.Integer,
-        db.ForeignKey("tags.id", ondelete="CASCADE"),
-        primary_key=True,
-    ),
-    db.Column(
-        "user_id",
-        db.Integer,
-        db.ForeignKey("users.id", ondelete="CASCADE"),
-        primary_key=True,
-    ),
+    db.Column("book_id", db.Integer, db.ForeignKey("books.id", ondelete="CASCADE"), primary_key=True),
+    db.Column("tag_id", db.Integer, db.ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True),
+    db.Column("user_id", db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
 )
 
 
@@ -43,9 +28,7 @@ class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(128))
-    role = db.Column(
-        db.Enum(UserRoleChoice), nullable=False, default=UserRoleChoice.STANDARD
-    )
+    role = db.Column(db.Enum(UserRoleChoice), nullable=False, default=UserRoleChoice.STANDARD)
     created_at = db.Column(db.DateTime, nullable=False, default=_utcnow)
 
     # Add these methods
@@ -58,9 +41,7 @@ class User(UserMixin, db.Model):
         return check_password_hash(self.password_hash, password)
 
     # Relationships
-    bookmarks = db.relationship(
-        "Bookmark", back_populates="user", cascade="all, delete-orphan"
-    )
+    bookmarks = db.relationship("Bookmark", back_populates="user", cascade="all, delete-orphan")
     uploaded_books = db.relationship("Book", back_populates="uploaded_by_user")
     tags = db.relationship("Tag", back_populates="user", cascade="all, delete-orphan")
 
@@ -82,12 +63,8 @@ class Book(db.Model):
     deleted_at = db.Column(db.DateTime, nullable=True, index=True)
 
     # Relationships
-    tags = db.relationship(
-        "Tag", secondary=book_tags, backref=db.backref("books", lazy="dynamic")
-    )
-    bookmarks = db.relationship(
-        "Bookmark", back_populates="book", cascade="all, delete-orphan"
-    )
+    tags = db.relationship("Tag", secondary=book_tags, backref=db.backref("books", lazy="dynamic"))
+    bookmarks = db.relationship("Bookmark", back_populates="book", cascade="all, delete-orphan")
     uploaded_by_user = db.relationship("User", back_populates="uploaded_books")
 
 
@@ -119,11 +96,7 @@ class Bookmark(db.Model):
     position = db.Column(db.Float, default=0)  # Percentage through chapter
 
     last_read = db.Column(db.DateTime, nullable=False, default=_utcnow)
-    status = db.Column(
-        db.Enum(BookProgressChoice),
-        nullable=False,
-        default=BookProgressChoice.UNREAD,
-    )
+    status = db.Column(db.Enum(BookProgressChoice), nullable=False, default=BookProgressChoice.UNREAD)
 
     # Relationships
     user = db.relationship("User", back_populates="bookmarks")

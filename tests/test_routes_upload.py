@@ -33,18 +33,14 @@ def test_generate_filename_handles_empty_input(tmp_path):
 def test_upload_book_requires_auth(client):
     epub = build_epub3()
     r = client.post(
-        "/upload_book",
-        data={"file": (io.BytesIO(epub), "anything.epub")},
-        content_type="multipart/form-data",
+        "/upload_book", data={"file": (io.BytesIO(epub), "anything.epub")}, content_type="multipart/form-data"
     )
     assert r.status_code == 401
 
 
 def test_upload_book_rejects_non_epub(standard_client):
     r = standard_client.post(
-        "/upload_book",
-        data={"file": (io.BytesIO(b"not an epub"), "foo.txt")},
-        content_type="multipart/form-data",
+        "/upload_book", data={"file": (io.BytesIO(b"not an epub"), "foo.txt")}, content_type="multipart/form-data"
     )
     assert r.status_code == 400
 
@@ -52,9 +48,7 @@ def test_upload_book_rejects_non_epub(standard_client):
 def _stage(client, **kwargs):
     epub = build_epub3(**kwargs)
     r = client.post(
-        "/upload_book",
-        data={"file": (io.BytesIO(epub), "incoming.epub")},
-        content_type="multipart/form-data",
+        "/upload_book", data={"file": (io.BytesIO(epub), "incoming.epub")}, content_type="multipart/form-data"
     )
     assert r.status_code == 200, r.get_json()
     return r.get_json()
@@ -77,23 +71,25 @@ def test_upload_book_accepts_epub2_with_ncx_only(standard_client, monkeypatch):
     """EPUB 2 books have an NCX table of contents and no nav document."""
     from ebooklib import epub as ebooklib_epub
 
-    monkeypatch.setattr(ebooklib_epub.EpubBook, "get_items_of_type",
-                        lambda self, kind: [] if kind == ebooklib_epub.EpubNav else [])
+    monkeypatch.setattr(
+        ebooklib_epub.EpubBook, "get_items_of_type", lambda self, kind: [] if kind == ebooklib_epub.EpubNav else []
+    )
     assert _stage(standard_client)["upload_id"]
 
 
-def test_confirm_moves_file_into_library_with_generated_name(
-    standard_client, standard_user, book_dir
-):
+def test_confirm_moves_file_into_library_with_generated_name(standard_client, standard_user, book_dir):
     payload = _stage(standard_client, title="Brave New World", author="Aldous Huxley")
-    r = standard_client.post("/upload_book_metadata", json={
-        "upload_id": payload["upload_id"],
-        "title": "Brave New World (Revised)",
-        "author": "Aldous Huxley",
-        "genre": "fiction",
-        "tags": ["dystopia", " ", "dystopia"],
-        "cover_path": payload["cover_path"],
-    })
+    r = standard_client.post(
+        "/upload_book_metadata",
+        json={
+            "upload_id": payload["upload_id"],
+            "title": "Brave New World (Revised)",
+            "author": "Aldous Huxley",
+            "genre": "fiction",
+            "tags": ["dystopia", " ", "dystopia"],
+            "cover_path": payload["cover_path"],
+        },
+    )
     assert r.status_code == 200, r.get_json()
     book = r.get_json()["book"]
     assert book["filename"] == "Brave_New_World_Revised__Aldous_Huxley.epub"
@@ -108,8 +104,7 @@ def test_confirm_moves_file_into_library_with_generated_name(
 
 def test_confirm_rejects_unknown_or_malicious_upload_ids(standard_client, book_dir):
     for upload_id in ("../../etc/passwd", "0" * 32, None, 5):
-        r = standard_client.post("/upload_book_metadata", json={
-            "upload_id": upload_id, "title": "T", "author": "A"})
+        r = standard_client.post("/upload_book_metadata", json={"upload_id": upload_id, "title": "T", "author": "A"})
         assert r.status_code == 400
     assert Book.query.count() == 0
 

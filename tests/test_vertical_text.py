@@ -27,7 +27,9 @@ def _epub(path, spine_rtl=False, css=None):
 
 def test_a_book_asks_for_vertical_text(tmp_path):
     assert get_epub_structure(_epub(tmp_path / "rtl.epub", spine_rtl=True))["vertical"]
-    assert get_epub_structure(_epub(tmp_path / "css.epub", css="body { -webkit-writing-mode: vertical-rl; }"))["vertical"]
+    assert get_epub_structure(_epub(tmp_path / "css.epub", css="body { -webkit-writing-mode: vertical-rl; }"))[
+        "vertical"
+    ]
     assert get_epub_structure(_epub(tmp_path / "old.epub", css="html { writing-mode:tb-rl }"))["vertical"]
 
 

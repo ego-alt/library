@@ -106,13 +106,26 @@ def import_file(src: str, issue: ComicIssue, *, remove_source: bool = True) -> C
     opts = settings.get_all()
     original = os.path.basename(src)
     folder = series_folder(series)
-    filename = os.path.join(folder, issue_filename(series, issue)) if opts["rename"] else os.path.join(folder, names.safe_filename(names.strip_extension(original)) + ".cbz")
+    filename = (
+        os.path.join(folder, issue_filename(series, issue))
+        if opts["rename"]
+        else os.path.join(folder, names.safe_filename(names.strip_extension(original)) + ".cbz")
+    )
     dest = os.path.join(comic_dir(), filename)
 
     old = abs_path(issue) if issue.filename else None
     tmp_dest = f"{dest}.new"
     try:
-        pages = archive.write_cbz(src, tmp_dest, webp=opts["convert_webp"], quality=int(opts["webp_quality"]), metadata=lambda pages: (archive.comicinfo_xml(issue, series, pages, original), archive.metroninfo_xml(issue, series, pages, original)))
+        pages = archive.write_cbz(
+            src,
+            tmp_dest,
+            webp=opts["convert_webp"],
+            quality=int(opts["webp_quality"]),
+            metadata=lambda pages: (
+                archive.comicinfo_xml(issue, series, pages, original),
+                archive.metroninfo_xml(issue, series, pages, original),
+            ),
+        )
         os.replace(tmp_dest, dest)
     finally:
         if os.path.exists(tmp_dest):
@@ -139,7 +152,11 @@ def retag(issue: ComicIssue) -> None:
     """Rewrite an issue's embedded metadata after its details change."""
     if not issue.filename or not os.path.exists(abs_path(issue)):
         return
-    archive.replace_metadata(abs_path(issue), archive.comicinfo_xml(issue, issue.series, issue.page_count or 0, issue.original_filename), archive.metroninfo_xml(issue, issue.series, issue.page_count or 0, issue.original_filename))
+    archive.replace_metadata(
+        abs_path(issue),
+        archive.comicinfo_xml(issue, issue.series, issue.page_count or 0, issue.original_filename),
+        archive.metroninfo_xml(issue, issue.series, issue.page_count or 0, issue.original_filename),
+    )
 
 
 def delete_file(issue: ComicIssue) -> None:

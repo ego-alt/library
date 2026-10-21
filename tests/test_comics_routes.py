@@ -4,14 +4,7 @@ from datetime import date, timedelta
 import pytest
 
 from library.comics import providers, settings
-from library.comics.models import (
-    DOWNLOADED,
-    SKIPPED,
-    WANTED,
-    ComicIssue,
-    ComicProgress,
-    ComicSeries,
-)
+from library.comics.models import DOWNLOADED, SKIPPED, WANTED, ComicIssue, ComicProgress, ComicSeries
 from library.models import db
 from tests.conftest import make_cbz
 
@@ -20,7 +13,21 @@ class FakeProvider:
     name = "comicvine"
 
     def search_series(self, query):
-        return [{"provider": "comicvine", "provider_id": "49901", "name": "Saga", "start_year": 2012, "publisher": "Image", "volume": None, "description": "", "cover_url": None, "issue_count": 3, "cv_id": 49901, "metron_id": None}]
+        return [
+            {
+                "provider": "comicvine",
+                "provider_id": "49901",
+                "name": "Saga",
+                "start_year": 2012,
+                "publisher": "Image",
+                "volume": None,
+                "description": "",
+                "cover_url": None,
+                "issue_count": 3,
+                "cv_id": 49901,
+                "metron_id": None,
+            }
+        ]
 
     def get_series(self, provider_id):
         return self.search_series("")[0]
@@ -45,7 +52,9 @@ def provider(monkeypatch):
 
 @pytest.fixture
 def saga(app, comic_dir, admin_client, provider):
-    response = admin_client.post("/comics/api/series", json={"provider": "comicvine", "provider_id": "49901", "monitor": "future"})
+    response = admin_client.post(
+        "/comics/api/series", json={"provider": "comicvine", "provider_id": "49901", "monitor": "future"}
+    )
     assert response.status_code == 201
     return ComicSeries.query.one()
 
@@ -60,7 +69,17 @@ def test_every_page_renders(admin_client, saga, tmp_path, comic_dir):
     from library.comics import files
 
     files.import_file(str(make_cbz(tmp_path / "Saga 001.cbz")), issue)
-    for path in ["/comics/", "/comics/add?q=saga", f"/comics/series/{saga.id}", "/comics/wanted", "/comics/upcoming", "/comics/activity", "/comics/import", "/comics/settings", f"/comics/read/{issue.id}"]:
+    for path in [
+        "/comics/",
+        "/comics/add?q=saga",
+        f"/comics/series/{saga.id}",
+        "/comics/wanted",
+        "/comics/upcoming",
+        "/comics/activity",
+        "/comics/import",
+        "/comics/settings",
+        f"/comics/read/{issue.id}",
+    ]:
         response = admin_client.get(path)
         assert response.status_code == 200, path
     assert b"Saga" in admin_client.get("/comics/").data
@@ -92,11 +111,18 @@ def test_monitor_all_and_bulk(admin_client, saga):
     admin_client.patch(f"/comics/api/series/{saga.id}", json={"monitor": "all"})
     assert all(i.status == WANTED for i in saga.issues)
     ids = [i.id for i in saga.issues]
-    assert admin_client.post("/comics/api/issues/bulk", json={"ids": ids, "status": "skipped"}).get_json()["changed"] == 3
+    assert (
+        admin_client.post("/comics/api/issues/bulk", json={"ids": ids, "status": "skipped"}).get_json()["changed"] == 3
+    )
 
 
 def test_upload_to_import_folder_matches_and_files(admin_client, saga, comic_dir):
-    data = {"files": [(io.BytesIO(make_cbz(comic_dir / "tmp.cbz").read_bytes()), "Saga 002 (2024) (Digital).cbz"), (io.BytesIO(b"x"), "notes.txt")]}
+    data = {
+        "files": [
+            (io.BytesIO(make_cbz(comic_dir / "tmp.cbz").read_bytes()), "Saga 002 (2024) (Digital).cbz"),
+            (io.BytesIO(b"x"), "notes.txt"),
+        ]
+    }
     result = admin_client.post("/comics/api/import/upload", data=data, content_type="multipart/form-data").get_json()
     assert len(result["imported"]) == 1
     assert saga.issues[1].status == DOWNLOADED
@@ -149,7 +175,9 @@ def test_settings_keep_masked_secrets(admin_client, comic_dir):
     shown = admin_client.get("/comics/api/settings").get_json()
     shown["max_size_mb"] = 300
     shown["rejected_words"] = "c2c, preview"
-    shown["indexers"] = [{"name": "Geek", "url": "https://api.nzbgeek.info", "api_key": "secret-key-123", "kind": "newznab"}]
+    shown["indexers"] = [
+        {"name": "Geek", "url": "https://api.nzbgeek.info", "api_key": "secret-key-123", "kind": "newznab"}
+    ]
     saved = admin_client.put("/comics/api/settings", json=shown).get_json()
     assert settings.get("comicvine_api_key") == "abcdef1234567890"
     assert settings.get("max_size_mb") == 300 and settings.get("rejected_words") == ["c2c", "preview"]

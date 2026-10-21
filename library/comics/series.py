@@ -5,16 +5,7 @@ from datetime import date, datetime, timedelta
 
 from ..models import _utcnow, db
 from . import names
-from .models import (
-    DOWNLOADED,
-    MONITOR_ALL,
-    MONITOR_FUTURE,
-    SKIPPED,
-    SNATCHED,
-    WANTED,
-    ComicIssue,
-    ComicSeries,
-)
+from .models import DOWNLOADED, MONITOR_ALL, MONITOR_FUTURE, SKIPPED, SNATCHED, WANTED, ComicIssue, ComicSeries
 from .providers import get_provider
 
 # Series are re-read from their provider this often (ongoing ones) or a tenth
@@ -44,7 +35,11 @@ def _status_for_new_issue(series: ComicSeries, issue: ComicIssue, first_sync: bo
             return WANTED if released is None or released > date.today() else SKIPPED
         # A new issue showing up later is new, unless it's an old back issue
         # the provider just added.
-        return WANTED if released is None or released >= (series.added_at.date() if series.added_at else date.today()) else SKIPPED
+        return (
+            WANTED
+            if released is None or released >= (series.added_at.date() if series.added_at else date.today())
+            else SKIPPED
+        )
     return SKIPPED
 
 
@@ -146,7 +141,9 @@ def local_series(name: str, year: int | None) -> ComicSeries:
     key = f"{names.normalize_series(name)}|{year or ''}"[:32]
     series = ComicSeries.query.filter_by(provider="local", provider_id=key).first()
     if series is None:
-        series = ComicSeries(provider="local", provider_id=key, name=name, start_year=year, monitor="none", refreshed_at=_utcnow())
+        series = ComicSeries(
+            provider="local", provider_id=key, name=name, start_year=year, monitor="none", refreshed_at=_utcnow()
+        )
         db.session.add(series)
         db.session.flush()
     return series
