@@ -7,34 +7,19 @@
     <link href="{{ url_for('static', filename='css/manage.css') }}" rel="stylesheet">
 {% endblock %}
 {% block content %}
-{% set comic_count = wanted_comics|sum(attribute='issues', start=[])|length %}
-{% set wanted_total = wanted_books|length + comic_count %}
-{# Like the libraries: one row of filters, one list at a time. #}
-<div class="library-toolbar dl-toolbar" id="dlToolbar" data-can-search="{{ '1' if can_search else '' }}">
-    <div class="status-filter" role="tablist" aria-label="Downloads">
-        <button type="button" role="tab" data-tab="wanted" aria-selected="true">Wanted{% if wanted_total %} <span class="count" id="wantedCount">{{ wanted_total }}</span>{% endif %}</button>
-        <button type="button" role="tab" data-tab="active" aria-selected="false">Downloading <span class="count" id="activeCount" hidden></span></button>
-        {% if upcoming %}<button type="button" role="tab" data-tab="upcoming" aria-selected="false">Coming up</button>{% endif %}
-        <button type="button" role="tab" data-tab="history" aria-selected="false">History</button>
-    </div>
-    <div class="dl-toolbar__actions">
-        {% if can_search and wanted_total %}<button type="button" class="btn btn-ghost" data-action="search-all">Search all</button>{% endif %}
-        <button type="button" class="btn btn-secondary" id="importPick"><i class="fas fa-plus" aria-hidden="true"></i> Add files</button>
-    </div>
-</div>
-<input type="file" id="importInput" accept=".epub,.cbz,.cbr,.cb7,.zip,.rar,.7z" multiple hidden>
-
-{# Comics that didn't match an issue on their own: only there when there are some. #}
-<section class="dl-notice" id="importWaiting" hidden>
-    <div class="dl-notice__head">
-        <h2 class="dl-notice__title">Files to match</h2>
-        <button type="button" class="btn btn-ghost" id="importScan">Match again</button>
-    </div>
-    <ol class="entries" id="importList"></ol>
+<section class="section" id="activeSection" hidden>
+    <div class="section__head"><h2 class="section__title">Downloading</h2></div>
+    <ol class="entries" id="activeList"></ol>
 </section>
 
-<section class="dl-panel" id="wanted" data-panel="wanted" data-can-search="{{ '1' if can_search else '' }}">
-    {% if wanted_total %}
+{% set comic_count = wanted_comics|sum(attribute='issues', start=[])|length %}
+<section class="section" id="wanted" data-can-search="{{ '1' if can_search else '' }}">
+    <div class="section__head">
+        <h2 class="section__title">Wanted</h2>
+        {% if can_search and (wanted_books or wanted_comics) %}<div class="section__actions"><button type="button" class="btn btn-secondary" data-action="search-all">Search all now</button></div>{% endif %}
+    </div>
+    {% if wanted_books or wanted_comics %}
+    <p class="section__hint">{% if can_search %}Searched for every few hours.{% else %}Searched for once there's an indexer in <a href="{{ url_for('settings.settings_page') }}#indexers">Settings</a>.{% endif %}</p>
     {% if wanted_books %}
     <h3 class="sub-head">Books <span class="count" data-count>{{ wanted_books|length }}</span></h3>
     <ol class="entries">
@@ -74,16 +59,30 @@
     </ol>
     {% endif %}
     {% else %}
-    <p class="empty-line">Nothing wanted. <a href="{{ url_for('downloads.get_page') }}">Get</a> a book or follow a comic series, and it waits here until it's in the library.</p>
+    <p class="section__hint">Nothing wanted. <a href="{{ url_for('downloads.get_page') }}">Get</a> a book or follow a comic series, and it waits here until it's in the library.</p>
     {% endif %}
 </section>
 
-<section class="dl-panel" data-panel="active" hidden>
-    <ol class="entries" id="activeList"><li class="empty-line">Nothing downloading.</li></ol>
+<section class="section" id="import">
+    <div class="section__head">
+        <h2 class="section__title">Import</h2>
+        <div class="section__actions">
+            <button type="button" class="btn btn-ghost" id="importScan" hidden>Match again</button>
+            <button type="button" class="btn btn-secondary" id="importPick">Choose files</button>
+        </div>
+    </div>
+    <p class="section__hint">Or drop EPUBs and CBZ, CBR or CB7 comics anywhere on this page. Books join the library; comics are matched to their issue.</p>
+    <input type="file" id="importInput" accept=".epub,.cbz,.cbr,.cb7,.zip,.rar,.7z" multiple hidden>
+    <div id="importWaiting" hidden>
+        <h3 class="sub-head">Waiting to be matched</h3>
+        <ol class="entries" id="importList"></ol>
+    </div>
 </section>
 
 {% if upcoming %}
-<section class="dl-panel" data-panel="upcoming" hidden>
+<section class="section" id="upcoming">
+    <div class="section__head"><h2 class="section__title">Coming up</h2></div>
+    <p class="section__hint">The next two months of the comics you follow, by the day they reach shops.</p>
     <ol class="entries">
     {% for issue in upcoming %}
         <li class="entry">
@@ -96,14 +95,15 @@
 </section>
 {% endif %}
 
-<section class="dl-panel" data-panel="history" hidden>
+<details class="section section--fold" id="historySection">
+    <summary class="section__head"><h2 class="section__title">History <span class="muted" id="historyCount"></span></h2></summary>
+    <p class="section__hint">A failed release isn't grabbed again for the same book or issue; remove it to allow it.</p>
     <ol class="entries" id="historyList"></ol>
-    <p class="dl-footnote">A failed release isn't grabbed again for the same book or issue; remove it from here to allow it.</p>
-</section>
+</details>
 
-{# The worker, as one quiet line; its jobs open under it. #}
-<details class="dl-jobs" id="jobs">
-    <summary class="dl-jobs__line" id="workerState">{{ 'Searched every few hours' if can_search else 'No indexers yet: add one in Settings' }}</summary>
+<details class="section section--fold" id="jobs">
+    <summary class="section__head"><h2 class="section__title">Background jobs</h2></summary>
+    <p class="section__hint" id="workerState">These run on their own; Run starts one now.</p>
     <ol class="entries" id="jobList">
         {% for job, label in [('downloads', 'Check downloads'), ('import', 'Import new files'), ('refresh', 'Refresh comic series'), ('search', 'Search for everything wanted')] %}
         <li class="entry" data-job="{{ job }}">

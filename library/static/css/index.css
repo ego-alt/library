@@ -75,23 +75,7 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 .lib-bar__title a { color: var(--color-text-primary); text-decoration: none; }
 .lib-bar__actions { display: flex; align-items: center; gap: var(--space-1); }
 
-/* The bar's icons: the view toggles, then the admin menu. */
-.bar-icon { position: relative; color: var(--color-text-muted); }
-.bar-icon:hover { color: var(--color-text-primary); }
-#layoutToggle[aria-pressed="true"] { color: var(--color-accent); }
-/* Something's downloading or waiting to be matched. */
-.bar-icon__dot {
-    position: absolute;
-    top: 10px;
-    right: 9px;
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: var(--color-accent);
-    box-shadow: 0 0 0 2px var(--color-bg-base);
-}
-
-/* The admin menu: Get, Downloads, Settings. */
+/* The one menu: night mode, the view, Settings. */
 .bar-menu { position: relative; }
 .bar-menu > summary { list-style: none; cursor: pointer; }
 .bar-menu > summary::-webkit-details-marker { display: none; }
@@ -148,8 +132,6 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 .shelf-nav a:hover { color: var(--color-text-primary); }
 .shelf-nav a[aria-current="page"] { color: var(--color-text-primary); border-bottom-color: var(--color-accent); }
 .shelf-nav__gap { flex: 1; }
-/* On an admin page, its name sits at the end of the row, as where you are. */
-.shelf-nav__here { color: var(--color-text-primary); font-size: 1.0625rem; font-weight: 500; border-bottom: 1px solid var(--color-accent); }
 .count {
     display: inline-block;
     min-width: 1.4em;
@@ -166,7 +148,7 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     .lib-bar__inner { height: 56px; }
     .lib-bar__title { letter-spacing: 0.22em; font-size: 1rem; }
     .shelf-nav { gap: var(--space-2) 18px; margin-bottom: 24px; }
-    .shelf-nav a, .shelf-nav__here { font-size: 1rem; }
+    .shelf-nav a { font-size: 1rem; }
 }
 /* The hang: covers at book proportions (2:3, so nothing important is
    cropped), five across on a laptop, equally spaced, stepping down to 4, 3
@@ -1451,8 +1433,7 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 }
 .meta-status button { font-size: var(--text-sm); }
 .status-filter button:hover { color: var(--color-text-primary); }
-.status-filter button[aria-checked="true"],
-.status-filter button[aria-selected="true"] {
+.status-filter button[aria-checked="true"] {
     color: var(--color-text-primary);
     border-bottom-color: var(--color-accent);
 }

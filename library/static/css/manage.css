@@ -114,38 +114,3 @@
 .monitor-choice select { height: 36px; font-size: var(--text-sm); }
 .entry__controls .input--short { width: 5rem; }
 .entry__controls .btn { height: 36px; padding: 0 var(--space-3); font-size: var(--text-sm); }
-
-/* --- Downloads: one filter row like the libraries, one list at a time. --- */
-.dl-toolbar { justify-content: space-between; margin-bottom: var(--space-5); }
-.dl-toolbar .status-filter button { white-space: nowrap; }
-.dl-toolbar__actions { display: flex; align-items: center; gap: var(--space-2); }
-.dl-panel > .sub-head:first-child { margin-top: 0; }
-.dl-footnote { margin: var(--space-3) 0 0; color: var(--color-text-muted); font-size: var(--text-sm); }
-
-/* Files that didn't match: a quiet notice above the lists, only when there are some. */
-.dl-notice {
-    margin-bottom: var(--space-8);
-    padding: var(--space-2) var(--space-4) var(--space-3);
-    border: 1px solid var(--pane-edge);
-    border-radius: var(--radius-md);
-    background: var(--color-bg-raised);
-}
-.dl-notice__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); min-height: 40px; }
-.dl-notice__title { margin: 0; font-size: var(--text-base); font-weight: 600; }
-.dl-notice .entry:last-child { border-bottom: none; }
-
-/* The worker, as one line at the foot of the page. */
-.dl-jobs { margin-top: var(--space-8); }
-.dl-jobs__line { list-style: none; cursor: pointer; color: var(--color-text-muted); font-size: var(--text-sm); }
-.dl-jobs__line::-webkit-details-marker { display: none; }
-.dl-jobs__line::before { content: "▸ "; transition: transform var(--dur-fast) ease; }
-.dl-jobs[open] .dl-jobs__line::before { content: "▾ "; }
-.dl-jobs__line.is-bad { color: var(--color-danger); }
-.dl-jobs .entries { margin-top: var(--space-2); }
-
-@media (max-width: 640px) {
-    .dl-toolbar { flex-direction: column; align-items: stretch; gap: var(--space-3); }
-    .dl-toolbar .status-filter { width: 100%; overflow-x: auto; scrollbar-width: none; }
-    .dl-toolbar .status-filter button { flex: 0 0 auto; min-height: 40px; }
-    .dl-toolbar__actions { justify-content: flex-end; }
-}

@@ -17,7 +17,7 @@ settings_blueprint = Blueprint("settings", __name__)
 def settings_page():
     if current_user.role != UserRoleChoice.ADMIN:
         return redirect(url_for("index_routes.index"))
-    return render_template("settings.html", import_dir=files.import_dir(), comic_dir=files.comic_dir())
+    return render_template("settings.html", shelf=None, import_dir=files.import_dir(), comic_dir=files.comic_dir())
 
 
 
