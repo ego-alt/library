@@ -20,6 +20,10 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="Library">
     <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
+    {# Fetched before the stylesheets ask for them, so text and icons draw in
+       their own fonts from the start rather than swapping in. #}
+    <link rel="preload" href="{{ url_for('static', filename='fonts/inter/inter-latin.woff2') }}" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="{{ url_for('static', filename='vendor/fontawesome-6.0.0-subset/fa-solid-900.woff2') }}" as="font" type="font/woff2" crossorigin>
     <link href="{{ url_for('static', filename='vendor/fontawesome-6.0.0-subset/icons.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='fonts/inter/inter.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/base.css') }}" rel="stylesheet">
@@ -29,24 +33,26 @@
     {% block styles %}{% endblock %}
 </head>
 <body{% block body_attrs %}{% endblock %}>
-    {# A slim paper bar: the name on the left, one menu on the right (night
-       mode, the view, Settings). Under it, one row for where you are: the
-       shelves, then Get and Downloads for admins. #}
+    {# A slim paper bar: the name on the left; on the right the view toggles,
+       then, for admins, a menu with Get, Downloads and Settings. Under it, the
+       shelves (and the admin page you're on, if any). #}
+    {% set admin_page = {'get': 'Get', 'downloads': 'Downloads', 'settings': 'Settings'}.get(shelf) %}
     <header class="lib-bar">
         <div class="lib-bar__inner container">
             <h1 class="lib-bar__title"><a href="{{ url_for('index_routes.index') }}">Shelves</a></h1>
             <div class="lib-bar__actions">
                 {% block bar_actions %}{% endblock %}
+                <button type="button" class="btn btn-ghost bar-icon" onclick="toggleDarkMode()" aria-label="Night mode" title="Night mode"><i id="dark-mode-icon" class="fas fa-moon" aria-hidden="true"></i></button>
+                {% if is_admin %}
                 <details class="bar-menu">
-                    <summary class="btn btn-ghost" aria-label="Menu" title="Menu"><i class="fas fa-bars" aria-hidden="true"></i></summary>
+                    <summary class="btn btn-ghost bar-icon" aria-label="Get, Downloads and Settings" title="Get, Downloads and Settings"><i class="fas fa-bars" aria-hidden="true"></i>{% if downloads_count %}<span class="bar-icon__dot" aria-hidden="true"></span>{% endif %}</summary>
                     <div class="bar-menu__panel">
-                        <button type="button" onclick="toggleDarkMode()"><i id="dark-mode-icon" class="fas fa-moon" aria-hidden="true"></i> <span class="bar-menu__label">Night mode</span></button>
-                        {% block menu_items %}{% endblock %}
-                        {% if is_admin %}
-                        <a href="{{ url_for('settings.settings_page') }}"{% if request.endpoint == 'settings.settings_page' %} aria-current="page"{% endif %}><i class="fas fa-gear" aria-hidden="true"></i> <span class="bar-menu__label">Settings</span></a>
-                        {% endif %}
+                        <a href="{{ url_for('downloads.get_page') }}"{% if shelf == 'get' %} aria-current="page"{% endif %}><i class="fas fa-plus" aria-hidden="true"></i> <span class="bar-menu__label">Get</span></a>
+                        <a href="{{ url_for('downloads.downloads_page') }}"{% if shelf == 'downloads' %} aria-current="page"{% endif %}><i class="fas fa-download" aria-hidden="true"></i> <span class="bar-menu__label">Downloads</span>{% if downloads_count %} <span class="count">{{ downloads_count }}</span>{% endif %}</a>
+                        <a href="{{ url_for('settings.settings_page') }}"{% if shelf == 'settings' %} aria-current="page"{% endif %}><i class="fas fa-gear" aria-hidden="true"></i> <span class="bar-menu__label">Settings</span></a>
                     </div>
                 </details>
+                {% endif %}
             </div>
         </div>
     </header>
@@ -54,10 +60,9 @@
     <nav class="shelf-nav container" aria-label="Library">
         <a href="{{ url_for('index_routes.index') }}"{% if shelf == 'books' %} aria-current="page"{% endif %}>Books</a>
         <a href="{{ url_for('comics.index') }}"{% if shelf == 'comics' %} aria-current="page"{% endif %}>Comics</a>
-        {% if is_admin %}
+        {% if admin_page %}
         <span class="shelf-nav__gap" aria-hidden="true"></span>
-        <a href="{{ url_for('downloads.get_page') }}"{% if shelf == 'get' %} aria-current="page"{% endif %}>Get</a>
-        <a href="{{ url_for('downloads.downloads_page') }}"{% if shelf == 'downloads' %} aria-current="page"{% endif %}>Downloads{% if downloads_count %} <span class="count">{{ downloads_count }}</span>{% endif %}</a>
+        <span class="shelf-nav__here" aria-current="page">{{ admin_page }}</span>
         {% endif %}
     </nav>
     {% endif %}

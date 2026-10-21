@@ -180,6 +180,7 @@ function initGet() {
 // --- Downloads ---------------------------------------------------------------
 
 function initDownloads() {
+    initTabs();
     initWanted();
     initDownloadLists();
     initImport();
@@ -189,9 +190,42 @@ function initDownloads() {
         await apiFetch(`/api/jobs/${button.dataset.run}`, {method: 'POST'});
         showToast('Starting', 'success');
     });
+    document.getElementById('dlToolbar').addEventListener('click', async (e) => {
+        if (!e.target.closest('[data-action="search-all"]')) return;
+        await apiFetch('/api/jobs/search', {method: 'POST'});
+        showToast('Searching; grabs show up under Downloading.', 'success');
+    });
+}
+
+// Wanted / Downloading / Coming up / History, one at a time, remembered in the
+// address (#history) so a link or a reload lands on the same list.
+let showTab = () => {};
+function initTabs() {
+    const tabs = document.querySelector('#dlToolbar [role="tablist"]');
+    showTab = (name, remember = true) => {
+        const button = tabs.querySelector(`[data-tab="${name}"]`);
+        if (!button) return;
+        tabs.querySelectorAll('[data-tab]').forEach(b => b.setAttribute('aria-selected', String(b === button)));
+        document.querySelectorAll('[data-panel]').forEach(panel => { panel.hidden = panel.dataset.panel !== name; });
+        if (remember) history.replaceState(null, '', `#${name}`);
+    };
+    tabs.addEventListener('click', (e) => {
+        const button = e.target.closest('[data-tab]');
+        if (button) showTab(button.dataset.tab);
+    });
+    const start = location.hash.slice(1);
+    if (start) showTab(start, false);
 }
 
 function showJobs(worker) {
+    const line = document.getElementById('workerState');
+    const failed = ['downloads', 'import', 'refresh', 'search'].filter(job => worker[job] && !worker[job].ok);
+    const last = worker.downloads && worker.downloads.at;
+    line.classList.toggle('is-bad', Boolean(failed.length) || !worker.alive);
+    line.textContent = !worker.alive
+        ? 'The background worker hasn’t checked in lately; it starts with the next visit after a restart'
+        : failed.length ? `A background job failed (${failed.join(', ')}); open for details`
+        : `Background jobs are fine${last ? ` · last check ${timeAgo(last)}` : ''}`;
     document.querySelectorAll('#jobList [data-job]').forEach(rowEl => {
         const job = worker[rowEl.dataset.job];
         const msg = rowEl.querySelector('.job-msg');
@@ -199,7 +233,6 @@ function showJobs(worker) {
         msg.textContent = pending ? 'Starting…' : (job ? `${job.message} (${timeAgo(job.at)})` : 'Not run yet');
         msg.classList.toggle('danger-text', Boolean(job && !job.ok));
     });
-    document.getElementById('workerState').textContent = worker.alive ? 'These run on their own; Run starts one now.' : 'The worker hasn’t checked in for a while; it starts when the app gets its first visit after a restart.';
 }
 
 // Wanted: compact rows, each with a ⋯ menu; a comic series' row acts on all
@@ -219,6 +252,9 @@ function initWanted() {
             const left = list.querySelectorAll('[data-item-id]').length;
             if (!left) { heading.remove(); list.remove(); } else heading.querySelector('[data-count]').textContent = left;
         });
+        const total = section.querySelectorAll('[data-item-id]').length;
+        const count = document.getElementById('wantedCount');
+        if (count) { count.textContent = total; count.hidden = !total; }
     }
 
     async function run(work, done) {
@@ -266,11 +302,6 @@ function initWanted() {
     section.addEventListener('click', async (e) => {
         const button = e.target.closest('[data-action]');
         if (!button) return;
-        if (button.dataset.action === 'search-all') {
-            await apiFetch('/api/jobs/search', {method: 'POST'});
-            showToast('Searching; grabs show up at the top of this page.', 'success');
-            return;
-        }
         e.preventDefault();  // a ⋯ in a series' summary shouldn't fold it
         const row = button.closest('[data-item-id]');
         openMenu(button, row ? itemMenu(row) : seriesMenu(button.closest('.entry-group')));
@@ -278,10 +309,10 @@ function initWanted() {
 }
 
 function initDownloadLists() {
-    const activeSection = document.getElementById('activeSection');
+    const activeCount = document.getElementById('activeCount');
+    let firstLoad = true;
     const activeList = document.getElementById('activeList');
     const historyList = document.getElementById('historyList');
-    const historyCount = document.getElementById('historyCount');
 
     // A download as a row: what it's for, then its state and details; ⋯ holds
     // Cancel, or for finished ones Try another and Remove.
@@ -316,18 +347,20 @@ function initDownloadLists() {
     async function refresh() {
         let data;
         try { data = await apiFetch('/api/downloads'); } catch (e) { return; }
-        activeSection.hidden = !data.active.length;
-        activeList.replaceChildren(...data.active.map(d => downloadRow(d, true)));
+        activeCount.textContent = data.active.length;
+        activeCount.hidden = !data.active.length;
+        activeList.replaceChildren(...(data.active.length ? data.active.map(d => downloadRow(d, true)) : [h('li', {class: 'empty-line'}, 'Nothing downloading.')]));
+        // Open on what's moving, unless the address says otherwise.
+        if (firstLoad && data.active.length && !location.hash) showTab('active', false);
+        firstLoad = false;
         historyList.replaceChildren(...(data.history.length ? data.history.map(d => downloadRow(d, false)) : [h('li', {class: 'empty-line'}, 'Nothing yet.')]));
         showJobs(data.worker || {});
-        const failed = data.history.filter(d => d.status === 'failed').length;
-        historyCount.textContent = data.history.length ? (failed ? `${data.history.length} · ${failed} failed` : String(data.history.length)) : '';
     }
 
     // Every 5 s while something is downloading, every 30 s otherwise.
     async function poll() {
         if (!document.hidden) await refresh();
-        setTimeout(poll, activeSection.hidden ? 30000 : 5000);
+        setTimeout(poll, activeCount.hidden ? 30000 : 5000);
     }
     poll();
 }
