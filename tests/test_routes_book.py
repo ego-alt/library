@@ -510,3 +510,25 @@ def test_load_more_pages_through_a_large_library(client, app, book_dir):
     assert len(first) == BOOKS_PER_LOAD
     assert len(second) == 6
     assert not {b["filename"] for b in first} & {b["filename"] for b in second}
+
+
+def test_update_cover_adds_a_cover_to_a_book_without(standard_client, app, book_dir):
+    import io
+
+    from library.models import Book, db
+    from library.utils import read_epub_cover
+    from tests._epub_builder import build_epub3
+
+    (book_dir / "bare.epub").write_bytes(build_epub3(include_cover=False))
+    db.session.add(Book(title="Bare", author="A", filename="bare.epub", cover_path=None, access_level="standard"))
+    db.session.commit()
+    jpeg = b"\xff\xd8\xff\xe0UPLOADED"
+    r = standard_client.post(
+        "/update_cover",
+        data={"filename": "bare.epub", "cover": (io.BytesIO(jpeg), "c.jpg")},
+        content_type="multipart/form-data",
+    )
+    assert r.status_code == 200
+    book = Book.query.filter_by(filename="bare.epub").one()
+    assert book.cover_path == "OEBPS/library-cover.jpg"
+    assert read_epub_cover(str(book_dir / "bare.epub"), book.cover_path) == jpeg

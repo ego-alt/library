@@ -174,7 +174,10 @@ def update_cover():
 
     try:
         new_cover_bytes = cover_file.read()
-        update_epub_cover(epub_file_path, new_cover_bytes)
+        cover_path = update_epub_cover(epub_file_path, new_cover_bytes)
+        if book.cover_path != cover_path:
+            book.cover_path = cover_path
+            db.session.commit()
         # The versioned URL changes with the file's mtime, so callers can swap
         # it into the grid and browsers fetch the new cover.
         return jsonify({

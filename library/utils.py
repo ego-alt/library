@@ -623,27 +623,61 @@ def extract_metadata(epub_book):
         return None
 
 
-def update_epub_cover(epub_file_path: str, new_cover_bytes: bytes) -> None:
-    """Replace the cover image in the EPUB file with new cover bytes."""
-    # Get the internal path for the cover image in the EPUB archive
-    cover_path_inside = get_epub_cover_path(epub_file_path)
+_COVER_EXTENSIONS = {"image/png": ".png", "image/gif": ".gif", "image/webp": ".webp"}
 
-    # Create a temporary file that will become the updated EPUB
-    temp_fd, temp_path = tempfile.mkstemp(suffix=".epub")
-    os.close(temp_fd)
 
+def _add_cover_to_opf(opf_bytes: bytes, href: str, mimetype: str) -> bytes:
+    """The package document with a new cover image in its manifest, marked both ways
+    readers look for one: EPUB3's cover-image property and EPUB2's <meta name="cover">."""
+    opf = etree.fromstring(opf_bytes)
+    ns = namespaces["opf"]
+    manifest = opf.find(f"{{{ns}}}manifest")
+    metadata = opf.find(f"{{{ns}}}metadata")
+    if manifest is None or metadata is None:
+        raise ValueError("Package document has no manifest or metadata")
+    ids = {item.get("id") for item in manifest}
+    item_id = next(i for i in ("cover-image", "cover-image-1", "cover-image-2", "library-cover") if i not in ids)
+    etree.SubElement(manifest, f"{{{ns}}}item", {"id": item_id, "href": href, "media-type": mimetype, "properties": "cover-image"})
+    etree.SubElement(metadata, f"{{{ns}}}meta", {"name": "cover", "content": item_id})
+    return etree.tostring(opf, xml_declaration=True, encoding="utf-8")
+
+
+def update_epub_cover(epub_file_path: str, new_cover_bytes: bytes) -> str:
+    """Replace the cover image in the EPUB file with new cover bytes, or add one to a
+    book that has none. Returns the cover's path inside the EPUB."""
     with zipfile.ZipFile(epub_file_path, "r") as zin:
+        try:
+            cover_path_inside = _discover_cover_path_in_open_zip(zin)
+            opf_path = new_opf = None
+        except ValueError:
+            # No cover yet: put the image beside the package document and list it there
+            container = etree.fromstring(zin.read("META-INF/container.xml"))
+            opf_path = container.xpath("/u:container/u:rootfiles/u:rootfile", namespaces=namespaces)[0].get("full-path").replace("\\", "/")
+            mimetype = guess_cover_mimetype_from_bytes(new_cover_bytes) or "image/jpeg"
+            href = "library-cover" + _COVER_EXTENSIONS.get(mimetype, ".jpg")
+            new_opf = _add_cover_to_opf(zin.read(opf_path), href, mimetype)
+            cover_path_inside = posixpath.join(posixpath.dirname(opf_path), href)
+
+        # Create a temporary file that will become the updated EPUB
+        temp_fd, temp_path = tempfile.mkstemp(suffix=".epub")
+        os.close(temp_fd)
+
         with zipfile.ZipFile(temp_path, "w") as zout:
             for item in zin.infolist():
                 if item.filename == cover_path_inside:
                     # Replace the cover image with the new image bytes
                     zout.writestr(item, new_cover_bytes)
+                elif item.filename == opf_path:
+                    zout.writestr(item, new_opf)
                 else:
                     # Copy all other original files as-is
                     zout.writestr(item, zin.read(item.filename))
+            if new_opf is not None:
+                zout.writestr(zipfile.ZipInfo(cover_path_inside), new_cover_bytes, zipfile.ZIP_STORED)
 
     # Replace the original EPUB file with the updated version
     shutil.move(temp_path, epub_file_path)
+    return cover_path_inside
 
 
 _NCX_NS = {"ncx": "http://www.daisy.org/z3986/2005/ncx/"}

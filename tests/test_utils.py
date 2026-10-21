@@ -1,3 +1,5 @@
+import zipfile
+
 import pytest
 
 from library.utils import (
@@ -341,6 +343,19 @@ def test_update_epub_cover_replaces_bytes(epub_path):
 
     # Re-reading must return the new bytes
     assert read_epub_cover(path, "OEBPS/cover.png") == new_bytes
+
+
+def test_update_epub_cover_adds_one_to_a_book_without(epub_path):
+    path = epub_path(build_epub3(include_cover=False))
+    jpeg = b"\xff\xd8\xff\xe0NEW-COVER-MARKER"
+    assert update_epub_cover(path, jpeg) == "OEBPS/library-cover.jpg"
+    assert get_epub_cover_path(path) == "OEBPS/library-cover.jpg"
+    assert read_epub_cover(path) == jpeg
+    # A second upload replaces it rather than adding another
+    update_epub_cover(path, jpeg + b"2")
+    assert read_epub_cover(path) == jpeg + b"2"
+    with zipfile.ZipFile(path) as z:
+        assert sum(n.endswith("library-cover.jpg") for n in z.namelist()) == 1
 
 
 # --- extract_metadata -----------------------------------------------------------
