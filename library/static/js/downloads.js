@@ -74,7 +74,7 @@ function initGet() {
     let shown = 'all';
 
     function applyShow() {
-        const has = section => section.querySelector('.get-results').children.length || section.querySelector('.get-section__note').textContent;
+        const has = section => section.querySelector('.get-results').children.length || section.querySelector('.get-note').textContent;
         bookSection.hidden = shown === 'comics' || !has(bookSection);
         comicSection.hidden = shown === 'books' || !has(comicSection);
     }
@@ -146,7 +146,8 @@ function initGet() {
 
     function fill(section, cards, note) {
         section.querySelector('.get-results').replaceChildren(...cards);
-        section.querySelector('.get-section__note').textContent = note || '';
+        section.querySelector('.get-note').textContent = note || '';
+        section.querySelector('[data-count]').textContent = cards.length || '';
     }
 
     async function search() {
@@ -182,7 +183,7 @@ function initDownloads() {
     initWanted();
     initDownloadLists();
     initImport();
-    document.getElementById('jobTable').addEventListener('click', async (e) => {
+    document.getElementById('jobList').addEventListener('click', async (e) => {
         const button = e.target.closest('[data-run]');
         if (!button) return;
         await apiFetch(`/api/jobs/${button.dataset.run}`, {method: 'POST'});
@@ -191,14 +192,14 @@ function initDownloads() {
 }
 
 function showJobs(worker) {
-    document.querySelectorAll('#jobTable [data-job]').forEach(rowEl => {
+    document.querySelectorAll('#jobList [data-job]').forEach(rowEl => {
         const job = worker[rowEl.dataset.job];
         const msg = rowEl.querySelector('.job-msg');
         const pending = (worker.pending || []).includes(rowEl.dataset.job);
         msg.textContent = pending ? 'Starting…' : (job ? `${job.message} (${timeAgo(job.at)})` : 'Not run yet');
         msg.classList.toggle('danger-text', Boolean(job && !job.ok));
     });
-    document.getElementById('workerState').textContent = worker.alive ? '' : 'The worker hasn’t checked in for a while; it starts when the app gets its first visit after a restart.';
+    document.getElementById('workerState').textContent = worker.alive ? 'These run on their own; Run starts one now.' : 'The worker hasn’t checked in for a while; it starts when the app gets its first visit after a restart.';
 }
 
 // Wanted: compact rows, each with a ⋯ menu; a comic series' row acts on all
@@ -209,11 +210,11 @@ function initWanted() {
 
     function removeRows(rows) {
         rows.forEach(row => {
-            const series = row.closest('.wanted-series');
+            const series = row.closest('.entry-group');
             row.remove();
             if (series && !series.querySelector('[data-item-id]')) series.remove();
         });
-        section.querySelectorAll('.wanted-heading').forEach(heading => {
+        section.querySelectorAll('.sub-head').forEach(heading => {
             const list = heading.nextElementSibling;
             const left = list.querySelectorAll('[data-item-id]').length;
             if (!left) { heading.remove(); list.remove(); } else heading.querySelector('[data-count]').textContent = left;
@@ -272,7 +273,7 @@ function initWanted() {
         }
         e.preventDefault();  // a ⋯ in a series' summary shouldn't fold it
         const row = button.closest('[data-item-id]');
-        openMenu(button, row ? itemMenu(row) : seriesMenu(button.closest('.wanted-series')));
+        openMenu(button, row ? itemMenu(row) : seriesMenu(button.closest('.entry-group')));
     });
 }
 
@@ -280,23 +281,28 @@ function initDownloadLists() {
     const activeSection = document.getElementById('activeSection');
     const activeList = document.getElementById('activeList');
     const historyList = document.getElementById('historyList');
-    const historyTitle = document.querySelector('#historySection h2');
+    const historyCount = document.getElementById('historyCount');
+
+    // A download as a row: what it's for, then its state and details; ⋯ holds
+    // Cancel, or for finished ones Try another and Remove.
     function downloadRow(d, active) {
-        const label = h('span', {}, h('span', {class: 'kind-tag'}, d.kind === 'book' ? 'Book' : 'Comic'), ' ', d.item ? h('a', {href: d.item.url}, d.item.label) : h('span', {class: 'text-muted'}, 'Removed'));
+        const percent = Math.round((d.progress || 0) * 100);
         const state = active
-            ? (d.status === 'importing' ? 'Importing' : d.client === 'blackhole' ? 'Waiting for the file' : `${Math.round((d.progress || 0) * 100)}%`)
+            ? (d.status === 'importing' ? 'Importing' : d.client === 'blackhole' ? 'Waiting for the file' : `${percent}%`)
             : (d.status === 'done' ? 'Done' : 'Failed');
-        const buttons = active
-            ? [h('button', {type: 'button', class: 'link-button', onclick: () => act(`/api/downloads/${d.id}/cancel`, 'POST', 'Cancelled')}, 'Cancel')]
-            : [d.status === 'failed' && d.item ? h('button', {type: 'button', class: 'link-button', onclick: () => act(`/api/downloads/${d.id}/retry`, 'POST', 'Grabbed another')}, 'Try another') : null,
-               h('button', {type: 'button', class: 'link-button', onclick: () => act(`/api/downloads/${d.id}`, 'DELETE', 'Removed')}, 'Remove')];
-        return h('li', {class: `download is-${d.status}`},
-            h('div', {class: 'download__text'},
-                label,
-                h('small', {class: 'text-muted'}, h('span', {class: `download__state status-dl-${d.status}`}, state), ' · ', [d.title, d.indexer, formatSize(d.size), timeAgo(d.updated_at || d.created_at)].filter(Boolean).join(' · ')),
-                d.error ? h('small', {class: 'download__error'}, d.error) : null,
-                active && d.client !== 'blackhole' ? h('span', {class: 'have-meter'}, h('span', {style: `width: ${Math.round((d.progress || 0) * 100)}%`})) : null),
-            h('div', {class: 'download__actions'}, buttons));
+        const actions = active
+            ? [{label: 'Cancel', danger: true, onClick: () => act(`/api/downloads/${d.id}/cancel`, 'POST', 'Cancelled')}]
+            : [d.status === 'failed' && d.item ? {label: 'Try another release', onClick: () => act(`/api/downloads/${d.id}/retry`, 'POST', 'Grabbed another')} : null,
+               {label: 'Remove from history', onClick: () => act(`/api/downloads/${d.id}`, 'DELETE', 'Removed')}];
+        const more = h('button', {type: 'button', class: 'entry__more', 'aria-label': 'More', dataset: {menuAnchor: ''}, onclick: (e) => openMenu(e.currentTarget, actions)}, h('i', {class: 'fas fa-ellipsis-h', 'aria-hidden': 'true'}));
+        return h('li', {class: 'entry', title: d.title},
+            h('div', {class: 'entry__main'},
+                h('span', {class: 'entry__title'}, d.item ? h('a', {href: d.item.url}, d.item.label) : h('span', {class: 'muted'}, 'Removed')),
+                h('span', {class: 'entry__meta'}, h('strong', {class: d.status === 'failed' ? 'is-bad' : d.status === 'done' ? 'is-good' : null}, state), ' · ', [d.kind === 'book' ? 'Book' : 'Comic', d.indexer, formatSize(d.size), timeAgo(d.updated_at || d.created_at)].filter(Boolean).join(' · ')),
+                d.error ? h('span', {class: 'entry__error'}, d.error) : null,
+                active && d.client !== 'blackhole' ? h('span', {class: 'entry__bar'}, h('span', {style: `width: ${percent}%`})) : null),
+            h('span'),
+            more);
     }
 
     async function act(path, method, done) {
@@ -312,10 +318,10 @@ function initDownloadLists() {
         try { data = await apiFetch('/api/downloads'); } catch (e) { return; }
         activeSection.hidden = !data.active.length;
         activeList.replaceChildren(...data.active.map(d => downloadRow(d, true)));
-        historyList.replaceChildren(...(data.history.length ? data.history.map(d => downloadRow(d, false)) : [h('li', {class: 'comics-hint'}, 'Nothing yet.')]));
+        historyList.replaceChildren(...(data.history.length ? data.history.map(d => downloadRow(d, false)) : [h('li', {class: 'empty-line'}, 'Nothing yet.')]));
         showJobs(data.worker || {});
         const failed = data.history.filter(d => d.status === 'failed').length;
-        historyTitle.replaceChildren('History', data.history.length ? ' ' : '', data.history.length ? h('span', {class: 'text-muted history__count'}, failed ? `${data.history.length} · ${failed} failed` : String(data.history.length)) : '');
+        historyCount.textContent = data.history.length ? (failed ? `${data.history.length} · ${failed} failed` : String(data.history.length)) : '';
     }
 
     // Every 5 s while something is downloading, every 30 s otherwise.
@@ -362,19 +368,22 @@ function initImport() {
             await apiFetch(`/api/import/file?path=${encodeURIComponent(file.path)}`, {method: 'DELETE'});
             load();
         }}, 'Delete');
-        return h('li', {class: 'import-row'},
-            h('div', {class: 'import-row__file'}, h('strong', {}, file.path), h('small', {class: 'text-muted'}, [formatSize(file.size), file.issue ? `Matches ${file.issue.label}; it's filed at the next import` : file.reason].filter(Boolean).join(' · '))),
-            h('div', {class: 'import-row__match'}, seriesSelect, newName, number, go, remove));
+        return h('li', {class: 'entry entry--import'},
+            h('div', {class: 'entry__main'},
+                h('span', {class: 'entry__title'}, file.path),
+                h('span', {class: 'entry__meta'}, [formatSize(file.size), file.issue ? `Matches ${file.issue.label}; it's filed at the next import` : file.reason].filter(Boolean).join(' · ')),
+                h('div', {class: 'entry__controls'}, seriesSelect, newName, number, go, remove)));
     }
 
     async function load() {
         try {
             const data = await apiFetch('/api/import');
             waiting.hidden = !data.files.length;
+            document.getElementById('importScan').hidden = !data.files.length;
             list.replaceChildren(...data.files.map(importRow));
         } catch (e) {
             waiting.hidden = false;
-            list.replaceChildren(h('li', {class: 'comics-hint'}, e.message));
+            list.replaceChildren(h('li', {class: 'empty-line'}, e.message));
         }
     }
 

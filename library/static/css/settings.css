@@ -52,7 +52,7 @@
     gap: var(--space-3);
     padding: var(--space-2) var(--space-3) var(--space-2) var(--space-4);
     margin: 0 0 var(--space-5);
-    background: var(--color-bg-elevated);
+    background: var(--color-bg-raised);
     border: 1px solid var(--pane-edge);
     border-radius: var(--radius-md);
     box-shadow: 0 12px 30px -12px var(--color-shadow);

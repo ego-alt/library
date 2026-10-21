@@ -2,50 +2,54 @@
 {% set shelf = 'downloads' %}
 {% block page_title %}Downloads{% endblock %}
 {% block page %}downloads{% endblock %}
+{% block styles %}
+    {{ super() }}
+    <link href="{{ url_for('static', filename='css/manage.css') }}" rel="stylesheet">
+{% endblock %}
 {% block content %}
-<section class="dl-section" id="activeSection" hidden>
-    <h2>Downloading</h2>
-    <ol class="download-list" id="activeList"></ol>
+<section class="section" id="activeSection" hidden>
+    <div class="section__head"><h2 class="section__title">Downloading</h2></div>
+    <ol class="entries" id="activeList"></ol>
 </section>
 
 {% set comic_count = wanted_comics|sum(attribute='issues', start=[])|length %}
-<section class="dl-section" id="wanted" data-can-search="{{ '1' if can_search else '' }}">
-    <div class="page-head">
-        <h2>Wanted</h2>
-        {% if can_search and (wanted_books or wanted_comics) %}<button type="button" class="btn btn-secondary" data-action="search-all">Search all now</button>{% endif %}
+<section class="section" id="wanted" data-can-search="{{ '1' if can_search else '' }}">
+    <div class="section__head">
+        <h2 class="section__title">Wanted</h2>
+        {% if can_search and (wanted_books or wanted_comics) %}<div class="section__actions"><button type="button" class="btn btn-secondary" data-action="search-all">Search all now</button></div>{% endif %}
     </div>
     {% if wanted_books or wanted_comics %}
-    <p class="comics-hint">{% if can_search %}Searched for every few hours.{% else %}Searched for once there's an indexer in <a href="{{ url_for('settings.settings_page') }}#indexers">Settings</a>.{% endif %}</p>
+    <p class="section__hint">{% if can_search %}Searched for every few hours.{% else %}Searched for once there's an indexer in <a href="{{ url_for('settings.settings_page') }}#indexers">Settings</a>.{% endif %}</p>
     {% if wanted_books %}
-    <h3 class="wanted-heading">Books <span class="count" data-count>{{ wanted_books|length }}</span></h3>
-    <ol class="wanted-list">
+    <h3 class="sub-head">Books <span class="count" data-count>{{ wanted_books|length }}</span></h3>
+    <ol class="entries">
     {% for r in wanted_books %}
-        <li class="wanted-row" data-kind="book" data-item-id="{{ r.id }}" data-label="{{ r.label }}">
-            <span class="wanted-row__name">{{ r.title }}{% if r.author %} <span class="text-muted">· {{ r.author }}</span>{% endif %}</span>
-            <span class="wanted-row__date" title="When you asked for it">Asked {{ r.created_at|comic_date }}</span>
-            <button type="button" class="wanted-row__more" data-action="menu" data-menu-anchor aria-label="More for {{ r.title }}"><i class="fas fa-ellipsis-h" aria-hidden="true"></i></button>
+        <li class="entry" data-kind="book" data-item-id="{{ r.id }}" data-label="{{ r.label }}">
+            <div class="entry__main"><span class="entry__title">{{ r.title }}{% if r.author %} <span class="muted">· {{ r.author }}</span>{% endif %}</span></div>
+            <span class="entry__side" title="When you asked for it">Asked {{ r.created_at|comic_date }}</span>
+            <button type="button" class="entry__more" data-action="menu" data-menu-anchor aria-label="More for {{ r.title }}"><i class="fas fa-ellipsis-h" aria-hidden="true"></i></button>
         </li>
     {% endfor %}
     </ol>
     {% endif %}
     {% if wanted_comics %}
-    <h3 class="wanted-heading">Comics <span class="count" data-count>{{ comic_count }}</span></h3>
-    <ol class="wanted-list">
+    <h3 class="sub-head">Comics <span class="count" data-count>{{ comic_count }}</span></h3>
+    <ol class="entries">
     {% for group in wanted_comics %}
         {% set n = group.issues|length %}
-        <li class="wanted-series" data-series-id="{{ group.series.id }}" data-label="{{ group.series.display_name }}">
+        <li class="entry-group" data-series-id="{{ group.series.id }}" data-label="{{ group.series.display_name }}">
             <details>
-                <summary class="wanted-row">
-                    <span class="wanted-row__name"><span class="wanted-row__fold" aria-hidden="true">▸</span>{{ group.series.display_name }} <span class="text-muted">· {% for i in group.issues[:3] %}#{{ i.number }}{{ ', ' if not loop.last }}{% endfor %}{% if n > 3 %} +{{ n - 3 }}{% endif %}</span></span>
-                    <span class="wanted-row__date">{{ group.issues[0].date|comic_date }}</span>
-                    <button type="button" class="wanted-row__more" data-action="menu" data-menu-anchor aria-label="More for {{ group.series.display_name }}"><i class="fas fa-ellipsis-h" aria-hidden="true"></i></button>
+                <summary class="entry">
+                    <div class="entry__main"><span class="entry__title"><span class="entry__fold" aria-hidden="true">▸</span>{{ group.series.display_name }} <span class="muted">· {% for i in group.issues[:3] %}#{{ i.number }}{{ ', ' if not loop.last }}{% endfor %}{% if n > 3 %} +{{ n - 3 }}{% endif %}</span></span></div>
+                    <span class="entry__side">{{ group.issues[0].date|comic_date }}</span>
+                    <button type="button" class="entry__more" data-action="menu" data-menu-anchor aria-label="More for {{ group.series.display_name }}"><i class="fas fa-ellipsis-h" aria-hidden="true"></i></button>
                 </summary>
-                <ol class="wanted-list wanted-list--issues">
+                <ol class="entries">
                 {% for issue in group.issues %}
-                    <li class="wanted-row" data-kind="comic" data-item-id="{{ issue.id }}" data-label="{{ group.series.display_name }} #{{ issue.number }}">
-                        <span class="wanted-row__name">#{{ issue.number }}{% if issue.title %} <span class="text-muted">· {{ issue.title }}</span>{% endif %}</span>
-                        <span class="wanted-row__date">{{ issue.date|comic_date }}</span>
-                        <button type="button" class="wanted-row__more" data-action="menu" data-menu-anchor aria-label="More for #{{ issue.number }}"><i class="fas fa-ellipsis-h" aria-hidden="true"></i></button>
+                    <li class="entry" data-kind="comic" data-item-id="{{ issue.id }}" data-label="{{ group.series.display_name }} #{{ issue.number }}">
+                        <div class="entry__main"><span class="entry__title">#{{ issue.number }}{% if issue.title %} <span class="muted">· {{ issue.title }}</span>{% endif %}</span></div>
+                        <span class="entry__side">{{ issue.date|comic_date }}</span>
+                        <button type="button" class="entry__more" data-action="menu" data-menu-anchor aria-label="More for #{{ issue.number }}"><i class="fas fa-ellipsis-h" aria-hidden="true"></i></button>
                     </li>
                 {% endfor %}
                 </ol>
@@ -55,64 +59,61 @@
     </ol>
     {% endif %}
     {% else %}
-    <p class="comics-hint">Nothing wanted. <a href="{{ url_for('downloads.get_page') }}">Get</a> a book or follow a comic series, and it shows up here until it's in the library.</p>
+    <p class="section__hint">Nothing wanted. <a href="{{ url_for('downloads.get_page') }}">Get</a> a book or follow a comic series, and it waits here until it's in the library.</p>
     {% endif %}
-    {% if books_on_the_way %}<p class="comics-hint">{{ books_on_the_way }} book{{ 's are' if books_on_the_way > 1 else ' is' }} downloading.</p>{% endif %}
 </section>
 
-<section class="dl-section" id="import">
-    <div class="page-head">
-        <h2>Import</h2>
-        <button type="button" class="btn btn-secondary" id="importScan">Match again</button>
+<section class="section" id="import">
+    <div class="section__head">
+        <h2 class="section__title">Import</h2>
+        <div class="section__actions">
+            <button type="button" class="btn btn-ghost" id="importScan" hidden>Match again</button>
+            <button type="button" class="btn btn-secondary" id="importPick">Choose files</button>
+        </div>
     </div>
-    <p class="comics-hint">Drop EPUBs or CBZ, CBR and CB7 comics anywhere on this page, or <button type="button" class="link-button" id="importPick">choose files</button>. Books join the library; comics are matched to an issue, tagged and filed under their series.</p>
+    <p class="section__hint">Or drop EPUBs and CBZ, CBR or CB7 comics anywhere on this page. Books join the library; comics are matched to their issue.</p>
     <input type="file" id="importInput" accept=".epub,.cbz,.cbr,.cb7,.zip,.rar,.7z" multiple hidden>
     <div id="importWaiting" hidden>
-        <h3>Waiting to be matched</h3>
-        <p class="comics-hint">These comics didn't match an issue on their own. Pick the series, or make a new one for comics no provider knows.</p>
-        <ol class="import-list" id="importList"></ol>
+        <h3 class="sub-head">Waiting to be matched</h3>
+        <ol class="entries" id="importList"></ol>
     </div>
 </section>
 
 {% if upcoming %}
-<section class="dl-section" id="upcoming">
-    <h2>Coming up</h2>
-    <p class="comics-hint">The next two months of the comics you follow, by the day they reach shops.</p>
-    <ol class="upcoming__list">
+<section class="section" id="upcoming">
+    <div class="section__head"><h2 class="section__title">Coming up</h2></div>
+    <p class="section__hint">The next two months of the comics you follow, by the day they reach shops.</p>
+    <ol class="entries">
     {% for issue in upcoming %}
-        <li class="upcoming__item">
-            <span class="upcoming__day">{{ issue.date|comic_date }}</span>
-            <span><a href="{{ url_for('comics.series_page', series_id=issue.series_id) }}">{{ issue.series }}</a> <span class="issue-num">#{{ issue.number }}</span></span>
-            {% if issue.status == 'wanted' %}<span class="status-chip status-wanted">wanted</span>{% else %}<span class="status-chip">{{ issue.status }}</span>{% endif %}
+        <li class="entry">
+            <div class="entry__main"><span class="entry__title"><a href="{{ url_for('comics.series_page', series_id=issue.series_id) }}">{{ issue.series }}</a> <span class="muted">· #{{ issue.number }}</span></span></div>
+            <span class="entry__side">{{ issue.date|comic_date }}</span>
+            <span></span>
         </li>
     {% endfor %}
     </ol>
 </section>
 {% endif %}
 
-<section class="dl-section">
-    <details class="history" id="historySection">
-        <summary><h2>History</h2></summary>
-        <p class="comics-hint">A failed release isn't grabbed again for the same book or issue; remove it here to allow it.</p>
-        <ol class="download-list" id="historyList"></ol>
-    </details>
-</section>
+<details class="section section--fold" id="historySection">
+    <summary class="section__head"><h2 class="section__title">History <span class="muted" id="historyCount"></span></h2></summary>
+    <p class="section__hint">A failed release isn't grabbed again for the same book or issue; remove it to allow it.</p>
+    <ol class="entries" id="historyList"></ol>
+</details>
 
-<section class="dl-section">
-    <details class="history" id="jobs">
-        <summary><h2>Background jobs</h2></summary>
-        <p class="comics-hint">These run on their own; Run starts one now.</p>
-        <table class="job-table" id="jobTable">
-            <tbody>
-                <tr data-job="downloads"><th>Check downloads</th><td class="job-msg"></td><td><button type="button" class="link-button" data-run="downloads">Run</button></td></tr>
-                <tr data-job="import"><th>Import new files</th><td class="job-msg"></td><td><button type="button" class="link-button" data-run="import">Run</button></td></tr>
-                <tr data-job="refresh"><th>Refresh comic series</th><td class="job-msg"></td><td><button type="button" class="link-button" data-run="refresh">Run</button></td></tr>
-                <tr data-job="search"><th>Search for everything wanted</th><td class="job-msg"></td><td><button type="button" class="link-button" data-run="search">Run</button></td></tr>
-            </tbody>
-        </table>
-        <p class="comics-hint" id="workerState"></p>
-    </details>
-</section>
+<details class="section section--fold" id="jobs">
+    <summary class="section__head"><h2 class="section__title">Background jobs</h2></summary>
+    <p class="section__hint" id="workerState">These run on their own; Run starts one now.</p>
+    <ol class="entries" id="jobList">
+        {% for job, label in [('downloads', 'Check downloads'), ('import', 'Import new files'), ('refresh', 'Refresh comic series'), ('search', 'Search for everything wanted')] %}
+        <li class="entry" data-job="{{ job }}">
+            <div class="entry__main"><span class="entry__title">{{ label }}</span><span class="entry__meta job-msg">Not run yet</span></div>
+            <span></span>
+            <button type="button" class="entry__more entry__more--text" data-run="{{ job }}">Run</button>
+        </li>
+        {% endfor %}
+    </ol>
+</details>
 
 <div class="drop-zone" id="dropZone" hidden><p>Drop books or comics to import them</p></div>
 <script id="seriesData" type="application/json">{{ series_options|tojson }}</script>
