@@ -116,17 +116,20 @@ def test_view_all_orders_by_created_at_desc(standard_client, app, book_dir):
     # Older book that the user has been reading
     old_path = book_dir / "old.epub"
     old_path.write_bytes(build_epub3(title="Old", author="Author"))
-    old = Book(title="Old", author="Author", filename="old.epub", cover_path="OEBPS/cover.png", access_level="standard")
+    old = Book(title="Old", author="Author", filename="old.epub",
+               cover_path="OEBPS/cover.png", access_level="standard")
     db.session.add(old)
     db.session.commit()
-    db.session.add(Bookmark(user_id=1, book_id=old.id, status=BookProgressChoice.IN_PROGRESS))
+    db.session.add(Bookmark(user_id=1, book_id=old.id,
+                            status=BookProgressChoice.IN_PROGRESS))
     db.session.commit()
 
     # Newer book the user hasn't touched
     time.sleep(0.01)
     new_path = book_dir / "new.epub"
     new_path.write_bytes(build_epub3(title="New", author="Author"))
-    new = Book(title="New", author="Author", filename="new.epub", cover_path="OEBPS/cover.png", access_level="standard")
+    new = Book(title="New", author="Author", filename="new.epub",
+               cover_path="OEBPS/cover.png", access_level="standard")
     db.session.add(new)
     db.session.commit()
 
@@ -146,18 +149,22 @@ def test_view_mine_orders_by_last_read_desc(standard_client, app, book_dir):
 
     a_path = book_dir / "a.epub"
     a_path.write_bytes(build_epub3(title="A", author="A"))
-    a = Book(title="A", author="A", filename="a.epub", cover_path="OEBPS/cover.png", access_level="standard")
+    a = Book(title="A", author="A", filename="a.epub",
+             cover_path="OEBPS/cover.png", access_level="standard")
     b_path = book_dir / "b.epub"
     b_path.write_bytes(build_epub3(title="B", author="B"))
-    b = Book(title="B", author="B", filename="b.epub", cover_path="OEBPS/cover.png", access_level="standard")
+    b = Book(title="B", author="B", filename="b.epub",
+             cover_path="OEBPS/cover.png", access_level="standard")
     db.session.add_all([a, b])
     db.session.commit()
 
     now = datetime.now(timezone.utc).replace(tzinfo=None)
-    db.session.add(
-        Bookmark(user_id=1, book_id=a.id, status=BookProgressChoice.IN_PROGRESS, last_read=now - timedelta(days=2))
-    )
-    db.session.add(Bookmark(user_id=1, book_id=b.id, status=BookProgressChoice.IN_PROGRESS, last_read=now))
+    db.session.add(Bookmark(user_id=1, book_id=a.id,
+                            status=BookProgressChoice.IN_PROGRESS,
+                            last_read=now - timedelta(days=2)))
+    db.session.add(Bookmark(user_id=1, book_id=b.id,
+                            status=BookProgressChoice.IN_PROGRESS,
+                            last_read=now))
     db.session.commit()
 
     r = standard_client.get("/load_more/0?view=reading")
@@ -194,7 +201,6 @@ def test_cover_bytes_are_memoized_across_requests(client, book, mocker):
     """Repeat fetches without a matching ETag should hit the in-memory cache,
     not re-extract from the zip."""
     import library.routes.index as index_module
-
     spy = mocker.spy(index_module, "read_epub_cover")
 
     r1 = client.get(f"/cover/{book.filename}")
@@ -212,7 +218,6 @@ def test_cover_cache_invalidates_when_file_mtime_changes(client, book, app, mock
     import time
 
     import library.routes.index as index_module
-
     spy = mocker.spy(index_module, "read_epub_cover")
 
     client.get(f"/cover/{book.filename}")
@@ -418,9 +423,8 @@ def test_book_without_cover_gets_typographic_fallback(client, app, book_dir):
     from tests._epub_builder import build_epub3
 
     (book_dir / "bare.epub").write_bytes(build_epub3(include_cover=False))
-    db.session.add(
-        Book(title="A Very Long Title Without Any Cover At All", author="Someone & Co", filename="bare.epub")
-    )
+    db.session.add(Book(title="A Very Long Title Without Any Cover At All",
+                        author="Someone & Co", filename="bare.epub"))
     db.session.commit()
 
     r = client.get("/cover/bare.epub")
@@ -471,7 +475,8 @@ def test_status_views_fall_back_to_all_when_signed_out(client, book):
 def test_search_matches_title_author_genre_and_tags(standard_client, book, book_dir):
     _second_book(book_dir, title="Postwar", author="Tony Judt", genre="History")
     standard_client.post(
-        f"/book_metadata/{book.filename}", json={"title": book.title, "author": book.author, "tags": ["bedside"]}
+        f"/book_metadata/{book.filename}",
+        json={"title": book.title, "author": book.author, "tags": ["bedside"]},
     )
     q = lambda text: [b["filename"] for b in standard_client.get(f"/load_more/0?q={text}").get_json()]  # noqa: E731
     assert q("judt") == ["other.epub"]
@@ -483,7 +488,8 @@ def test_search_matches_title_author_genre_and_tags(standard_client, book, book_
 
 def test_book_with_several_tags_is_listed_once(standard_client, book):
     standard_client.post(
-        f"/book_metadata/{book.filename}", json={"title": book.title, "author": book.author, "tags": ["a", "b", "c"]}
+        f"/book_metadata/{book.filename}",
+        json={"title": book.title, "author": book.author, "tags": ["a", "b", "c"]},
     )
     r = standard_client.get("/load_more/0")
     assert len(r.get_json()) == 1

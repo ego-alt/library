@@ -14,7 +14,14 @@ from .commands import init_commands
 from .config import DATA_DIR, Config
 from .models import db
 from .proxy_auth import load_user_from_proxy_header
-from .routes import auth_blueprint, index_blueprint, metadata_blueprint, pwa_blueprint, read_blueprint, upload_blueprint
+from .routes import (
+    auth_blueprint,
+    index_blueprint,
+    metadata_blueprint,
+    pwa_blueprint,
+    read_blueprint,
+    upload_blueprint,
+)
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -37,7 +44,6 @@ def create_app(config_overrides: dict | None = None):
             app.config["SECRET_KEY"] = "test-only-secret-key"
         else:
             import secrets
-
             app.config["SECRET_KEY"] = secrets.token_hex(32)
             logger.warning(
                 "SECRET_KEY env var is not set; generated a random key for "
@@ -49,21 +55,20 @@ def create_app(config_overrides: dict | None = None):
     if not app.config.get("TESTING"):
         book_dir = app.config["BOOK_DIR"]
         if not os.path.isdir(book_dir):
-            raise RuntimeError(f"BOOK_DIR does not exist or is not a directory: {book_dir}")
+            raise RuntimeError(
+                f"BOOK_DIR does not exist or is not a directory: {book_dir}"
+            )
     # Cover bytes and per-book sizes are cached on disk so a restart or
     # deploy doesn't mean re-reading every EPUB. Tests get a throwaway
     # in-memory cache.
     if app.config.get("TESTING"):
         cache.init_app(app, config={"CACHE_TYPE": "SimpleCache"})
     else:
-        cache.init_app(
-            app,
-            config={
-                "CACHE_TYPE": "FileSystemCache",
-                "CACHE_DIR": os.path.join(DATA_DIR, "cache"),
-                "CACHE_THRESHOLD": 5000,
-            },
-        )
+        cache.init_app(app, config={
+            "CACHE_TYPE": "FileSystemCache",
+            "CACHE_DIR": os.path.join(DATA_DIR, "cache"),
+            "CACHE_THRESHOLD": 5000,
+        })
 
     # Honor X-Forwarded-* from nginx when TLS terminates upstream. x_prefix
     # picks up X-Forwarded-Prefix so url_for() emits the /library mount path.

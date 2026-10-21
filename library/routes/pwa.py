@@ -16,23 +16,26 @@ pwa_blueprint = Blueprint("pwa", __name__)
 def manifest():
     root = request.script_root + "/"
     icon = lambda name: url_for("static", filename=f"icons/{name}")  # noqa: E731
-    response = jsonify(
-        {
-            "name": "Library",
-            "short_name": "Library",
-            "description": "Your ebooks, catalogued and readable anywhere.",
-            "start_url": root,
-            "scope": root,
-            "display": "standalone",
-            "background_color": "#f6f4ef",
-            "theme_color": "#f6f4ef",
-            "icons": [
-                {"src": icon("icon-192.png"), "sizes": "192x192", "type": "image/png"},
-                {"src": icon("icon-512.png"), "sizes": "512x512", "type": "image/png"},
-                {"src": icon("icon-maskable-512.png"), "sizes": "512x512", "type": "image/png", "purpose": "maskable"},
-            ],
-        }
-    )
+    response = jsonify({
+        "name": "Library",
+        "short_name": "Library",
+        "description": "Your ebooks, catalogued and readable anywhere.",
+        "start_url": root,
+        "scope": root,
+        "display": "standalone",
+        "background_color": "#f6f4ef",
+        "theme_color": "#f6f4ef",
+        "icons": [
+            {"src": icon("icon-192.png"), "sizes": "192x192", "type": "image/png"},
+            {"src": icon("icon-512.png"), "sizes": "512x512", "type": "image/png"},
+            {
+                "src": icon("icon-maskable-512.png"),
+                "sizes": "512x512",
+                "type": "image/png",
+                "purpose": "maskable",
+            },
+        ],
+    })
     response.mimetype = "application/manifest+json"
     return response
 
@@ -40,7 +43,8 @@ def manifest():
 @pwa_blueprint.route("/sw.js")
 def service_worker():
     response = send_from_directory(
-        os.path.join(current_app.static_folder, "js"), "sw.js", mimetype="application/javascript"
+        os.path.join(current_app.static_folder, "js"), "sw.js",
+        mimetype="application/javascript",
     )
     # Browsers must always re-check the worker so updates roll out promptly.
     response.headers["Cache-Control"] = "no-cache"

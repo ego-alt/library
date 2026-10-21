@@ -14,7 +14,11 @@ def book_dir(tmp_path):
 def test_create_app_uses_test_default_when_testing(monkeypatch, tmp_path):
     """Tests get a deterministic fallback so they don't need to set the env var."""
     monkeypatch.delenv("SECRET_KEY", raising=False)
-    app = create_app({"TESTING": True, "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:", "BOOK_DIR": str(tmp_path)})
+    app = create_app({
+        "TESTING": True,
+        "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
+        "BOOK_DIR": str(tmp_path),
+    })
     assert app.config["SECRET_KEY"]
 
 
@@ -24,16 +28,21 @@ def test_create_app_falls_back_to_random_key_with_warning(monkeypatch, book_dir,
 
     monkeypatch.delenv("SECRET_KEY", raising=False)
     with caplog.at_level(logging.WARNING, logger="library"):
-        app = create_app({"SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:", "BOOK_DIR": str(book_dir)})
+        app = create_app({
+            "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
+            "BOOK_DIR": str(book_dir),
+        })
     assert app.config["SECRET_KEY"]
     assert any("SECRET_KEY" in rec.message for rec in caplog.records)
 
 
 def test_create_app_honors_explicit_secret_key(book_dir):
     """An explicit SECRET_KEY in config_overrides wins over the env-var path."""
-    app = create_app(
-        {"SECRET_KEY": "from-overrides", "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:", "BOOK_DIR": str(book_dir)}
-    )
+    app = create_app({
+        "SECRET_KEY": "from-overrides",
+        "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
+        "BOOK_DIR": str(book_dir),
+    })
     assert app.config["SECRET_KEY"] == "from-overrides"
 
 
@@ -42,4 +51,7 @@ def test_create_app_refuses_missing_book_dir(monkeypatch, tmp_path):
     monkeypatch.setenv("SECRET_KEY", "x")
     missing = tmp_path / "not-mounted"
     with pytest.raises(RuntimeError, match="does not exist"):
-        create_app({"SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:", "BOOK_DIR": str(missing)})
+        create_app({
+            "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
+            "BOOK_DIR": str(missing),
+        })

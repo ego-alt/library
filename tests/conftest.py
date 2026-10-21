@@ -25,15 +25,13 @@ def book_dir(tmp_path):
 def app(book_dir, monkeypatch):
     """A Flask app wired to an in-memory SQLite and a temp BOOK_DIR."""
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key-not-used")
-    app = create_app(
-        {
-            "TESTING": True,
-            "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
-            "BOOK_DIR": str(book_dir),
-            "THUMB_DIR": str(book_dir.parent / "thumbs"),
-            "WTF_CSRF_ENABLED": False,
-        }
-    )
+    app = create_app({
+        "TESTING": True,
+        "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
+        "BOOK_DIR": str(book_dir),
+        "THUMB_DIR": str(book_dir.parent / "thumbs"),
+        "WTF_CSRF_ENABLED": False,
+    })
     with app.app_context():
         db.create_all()
         yield app

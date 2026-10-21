@@ -22,7 +22,11 @@ p.big { font-weight: bold; font-size: 300%; }
 
 
 def _epub(tmp_path, css=CSS):
-    body = '<div class="ct">II</div>' + '<p class="tx">body</p>' * 5 + '<p class="ep">epigraph</p>'
+    body = (
+        '<div class="ct">II</div>'
+        + '<p class="tx">body</p>' * 5
+        + '<p class="ep">epigraph</p>'
+    )
     chapters = [("ch1.xhtml", body)]
     data = io.BytesIO(build_epub3(chapters=chapters))
     with zipfile.ZipFile(data, "a") as z:
@@ -53,16 +57,19 @@ def test_sizes_are_relative_to_the_books_body_text(tmp_path):
     # Body text (.tx, the most-used class) is "small"; "large" is 1.2/0.89 of it.
     assert "font-size: 1.35em" in _rule(css, ".ct")
     assert "font-size" not in _rule(css, ".tx")  # body text stays the reader's size
-    assert "font-size: 2.00em" in _rule(css, "p.big")  # 300% is clamped to 2×
+    assert "font-size: 2.00em" in _rule(css, "p.big")    # 300% is clamped to 2×
 
 
 def test_drops_what_the_reader_sets_for_comfort(tmp_path):
     css = book_style_subset(_epub(tmp_path))
-    banned_words = ("justify", "text-indent", "margin-top", "margin-bottom", "font-family", "color", "Times")
+    banned_words = (
+        "justify", "text-indent", "margin-top", "margin-bottom",
+        "font-family", "color", "Times",
+    )
     for banned in banned_words:
         assert banned not in css
-    assert "body" not in css and ".a .b" not in css  # only simple class selectors
-    assert "text-align: left" not in css  # @media blocks skipped
+    assert "body" not in css and ".a .b" not in css        # only simple class selectors
+    assert "text-align: left" not in css                    # @media blocks skipped
     poem = _rule(css, ".poem")
     # Indents are capped at 4em.
     assert "margin-left: 2em" in poem and "padding-left: 4em" in poem

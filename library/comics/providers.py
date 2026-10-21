@@ -131,27 +131,18 @@ class ComicVine:
         fields = "id,issue_number,name,cover_date,store_date,image,deck"
         issues, offset = [], 0
         while True:
-            data = self._get(
-                "issues/",
-                filter=f"volume:{int(provider_id)}",
-                field_list=fields,
-                sort="cover_date:asc",
-                offset=offset,
-                limit=100,
-            )
+            data = self._get("issues/", filter=f"volume:{int(provider_id)}", field_list=fields, sort="cover_date:asc", offset=offset, limit=100)
             for row in data.get("results", []):
                 image = row.get("image") or {}
-                issues.append(
-                    {
-                        "provider_id": str(row["id"]),
-                        "number": str(row.get("issue_number") or "").strip(),
-                        "title": row.get("name"),
-                        "cover_date": _date(row.get("cover_date")),
-                        "store_date": _date(row.get("store_date")),
-                        "cover_url": image.get("medium_url") or image.get("original_url"),
-                        "description": row.get("deck") or "",
-                    }
-                )
+                issues.append({
+                    "provider_id": str(row["id"]),
+                    "number": str(row.get("issue_number") or "").strip(),
+                    "title": row.get("name"),
+                    "cover_date": _date(row.get("cover_date")),
+                    "store_date": _date(row.get("store_date")),
+                    "cover_url": image.get("medium_url") or image.get("original_url"),
+                    "description": row.get("deck") or "",
+                })
             offset += 100
             if offset >= data.get("number_of_total_results", 0):
                 return issues
@@ -165,9 +156,7 @@ class Metron:
     def __init__(self, username: str, password: str, transport: httpx.BaseTransport | None = None):
         if not (username and password):
             raise ProviderError("Add your Metron username and password in Settings.")
-        self.http = httpx.Client(
-            timeout=20, auth=(username, password), headers={"User-Agent": USER_AGENT}, transport=transport
-        )
+        self.http = httpx.Client(timeout=20, auth=(username, password), headers={"User-Agent": USER_AGENT}, transport=transport)
 
     def _get(self, url: str, **params) -> dict:
         self.throttle.wait()
@@ -200,21 +189,19 @@ class Metron:
         for row in data.get("results", [])[:20]:
             # The list gives "Batman (2016)" as `series`; details come with get_series.
             name = re.sub(r"\s*\(\d{4}\)\s*$", "", row.get("series") or "")
-            results.append(
-                {
-                    "provider": "metron",
-                    "provider_id": str(row["id"]),
-                    "name": name,
-                    "start_year": row.get("year_began"),
-                    "publisher": None,
-                    "volume": row.get("volume"),
-                    "description": "",
-                    "cover_url": None,
-                    "issue_count": row.get("issue_count"),
-                    "cv_id": None,
-                    "metron_id": row["id"],
-                }
-            )
+            results.append({
+                "provider": "metron",
+                "provider_id": str(row["id"]),
+                "name": name,
+                "start_year": row.get("year_began"),
+                "publisher": None,
+                "volume": row.get("volume"),
+                "description": "",
+                "cover_url": None,
+                "issue_count": row.get("issue_count"),
+                "cv_id": None,
+                "metron_id": row["id"],
+            })
         return results
 
     def get_series(self, provider_id: str) -> dict:

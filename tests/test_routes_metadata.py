@@ -24,7 +24,8 @@ def test_post_metadata_requires_auth(client, book):
 
 def test_post_metadata_updates_fields(admin_client, book):
     r = admin_client.post(
-        f"/book_metadata/{book.filename}", json={"title": "Renamed", "author": "Other", "genre": "fiction", "tags": []}
+        f"/book_metadata/{book.filename}",
+        json={"title": "Renamed", "author": "Other", "genre": "fiction", "tags": []},
     )
     assert r.status_code == 200
     db.session.refresh(book)
@@ -49,14 +50,13 @@ def test_saving_without_status_leaves_it_alone(standard_client, book, standard_u
     bookmark = Bookmark.query.filter_by(user_id=standard_user.id, book_id=book.id).one()
     assert bookmark.status == BookProgressChoice.FINISHED
 
-
 def test_status_names_in_tags_are_plain_tags(standard_client, book):
     """Status has its own field; a tag that happens to say "Finished" is a tag."""
-    standard_client.post(f"/book_metadata/{book.filename}", json={"tags": ["Finished", "scifi"]})
+    standard_client.post(
+        f"/book_metadata/{book.filename}", json={"tags": ["Finished", "scifi"]})
     payload = standard_client.get(f"/book_metadata/{book.filename}").get_json()
     assert payload["tags"] == ["Finished", "scifi"]
     assert payload["status"] == "Unread"
-
 
 def test_status_field_sets_reading_status(standard_client, book):
     r = standard_client.post(
@@ -77,7 +77,8 @@ def test_status_field_sets_reading_status(standard_client, book):
 
 def test_unknown_status_is_rejected(standard_client, book):
     r = standard_client.post(
-        f"/book_metadata/{book.filename}", json={"title": book.title, "author": book.author, "status": "Abandoned"}
+        f"/book_metadata/{book.filename}",
+        json={"title": book.title, "author": book.author, "status": "Abandoned"},
     )
     assert r.status_code == 400
 
@@ -98,7 +99,8 @@ def test_get_metadata_exposes_access_level(client, book):
 def test_admin_can_set_access_level_restricted(admin_client, book):
     r = admin_client.post(
         f"/book_metadata/{book.filename}",
-        json={"title": book.title, "author": book.author, "genre": "", "tags": [], "access_level": "restricted"},
+        json={"title": book.title, "author": book.author, "genre": "",
+              "tags": [], "access_level": "restricted"},
     )
     assert r.status_code == 200
     db.session.refresh(book)
@@ -110,7 +112,8 @@ def test_admin_can_clear_access_level_back_to_standard(admin_client, book):
     db.session.commit()
     r = admin_client.post(
         f"/book_metadata/{book.filename}",
-        json={"title": book.title, "author": book.author, "genre": "", "tags": [], "access_level": "standard"},
+        json={"title": book.title, "author": book.author, "genre": "",
+              "tags": [], "access_level": "standard"},
     )
     assert r.status_code == 200
     db.session.refresh(book)
@@ -120,7 +123,8 @@ def test_admin_can_clear_access_level_back_to_standard(admin_client, book):
 def test_standard_user_cannot_change_access_level(standard_client, book):
     r = standard_client.post(
         f"/book_metadata/{book.filename}",
-        json={"title": book.title, "author": book.author, "genre": "", "tags": [], "access_level": "restricted"},
+        json={"title": book.title, "author": book.author, "genre": "",
+              "tags": [], "access_level": "restricted"},
     )
     assert r.status_code == 200  # the rest of the save still succeeds
     db.session.refresh(book)
@@ -130,7 +134,8 @@ def test_standard_user_cannot_change_access_level(standard_client, book):
 def test_admin_invalid_access_level_is_ignored(admin_client, book):
     r = admin_client.post(
         f"/book_metadata/{book.filename}",
-        json={"title": book.title, "author": book.author, "genre": "", "tags": [], "access_level": "superuser"},
+        json={"title": book.title, "author": book.author, "genre": "",
+              "tags": [], "access_level": "superuser"},
     )
     assert r.status_code == 200
     db.session.refresh(book)
@@ -155,7 +160,8 @@ def test_list_tags_excludes_status_values(standard_client):
 def test_list_tags_returns_user_custom_tags_alphabetised(standard_client, book):
     standard_client.post(
         f"/book_metadata/{book.filename}",
-        json={"title": book.title, "author": book.author, "genre": "", "tags": ["zeta", "alpha", "mike"]},
+        json={"title": book.title, "author": book.author, "genre": "",
+              "tags": ["zeta", "alpha", "mike"]},
     )
     r = standard_client.get("/tags")
     payload = r.get_json()
@@ -184,10 +190,10 @@ def test_list_tags_does_not_leak_other_users_tags(standard_client):
 def test_standard_user_cannot_rename_shared_fields(standard_client, book):
     """Title/author/genre are shared; only admins change them. Tags and
     status still save for everyone."""
-    r = standard_client.post(
-        f"/book_metadata/{book.filename}",
-        json={"title": "Hacked", "author": "Nobody", "genre": "x", "tags": ["mine"], "status": "Finished"},
-    )
+    r = standard_client.post(f"/book_metadata/{book.filename}", json={
+        "title": "Hacked", "author": "Nobody", "genre": "x", "tags": ["mine"],
+        "status": "Finished",
+    })
     assert r.status_code == 200
     payload = standard_client.get(f"/book_metadata/{book.filename}").get_json()
     assert payload["title"] == "Test Book"
@@ -197,9 +203,8 @@ def test_standard_user_cannot_rename_shared_fields(standard_client, book):
 
 
 def test_admin_can_rename(admin_client, book):
-    admin_client.post(
-        f"/book_metadata/{book.filename}", json={"title": "  New Title ", "author": "New Author", "genre": ""}
-    )
+    admin_client.post(f"/book_metadata/{book.filename}", json={
+        "title": "  New Title ", "author": "New Author", "genre": ""})
     payload = admin_client.get(f"/book_metadata/{book.filename}").get_json()
     assert payload["title"] == "New Title"
     assert payload["genre"] is None

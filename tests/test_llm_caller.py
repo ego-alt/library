@@ -86,7 +86,11 @@ def test_ai_reports_missing_api_key_plainly(standard_client, monkeypatch):
 def test_explain_returns_502_when_llm_fails(standard_client, monkeypatch):
     from library.routes import reader as reader_module
 
-    monkeypatch.setattr(reader_module.llm_caller, "explain", lambda *a, **kw: (_ for _ in ()).throw(LLMError("nope")))
+    monkeypatch.setattr(
+        reader_module.llm_caller,
+        "explain",
+        lambda *a, **kw: (_ for _ in ()).throw(LLMError("nope")),
+    )
     r = standard_client.post("/explain", json={"text": "x", "context": "y"})
     assert r.status_code == 502
 

@@ -27,7 +27,9 @@ def _resolve_book_dir(directory: str | None) -> str:
 
 @click.command("import-books")
 @click.option("--directory", help="Directory containing EPUB files")
-@click.option("--access-level", default="standard", help="Default access level for imported books")
+@click.option(
+    "--access-level", default="standard", help="Default access level for imported books"
+)
 @with_appcontext
 def import_books_command(directory, access_level):
     """Import books from the specified directory."""
@@ -133,7 +135,9 @@ def refresh_cover_paths_command(directory: str | None, filename: str | None) -> 
     if filename:
         books = Book.query.filter_by(filename=filename).all()
         if not books:
-            raise click.ClickException(f"No book with filename={filename!r} in the database.")
+            raise click.ClickException(
+                f"No book with filename={filename!r} in the database."
+            )
     else:
         books = Book.query.all()
 
@@ -163,11 +167,20 @@ def refresh_cover_paths_command(directory: str | None, filename: str | None) -> 
         logger.error("refresh-cover-paths commit failed: %s", e)
         raise
 
-    click.echo(f"Updated {updated} cover_path(s); {missing} missing file(s); {errors} parse error(s).")
+    click.echo(
+        f"Updated {updated} cover_path(s); "
+        f"{missing} missing file(s); "
+        f"{errors} parse error(s)."
+    )
 
 
 @click.command("backup-db")
-@click.option("--to", "dest_dir", required=True, help="Directory to write backups into (created if missing)")
+@click.option(
+    "--to",
+    "dest_dir",
+    required=True,
+    help="Directory to write backups into (created if missing)",
+)
 @click.option(
     "--keep",
     default=14,
@@ -185,10 +198,14 @@ def backup_db_command(dest_dir: str, keep: int) -> None:
     """
     url = make_url(current_app.config["SQLALCHEMY_DATABASE_URI"])
     if url.drivername.split("+")[0] != "sqlite":
-        raise click.ClickException(f"backup-db only supports SQLite (got {url.drivername!r}).")
+        raise click.ClickException(
+            f"backup-db only supports SQLite (got {url.drivername!r})."
+        )
     src_path = url.database
     if not src_path or src_path == ":memory:":
-        raise click.ClickException("backup-db cannot back up an in-memory or unset database.")
+        raise click.ClickException(
+            "backup-db cannot back up an in-memory or unset database."
+        )
     if not os.path.isfile(src_path):
         raise click.ClickException(f"Database file not found: {src_path}")
 
@@ -197,7 +214,10 @@ def backup_db_command(dest_dir: str, keep: int) -> None:
     dest_path = os.path.join(dest_dir, f"library-{ts}.db")
 
     try:
-        with closing(sqlite3.connect(src_path)) as src_conn, closing(sqlite3.connect(dest_path)) as dst_conn:
+        with (
+            closing(sqlite3.connect(src_path)) as src_conn,
+            closing(sqlite3.connect(dest_path)) as dst_conn,
+        ):
             src_conn.backup(dst_conn)
     except Exception:
         # Don't leave a half-written backup behind on failure.
@@ -205,13 +225,19 @@ def backup_db_command(dest_dir: str, keep: int) -> None:
             os.remove(dest_path)
         raise
 
-    existing = sorted((f for f in os.listdir(dest_dir) if _BACKUP_FILENAME_RE.match(f)), reverse=True)
+    existing = sorted(
+        (f for f in os.listdir(dest_dir) if _BACKUP_FILENAME_RE.match(f)),
+        reverse=True,
+    )
     removed = 0
     for old in existing[keep:]:
         os.remove(os.path.join(dest_dir, old))
         removed += 1
 
-    click.echo(f"Wrote {dest_path}. Retained {min(len(existing), keep)} backup(s); removed {removed} older.")
+    click.echo(
+        f"Wrote {dest_path}. "
+        f"Retained {min(len(existing), keep)} backup(s); removed {removed} older."
+    )
 
 
 @click.command("purge-trash")
@@ -219,7 +245,8 @@ def backup_db_command(dest_dir: str, keep: int) -> None:
     "--days",
     type=click.IntRange(min=0),
     default=None,
-    help="Purge books deleted more than this many days ago [default: TRASH_RETENTION_DAYS, 30]",
+    help="Purge books deleted more than this many days ago "
+    "[default: TRASH_RETENTION_DAYS, 30]",
 )
 @with_appcontext
 def purge_trash_command(days: int | None) -> None:

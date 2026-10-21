@@ -1,17 +1,15 @@
 """Shelves app icon: a pane of four covers on a dark wall in a pool of warm lamplight."""
-
 import sys
 
 from PIL import Image, ImageDraw, ImageFilter
 
 N = 2048  # draw large, downsample for crisp edges
 
-
 def render(scale_cover=1.0):
-    im = Image.new("RGB", (N, N), (20, 18, 16))  # night wall #141210
+    im = Image.new("RGB", (N, N), (20, 18, 16))           # night wall #141210
     # The lamp: a warm glow above and behind the cover.
     glow = Image.new("L", (N, N), 0)
-    ImageDraw.Draw(glow).ellipse((N * 0.10, N * 0.02, N * 0.90, N * 0.86), fill=255)
+    ImageDraw.Draw(glow).ellipse((N*0.10, N*0.02, N*0.90, N*0.86), fill=255)
     glow = glow.filter(ImageFilter.GaussianBlur(N * 0.16))
     amber = Image.new("RGB", (N, N), (150, 98, 46))
     im = Image.composite(amber, im, glow.point(lambda v: int(v * 0.80)))
@@ -23,12 +21,11 @@ def render(scale_cover=1.0):
     x_left = (N - (2 * w + gap)) / 2
     y_top = (N - (2 * h + gap)) / 2 + N * 0.025
     from PIL import ImageChops
-
     for i, colour in enumerate(covers):
         x0 = x_left + (i % 2) * (w + gap)
         y0 = y_top + (i // 2) * (h + gap)
         sh = Image.new("L", (N, N), 0)
-        ImageDraw.Draw(sh).rectangle((x0 + N * 0.006, y0 + N * 0.03, x0 + w - N * 0.006, y0 + h + N * 0.028), fill=255)
+        ImageDraw.Draw(sh).rectangle((x0 + N*0.006, y0 + N*0.03, x0 + w - N*0.006, y0 + h + N*0.028), fill=255)
         sh = sh.filter(ImageFilter.GaussianBlur(N * 0.022))
         im = Image.composite(Image.new("RGB", (N, N), (8, 6, 4)), im, sh.point(lambda v: int(v * 0.8)))
         d = ImageDraw.Draw(im)
@@ -45,7 +42,6 @@ def render(scale_cover=1.0):
         px = w * 0.17
         d.rectangle((x0 + px, y0 + h * 0.20, x0 + w - px, y0 + h * 0.40), fill=(244, 236, 220))
     return im
-
 
 out = sys.argv[1]
 full = render()

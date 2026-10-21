@@ -12,13 +12,10 @@ from tests._epub_builder import build_epub3
 
 def _epub(path, language="zh-HK", chapter_lang="en"):
     """A book in `language` whose second chapter says it's in `chapter_lang`."""
-    source = zipfile.ZipFile(
-        io.BytesIO(
-            build_epub3(
-                chapters=[("ch1.xhtml", "<p>今朝落咗場大雨。</p>"), ("ch2.xhtml", "<p>An English chapter.</p>")]
-            )
-        )
-    )
+    source = zipfile.ZipFile(io.BytesIO(build_epub3(chapters=[
+        ("ch1.xhtml", "<p>今朝落咗場大雨。</p>"),
+        ("ch2.xhtml", "<p>An English chapter.</p>"),
+    ])))
     out = io.BytesIO()
     with zipfile.ZipFile(out, "w") as z:
         for item in source.infolist():
@@ -40,9 +37,8 @@ def test_the_books_language(tmp_path):
 def test_a_chapters_own_language(tmp_path):
     path = _epub(tmp_path / "a.epub")
     structure = get_epub_structure(path)
-    langs = [
-        process_chapter_content(path, c["path"], structure["images"], "/a/")["lang"] for c in structure["chapters"]
-    ]
+    langs = [process_chapter_content(path, c["path"], structure["images"], "/a/")["lang"]
+             for c in structure["chapters"]]
     assert langs[-1] == "en" and langs[-2] == ""
 
 

@@ -26,7 +26,17 @@ from werkzeug.utils import secure_filename
 from ..models import db
 from ..routes._helpers import json_admin_required, json_login_required
 from ..utils import make_thumbnail
-from . import archive, clients, downloads, files, indexers, jobs, names, providers, settings
+from . import (
+    archive,
+    clients,
+    downloads,
+    files,
+    indexers,
+    jobs,
+    names,
+    providers,
+    settings,
+)
 from .models import (
     DL_ACTIVE,
     DL_FAILED,
@@ -79,9 +89,7 @@ def _series_cover(series: ComicSeries) -> str | None:
 def _progress_by_issue(issue_ids) -> dict:
     if not current_user.is_authenticated or not issue_ids:
         return {}
-    rows = ComicProgress.query.filter(
-        ComicProgress.user_id == current_user.id, ComicProgress.issue_id.in_(list(issue_ids))
-    ).all()
+    rows = ComicProgress.query.filter(ComicProgress.user_id == current_user.id, ComicProgress.issue_id.in_(list(issue_ids))).all()
     return {p.issue_id: p for p in rows}
 
 
@@ -118,13 +126,7 @@ def download_json(d: ComicDownload) -> dict:
         "error": d.error,
         "created_at": d.created_at.isoformat() + "Z",
         "updated_at": d.updated_at.isoformat() + "Z" if d.updated_at else None,
-        "issue": {
-            "id": d.issue.id,
-            "series_id": d.issue.series_id,
-            "label": f"{d.issue.series.display_name} #{d.issue.number}",
-        }
-        if d.issue
-        else None,
+        "issue": {"id": d.issue.id, "series_id": d.issue.series_id, "label": f"{d.issue.series.display_name} #{d.issue.number}"} if d.issue else None,
     }
 
 
@@ -137,14 +139,7 @@ def _nav_counts() -> dict:
 
 
 def _page(template: str, active: str, **context):
-    return render_template(
-        f"comics/{template}",
-        active=active,
-        counts=_nav_counts(),
-        is_admin=_is_admin(),
-        providers_ready=bool(providers.available()),
-        **context,
-    )
+    return render_template(f"comics/{template}", active=active, counts=_nav_counts(), is_admin=_is_admin(), providers_ready=bool(providers.available()), **context)
 
 
 # Pages
@@ -158,16 +153,7 @@ def index():
     for s in series:
         have = sum(1 for i in s.issues if i.filename)
         upcoming = sum(1 for i in s.issues if not i.released)
-        cards.append(
-            {
-                "series": s,
-                "cover": _series_cover(s),
-                "have": have,
-                "total": len(s.issues),
-                "upcoming": upcoming,
-                "added": s.added_at,
-            }
-        )
+        cards.append({"series": s, "cover": _series_cover(s), "have": have, "total": len(s.issues), "upcoming": upcoming, "added": s.added_at})
     return _page("index.html", "series", cards=cards)
 
 
@@ -183,14 +169,7 @@ def series_page(series_id):
     series = _series_or_404(series_id)
     progress = _progress_by_issue(i.id for i in series.issues)
     issues = [issue_json(i, progress.get(i.id)) for i in reversed(series.issues)]
-    return _page(
-        "series.html",
-        "series",
-        series=series,
-        cover=_series_cover(series),
-        issues=issues,
-        monitor_choices=MONITOR_CHOICES,
-    )
+    return _page("series.html", "series", series=series, cover=_series_cover(series), issues=issues, monitor_choices=MONITOR_CHOICES)
 
 
 @comics_blueprint.get("/wanted")
@@ -204,12 +183,7 @@ def wanted_page():
 @login_required
 def upcoming_page():
     today = date.today()
-    soon = ComicIssue.query.filter(
-        db.or_(
-            ComicIssue.store_date >= today - timedelta(days=7),
-            db.and_(ComicIssue.store_date.is_(None), ComicIssue.cover_date >= today - timedelta(days=7)),
-        )
-    ).all()
+    soon = ComicIssue.query.filter(db.or_(ComicIssue.store_date >= today - timedelta(days=7), db.and_(ComicIssue.store_date.is_(None), ComicIssue.cover_date >= today - timedelta(days=7)))).all()
     soon = [i for i in soon if i.release_date and i.release_date <= today + timedelta(days=60)]
     soon.sort(key=lambda i: (i.release_date, i.series.name, i.sort_number))
     return _page("upcoming.html", "upcoming", issues=[issue_json(i) for i in soon], today=today.isoformat())
@@ -250,14 +224,7 @@ def read_page(issue_id):
     index = next((n for n, i in enumerate(siblings) if i.id == issue.id), 0)
     prev_issue = siblings[index - 1] if index > 0 else None
     next_issue = siblings[index + 1] if index + 1 < len(siblings) else None
-    return render_template(
-        "comics/reader.html",
-        issue=issue,
-        series=issue.series,
-        page=progress.page if progress and not progress.finished else 0,
-        prev_issue=prev_issue,
-        next_issue=next_issue,
-    )
+    return render_template("comics/reader.html", issue=issue, series=issue.series, page=progress.page if progress and not progress.finished else 0, prev_issue=prev_issue, next_issue=next_issue)
 
 
 # Files
@@ -474,9 +441,7 @@ def search_issue(issue_id):
     releases, errors = downloads.find_releases(issue)
     best = next((r for r in releases if r.score >= 0), None)
     if best is None:
-        return jsonify(
-            {"error": "; ".join(errors) or "Nothing on the indexers fits this issue yet.", "releases": len(releases)}
-        ), 404
+        return jsonify({"error": "; ".join(errors) or "Nothing on the indexers fits this issue yet.", "releases": len(releases)}), 404
     try:
         download = downloads.grab(issue, best)
     except clients.ClientError as e:
@@ -579,18 +544,14 @@ def import_list():
     rows = []
     for path in files.comic_files(folder):
         match = files.match_file(path)
-        rows.append(
-            {
-                "path": os.path.relpath(path, folder),
-                "size": os.path.getsize(path),
-                "parsed": {"series": match.parsed.series, "number": match.parsed.number, "year": match.parsed.year},
-                "issue": {"id": match.issue.id, "label": f"{match.series.display_name} #{match.issue.number}"}
-                if match.issue
-                else None,
-                "series": {"id": match.series.id, "name": match.series.display_name} if match.series else None,
-                "reason": match.reason,
-            }
-        )
+        rows.append({
+            "path": os.path.relpath(path, folder),
+            "size": os.path.getsize(path),
+            "parsed": {"series": match.parsed.series, "number": match.parsed.number, "year": match.parsed.year},
+            "issue": {"id": match.issue.id, "label": f"{match.series.display_name} #{match.issue.number}"} if match.issue else None,
+            "series": {"id": match.series.id, "name": match.series.display_name} if match.series else None,
+            "reason": match.reason,
+        })
     return jsonify({"files": rows, "folder": folder})
 
 
@@ -677,22 +638,9 @@ def import_delete():
 @comics_blueprint.get("/api/activity")
 @json_login_required
 def activity():
-    active = (
-        ComicDownload.query.filter(ComicDownload.status.in_(DL_ACTIVE)).order_by(ComicDownload.created_at.desc()).all()
-    )
-    history = (
-        ComicDownload.query.filter(~ComicDownload.status.in_(DL_ACTIVE))
-        .order_by(ComicDownload.updated_at.desc())
-        .limit(100)
-        .all()
-    )
-    return jsonify(
-        {
-            "active": [download_json(d) for d in active],
-            "history": [download_json(d) for d in history],
-            "worker": jobs.status(),
-        }
-    )
+    active = ComicDownload.query.filter(ComicDownload.status.in_(DL_ACTIVE)).order_by(ComicDownload.created_at.desc()).all()
+    history = ComicDownload.query.filter(~ComicDownload.status.in_(DL_ACTIVE)).order_by(ComicDownload.updated_at.desc()).limit(100).all()
+    return jsonify({"active": [download_json(d) for d in active], "history": [download_json(d) for d in history], "worker": jobs.status()})
 
 
 @comics_blueprint.post("/api/jobs/<job>")
@@ -772,25 +720,19 @@ def put_settings():
             if not (indexer.get("url") or "").strip():
                 continue
             previous = old.get((indexer.get("name"), indexer.get("url")), {})
-            cleaned.append(
-                {
-                    "name": (indexer.get("name") or "").strip() or indexer["url"],
-                    "kind": "torznab" if indexer.get("kind") == "torznab" else "newznab",
-                    "url": indexer["url"].strip(),
-                    "api_key": _merge_secret(indexer.get("api_key", ""), previous.get("api_key", "")),
-                    "categories": (indexer.get("categories") or indexers.COMICS_CATEGORY).strip(),
-                    "enabled": bool(indexer.get("enabled", True)),
-                }
-            )
+            cleaned.append({
+                "name": (indexer.get("name") or "").strip() or indexer["url"],
+                "kind": "torznab" if indexer.get("kind") == "torznab" else "newznab",
+                "url": indexer["url"].strip(),
+                "api_key": _merge_secret(indexer.get("api_key", ""), previous.get("api_key", "")),
+                "categories": (indexer.get("categories") or indexers.COMICS_CATEGORY).strip(),
+                "enabled": bool(indexer.get("enabled", True)),
+            })
         data["indexers"] = cleaned
     if "sabnzbd" in data:
-        data["sabnzbd"]["api_key"] = _merge_secret(
-            data["sabnzbd"].get("api_key", ""), current["sabnzbd"].get("api_key", "")
-        )
+        data["sabnzbd"]["api_key"] = _merge_secret(data["sabnzbd"].get("api_key", ""), current["sabnzbd"].get("api_key", ""))
     if "qbittorrent" in data:
-        data["qbittorrent"]["password"] = _merge_secret(
-            data["qbittorrent"].get("password", ""), current["qbittorrent"].get("password", "")
-        )
+        data["qbittorrent"]["password"] = _merge_secret(data["qbittorrent"].get("password", ""), current["qbittorrent"].get("password", ""))
     for key in ("preferred_words", "rejected_words"):
         if isinstance(data.get(key), str):
             data[key] = [w.strip() for w in data[key].split(",") if w.strip()]

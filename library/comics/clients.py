@@ -38,7 +38,7 @@ def map_path(path: str | None) -> str | None:
     mapping = settings.get("path_map")
     remote, local = (mapping.get("remote_path") or "").rstrip("/"), (mapping.get("local_path") or "").rstrip("/")
     if remote and (path == remote or path.startswith(remote + "/")):
-        return local + path[len(remote) :]
+        return local + path[len(remote):]
     return path
 
 
@@ -71,9 +71,7 @@ class SABnzbd:
         return f"Connected to SABnzbd {version}."
 
     def add(self, url: str, title: str, download_id: int, protocol: str = "usenet") -> str:
-        data = self._call(
-            "addurl", name=url, nzbname=f"{title} [shelves-{download_id}]", cat=self.config.get("category") or "comics"
-        )
+        data = self._call("addurl", name=url, nzbname=f"{title} [shelves-{download_id}]", cat=self.config.get("category") or "comics")
         ids = data.get("nzo_ids") or []
         if not data.get("status") or not ids:
             raise ClientError("SABnzbd didn't take the NZB.")
@@ -111,19 +109,14 @@ class QBittorrent:
             raise ClientError("qBittorrent isn't set up.")
         self.config = config
         self.base = config["url"].rstrip("/")
-        self.http = httpx.Client(
-            timeout=20, headers={"User-Agent": USER_AGENT, "Referer": self.base}, transport=transport
-        )
+        self.http = httpx.Client(timeout=20, headers={"User-Agent": USER_AGENT, "Referer": self.base}, transport=transport)
         self._logged_in = False
 
     def _login(self):
         if self._logged_in:
             return
         try:
-            response = self.http.post(
-                f"{self.base}/api/v2/auth/login",
-                data={"username": self.config.get("username", ""), "password": self.config.get("password", "")},
-            )
+            response = self.http.post(f"{self.base}/api/v2/auth/login", data={"username": self.config.get("username", ""), "password": self.config.get("password", "")})
         except httpx.HTTPError as e:
             raise ClientError(f"qBittorrent didn't answer ({e.__class__.__name__}).") from e
         if response.status_code != 200 or response.text.strip() == "Fails.":
@@ -145,9 +138,7 @@ class QBittorrent:
 
     def add(self, url: str, title: str, download_id: int, protocol: str = "usenet") -> str:
         tag = f"shelves-{download_id}"
-        response = self._request(
-            "POST", "torrents/add", data={"urls": url, "category": self.config.get("category") or "comics", "tags": tag}
-        )
+        response = self._request("POST", "torrents/add", data={"urls": url, "category": self.config.get("category") or "comics", "tags": tag})
         if response.text.strip() == "Fails.":
             raise ClientError("qBittorrent didn't take the torrent.")
         return tag
@@ -189,14 +180,10 @@ class Blackhole:
 
     def add(self, url: str, title: str, download_id: int, protocol: str = "usenet") -> str:
         try:
-            with httpx.Client(
-                timeout=60, headers={"User-Agent": USER_AGENT}, follow_redirects=True, transport=self.transport
-            ) as http:
+            with httpx.Client(timeout=60, headers={"User-Agent": USER_AGENT}, follow_redirects=True, transport=self.transport) as http:
                 response = http.get(url)
         except httpx.HTTPError as e:
-            raise ClientError(
-                f"Couldn't fetch the {'NZB' if protocol == 'usenet' else 'torrent'} ({e.__class__.__name__})."
-            ) from e
+            raise ClientError(f"Couldn't fetch the {'NZB' if protocol == 'usenet' else 'torrent'} ({e.__class__.__name__}).") from e
         if response.status_code >= 400:
             raise ClientError(f"The indexer answered {response.status_code} for the file.")
         ext = ".nzb" if protocol == "usenet" else ".torrent"
@@ -226,9 +213,7 @@ def client_for(protocol: str, name: str | None = None):
         return QBittorrent(qbit)
     if name == "blackhole" or (name is None and blackhole):
         return Blackhole(blackhole)
-    raise ClientError(
-        f"No download client for {protocol} is set up: add {'SABnzbd' if protocol == 'usenet' else 'qBittorrent'} or a blackhole folder in Settings."
-    )
+    raise ClientError(f"No download client for {protocol} is set up: add {'SABnzbd' if protocol == 'usenet' else 'qBittorrent'} or a blackhole folder in Settings.")
 
 
 def can_download(protocol: str) -> bool:

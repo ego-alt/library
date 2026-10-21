@@ -8,7 +8,15 @@ from xml.etree import ElementTree as ET
 import pytest
 
 from library.comics import archive, files, settings
-from library.comics.models import DOWNLOADED, MONITOR_ALL, MONITOR_FUTURE, SKIPPED, WANTED, ComicIssue, ComicSeries
+from library.comics.models import (
+    DOWNLOADED,
+    MONITOR_ALL,
+    MONITOR_FUTURE,
+    SKIPPED,
+    WANTED,
+    ComicIssue,
+    ComicSeries,
+)
 from library.comics.series import set_monitor, sync_issues
 from library.models import db
 from tests.conftest import make_cbz
@@ -16,27 +24,10 @@ from tests.conftest import make_cbz
 
 @pytest.fixture
 def series(app):
-    s = ComicSeries(
-        provider="comicvine",
-        provider_id="123",
-        name="Saga",
-        start_year=2012,
-        publisher="Image",
-        issue_count=66,
-        monitor=MONITOR_FUTURE,
-    )
+    s = ComicSeries(provider="comicvine", provider_id="123", name="Saga", start_year=2012, publisher="Image", issue_count=66, monitor=MONITOR_FUTURE)
     db.session.add(s)
     for n in (1, 2, 65, 66):
-        db.session.add(
-            ComicIssue(
-                series=s,
-                provider_id=str(1000 + n),
-                number=str(n),
-                sort_number=n,
-                cover_date=date(2012 + n // 10, 3, 1),
-                status=SKIPPED,
-            )
-        )
+        db.session.add(ComicIssue(series=s, provider_id=str(1000 + n), number=str(n), sort_number=n, cover_date=date(2012 + n // 10, 3, 1), status=SKIPPED))
     db.session.commit()
     return s
 
@@ -45,15 +36,7 @@ def test_write_cbz_orders_converts_and_tags(app, tmp_path, series):
     src = make_cbz(tmp_path / "Saga 065 (2023) (Digital).cbz", pages=12)
     dest = tmp_path / "out.cbz"
     issue = series.issues[2]
-    pages = archive.write_cbz(
-        str(src),
-        str(dest),
-        webp=True,
-        metadata=lambda n: (
-            archive.comicinfo_xml(issue, series, n, src.name),
-            archive.metroninfo_xml(issue, series, n, src.name),
-        ),
-    )
+    pages = archive.write_cbz(str(src), str(dest), webp=True, metadata=lambda n: (archive.comicinfo_xml(issue, series, n, src.name), archive.metroninfo_xml(issue, series, n, src.name)))
     assert pages == 12
     with zipfile.ZipFile(dest) as zf:
         names = zf.namelist()

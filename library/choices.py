@@ -7,7 +7,7 @@ class UserRoleChoice(str, Enum):
 
 
 class AccessLevelChoice(str, Enum):
-    STANDARD = "standard"  # visible to everyone
+    STANDARD = "standard"      # visible to everyone
     RESTRICTED = "restricted"  # admins only
 
 

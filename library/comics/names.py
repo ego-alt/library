@@ -19,9 +19,7 @@ _OF_N = re.compile(r"\(\s*of\s+\d+\s*\)", re.I)
 _VOLUME = re.compile(r"\b(?:v|vol\.?|volume)\s*(\d{1,4})\b", re.I)
 # An issue number: 1, 001, #1, 1.5, ½, -1, 1.MU, 1AU. Not a year.
 _NUMBER = re.compile(r"(?:^|\s)#?(-?\d{1,4}(?:\.\d{1,2})?|½|¼|¾)(?:\.?([A-Za-z]{1,3}))?(?=\s|$)")
-_TRADE_WORDS = re.compile(
-    r"\b(tpb|trade paperback|hc|hardcover|omnibus|compendium|collection|graphic novel|gn)\b", re.I
-)
+_TRADE_WORDS = re.compile(r"\b(tpb|trade paperback|hc|hardcover|omnibus|compendium|collection|graphic novel|gn)\b", re.I)
 _FRACTIONS = {"½": 0.5, "¼": 0.25, "¾": 0.75}
 
 
@@ -98,7 +96,7 @@ def parse(name: str) -> ParsedName:
 
     if match := _VOLUME.search(text):
         result.volume = int(match.group(1))
-        text = text[: match.start()] + " " + text[match.end() :]
+        text = text[: match.start()] + " " + text[match.end():]
 
     if re.search(r"\bannual\b", text, re.I):
         result.annual = True
@@ -113,19 +111,17 @@ def parse(name: str) -> ParsedName:
     for i in range(len(words) - 1, 0, -1):
         if _YEAR.match(words[i]):
             continue
-        if _NUMBER.fullmatch(" " + words[i]) and any(
-            (j == 0 or not _YEAR.match(w)) and w not in "-#" for j, w in enumerate(words[:i])
-        ):
+        if _NUMBER.fullmatch(" " + words[i]) and any((j == 0 or not _YEAR.match(w)) and w not in "-#" for j, w in enumerate(words[:i])):
             number_at = i
             break
     if number_at is not None:
         match = _NUMBER.fullmatch(" " + words[number_at])
         result.number = normalize_number(match.group(1) + (f".{match.group(2)}" if match.group(2) else ""))
-        tail = [w for w in words[number_at + 1 :] if not _YEAR.match(w)]
+        tail = [w for w in words[number_at + 1:] if not _YEAR.match(w)]
         if tail and " ".join(tail).strip(" -"):
             # "Batman 001 - The Court of Owls": the words after are its title.
             result.tags.insert(0, " ".join(tail).strip(" -"))
-        before, after = words[:number_at], words[number_at + 1 :]
+        before, after = words[:number_at], words[number_at + 1:]
     else:
         before, after = words, []
     # A name can start with a year ("2000 AD"); anywhere else it's the year.
