@@ -7,7 +7,8 @@ from xml.etree import ElementTree as ET
 
 import pytest
 
-from library.comics import archive, files, settings
+from library import settings
+from library.comics import archive, files
 from library.comics.models import (
     DOWNLOADED,
     MONITOR_ALL,

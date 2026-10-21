@@ -133,45 +133,21 @@ window.addEventListener('resize', () => {
     _shelfPlankResizeTimer = setTimeout(repaintShelfPlanks, 120);
 });
 
-/** "AUTHOR · 37%": the author, plus how far in you are for books you're
- * reading (from 1% — "0%" reads like an error). */
-function captionMeta(book) {
-    const n = Math.floor((book.progress || 0) * 100);
-    const pct = n > 0 ? `${n}%` : '';
-    const parts = [book.author ? escapeHtml(book.author) : '', pct].filter(Boolean);
-    return parts.length ? `<span class="book-caption__author">${parts.join(' · ')}</span>` : '';
-}
-
 function getBookTemplate(book) {
-    // book.filename comes from the DB and could contain anything if a malicious
-    // filename was placed in BOOK_DIR and imported via `flask import-books`.
-    // - URL paths: encodeURIComponent (handles spaces and HTML-special chars)
-    // - data-filename attribute: HTML-escape so attribute parsing stays safe
-    // - JS handler: event delegation reads dataset.filename, never inline onclick
-    const urlSafe = encodeURIComponent(book.filename);
-    const attrSafe = escapeHtml(book.filename);
-    const coverSafe = escapeHtml(book.cover);
-    const label = escapeHtml(bookLabel(book));
-    return `
-        <div class="col-6 col-sm-4 col-md-3 mb-3">
-            <div class="book">
-                ${lockBadge(book)}
-                <a href="${appUrl(`/read/${urlSafe}`)}" aria-label="Read ${label}">
-                    <img src="${coverSafe}" alt="${label}" loading="lazy">
-                </a>
-                <div class="book-buttons">
-                    <button class="book-button" data-action="show-metadata" data-filename="${attrSafe}"
-                            aria-label="Details" title="Details">
-                        <i class="fas fa-ellipsis-h" aria-hidden="true"></i>
-                    </button>
-                </div>
-            </div>
-            <div class="book-caption" aria-hidden="true">
-                <span class="book-caption__title">${escapeHtml(book.title || '')}</span>
-                ${captionMeta(book)}
-            </div>
-        </div>
-    `;
+    const n = Math.floor((book.progress || 0) * 100);
+    const lock = book.access_level && book.access_level !== 'standard'
+        ? h('span', {class: 'book-lock', title: 'Private — only admins can see this', 'aria-label': 'Private'}, h('i', {class: 'fas fa-lock', 'aria-hidden': 'true'}))
+        : null;
+    return coverCard({
+        href: appUrl(`/read/${encodeURIComponent(book.filename)}`),
+        label: `Read ${bookLabel(book)}`,
+        title: book.title || '',
+        meta: [book.author, n > 0 ? `${n}%` : ''],
+        cover: book.cover,
+        extras: [lock, h('div', {class: 'book-buttons'},
+            h('button', {class: 'book-button', dataset: {action: 'show-metadata', filename: book.filename}, 'aria-label': 'Details', title: 'Details'},
+                h('i', {class: 'fas fa-ellipsis-h', 'aria-hidden': 'true'})))],
+    });
 }
 
 function nearPageBottom(thresholdPx = 100) {
@@ -1370,32 +1346,7 @@ async function saveNewBook() {
 }
 
 // Drop EPUBs anywhere on the library page to add them.
-(function enableDropToAdd() {
-    if (!window.isAuthenticated) return;
-    let depth = 0;
-    const hasFiles = e => Array.from(e.dataTransfer?.types || []).includes('Files');
-    const zone = document.getElementById('dropZone');
-    document.addEventListener('dragenter', (e) => {
-        if (!hasFiles(e)) return;
-        depth += 1;
-        zone.hidden = false;
-    });
-    document.addEventListener('dragleave', (e) => {
-        if (!hasFiles(e)) return;
-        depth = Math.max(0, depth - 1);
-        if (!depth) zone.hidden = true;
-    });
-    document.addEventListener('dragover', (e) => {
-        if (hasFiles(e)) e.preventDefault();
-    });
-    document.addEventListener('drop', (e) => {
-        if (!hasFiles(e)) return;
-        e.preventDefault();
-        depth = 0;
-        zone.hidden = true;
-        handleFileUpload(e.dataTransfer.files);
-    });
-})();
+if (window.isAuthenticated) enableDropZone(document.getElementById('dropZone'), files => handleFileUpload(files));
 
 // Function to trigger the cover upload dialog
 function triggerCoverUpload(filename) {

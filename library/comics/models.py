@@ -6,7 +6,6 @@ Mylar calls it: wanted issues get searched for, snatched ones are downloading,
 downloaded ones have a file in COMIC_DIR.
 """
 
-import json
 from datetime import date
 
 from ..models import _utcnow, db
@@ -138,16 +137,3 @@ class ComicProgress(db.Model):
     updated_at = db.Column(db.DateTime, nullable=False, default=_utcnow, onupdate=_utcnow)
 
     __table_args__ = (db.UniqueConstraint("user_id", "issue_id", name="uq_comic_progress_user_issue"),)
-
-
-class ComicSetting(db.Model):
-    """One JSON value per key; see settings.py for the keys and defaults."""
-
-    __tablename__ = "comic_settings"
-
-    key = db.Column(db.String(50), primary_key=True)
-    value = db.Column(db.Text, nullable=False)
-
-    @property
-    def data(self):
-        return json.loads(self.value)

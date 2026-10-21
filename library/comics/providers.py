@@ -21,7 +21,7 @@ from datetime import date
 import httpx
 from bs4 import BeautifulSoup
 
-from . import settings
+from .. import settings
 
 USER_AGENT = "Shelves/1.0 (home stack comics)"
 

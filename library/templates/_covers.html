@@ -2,8 +2,8 @@
    caller adds what floats over it (the ⋯ button, a lock), and the wall label
    underneath is the title, then a line in spaced small capitals.
    main.js builds the same markup for books loaded as you scroll. #}
-{% macro cover_card(href, label, title, meta=[], cover=None, attrs={}, img_attrs={}) %}
-<div class="col-6 col-sm-4 col-md-3 mb-3"{{ attrs|xmlattr }}>
+{% macro cover_card(href, label, title, meta=[], cover=None, attrs={}, img_attrs={}, classes='') %}
+<div class="col-6 col-sm-4 col-md-3 mb-3{% if classes %} {{ classes }}{% endif %}"{{ attrs|xmlattr }}>
     <div class="book">
         <a href="{{ href }}" aria-label="{{ label }}">
             {% if cover %}<img src="{{ cover }}" alt="{{ label }}" loading="lazy"{{ img_attrs|xmlattr }}>{% else %}<span class="cover-blank">{{ title }}</span>{% endif %}

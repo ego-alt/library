@@ -18,9 +18,10 @@ from datetime import datetime, timezone
 
 from flask import current_app
 
+from .. import settings
 from ..config import DATA_DIR
 from ..models import db
-from . import downloads, files, settings
+from . import downloads, files
 from .series import due_for_refresh, refresh_series
 
 logger = logging.getLogger(__name__)

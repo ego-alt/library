@@ -23,6 +23,7 @@ from flask import (
 from flask_login import current_user, login_required
 from werkzeug.utils import secure_filename
 
+from .. import settings
 from ..models import db
 from ..routes._helpers import json_admin_required, json_login_required
 from ..utils import make_thumbnail
@@ -35,7 +36,6 @@ from . import (
     jobs,
     names,
     providers,
-    settings,
 )
 from .models import (
     DL_ACTIVE,
@@ -53,6 +53,16 @@ from .models import (
 from .series import add_series, local_series, refresh_series, set_monitor
 
 comics_blueprint = Blueprint("comics", __name__, url_prefix="/comics", template_folder="../templates")
+
+
+@comics_blueprint.app_template_filter("comic_date")
+def comic_date(value) -> str:
+    """"19 Aug" this year, "19 Aug 2025" otherwise; takes a date or an ISO string."""
+    if not value:
+        return ""
+    if isinstance(value, str):
+        value = date.fromisoformat(value[:10])
+    return f"{value.day} {value:%b}" + ("" if value.year == date.today().year else f" {value.year}")
 
 
 def _series_or_404(series_id: int) -> ComicSeries:
@@ -154,25 +164,32 @@ def _admin_page():
 VIEWS = ("all", "unread", "reading", "finished")
 
 
+def _up_next(have: list, mine: dict):
+    """The issue to open: the one you're partway through (the latest, if
+    several), else the first you haven't finished, else the first. Returns
+    (issue, its progress if started)."""
+    started = sorted((p for p in mine.values() if not p.finished and p.page > 0), key=lambda p: p.updated_at, reverse=True)
+    if started:
+        return next(i for i in have if i.id == started[0].issue_id), started[0]
+    return next((i for i in have if not (i.id in mine and mine[i.id].finished)), have[0] if have else None), None
+
+
 def _series_card(series: ComicSeries, progress: dict) -> dict:
-    """A series on the wall, as books are: where the cover takes you (the issue
-    you're partway through, else the next one unread), how far you are, and
-    which of All / Unread / Reading / Finished it falls under."""
+    """A series on the wall, as books are: where the cover takes you, how far
+    you are, and which of All / Unread / Reading / Finished it falls under."""
     have = [i for i in series.issues if i.filename]
     mine = {i.id: progress[i.id] for i in have if i.id in progress}
     finished = sum(1 for p in mine.values() if p.finished)
-    started = sorted((p for p in mine.values() if not p.finished and p.page > 0), key=lambda p: p.updated_at, reverse=True)
     last = max((p.updated_at for p in mine.values()), default=None)
+    issue, started = _up_next(have, mine)
     if not have:
-        state, issue, line = "unread", None, "No issues yet"
+        state, line = "unread", "No issues yet"
     elif started:
-        issue = db.session.get(ComicIssue, started[0].issue_id)
-        pct = int(100 * (started[0].page + 1) / issue.page_count) if issue.page_count else None
+        pct = int(100 * (started.page + 1) / issue.page_count) if issue.page_count else None
         state, line = "reading", f"#{issue.number}" + (f" · {pct}%" if pct else "")
     elif finished == len(have):
-        state, issue, line = "finished", have[0], f"All {len(have)} read" if len(have) > 1 else "Read"
+        state, line = "finished", f"All {len(have)} read" if len(have) > 1 else "Read"
     else:
-        issue = next(i for i in have if not (i.id in mine and mine[i.id].finished))
         state = "reading" if finished else "unread"
         line = f"{finished} of {len(have)} read" if finished else (f"{len(have)} issues" if len(have) > 1 else "1 issue")
     if issue is None:
@@ -207,10 +224,17 @@ def add_page():
 @login_required
 def series_page(series_id):
     series = _series_or_404(series_id)
-    shown = series.issues if _is_admin() else [i for i in series.issues if i.filename]
+    admin = _is_admin()
+    shown = series.issues if admin else [i for i in series.issues if i.filename]
     progress = _progress_by_issue(i.id for i in shown)
-    issues = [issue_json(i, progress.get(i.id)) for i in reversed(shown)]
-    return _page("series.html", "series", series=series, cover=_series_cover(series), issues=issues, monitor_choices=MONITOR_CHOICES)
+    # Admins manage newest first; readers read from #1.
+    issues = [issue_json(i, progress.get(i.id)) for i in (reversed(shown) if admin else shown)]
+    have = [i for i in series.issues if i.filename]
+    up_next = None
+    if have:
+        next_issue = _up_next(have, {i.id: progress[i.id] for i in have if i.id in progress})[0]
+        up_next = next(i for i in issues if i["id"] == next_issue.id)
+    return _page("series.html", "series", series=series, cover=_series_cover(series), issues=issues, up_next=up_next, monitor_choices=MONITOR_CHOICES)
 
 
 @comics_blueprint.get("/downloads")
@@ -227,17 +251,20 @@ def downloads_page():
     return _page(
         "downloads.html",
         "downloads",
-        wanted=[issue_json(i) for i in downloads.wanted_issues()],
+        wanted=_wanted_by_series(),
         upcoming=[issue_json(i) for i in soon],
         series_options=options,
         can_search=bool(settings.get("indexers")),
     )
 
 
-@comics_blueprint.get("/settings")
-@login_required
-def settings_page():
-    return _admin_page() or _page("settings.html", "settings", import_dir=files.import_dir(), comic_dir=files.comic_dir())
+def _wanted_by_series() -> list[dict]:
+    """Wanted issues, a group per series, the series with the newest first."""
+    groups: dict[int, dict] = {}
+    for issue in downloads.wanted_issues():
+        group = groups.setdefault(issue.series_id, {"series": issue.series, "issues": []})
+        group["issues"].append(issue_json(issue))
+    return list(groups.values())
 
 
 @comics_blueprint.get("/read/<int:issue_id>")
@@ -719,83 +746,3 @@ def forget_download(download_id):
     db.session.delete(download)
     db.session.commit()
     return jsonify({"ok": True})
-
-
-# API: settings
-
-
-def _merge_secret(new, old):
-    return old if settings.is_masked(new) else new
-
-
-@comics_blueprint.get("/api/settings")
-@json_admin_required
-def get_settings():
-    return jsonify(settings.for_browser())
-
-
-@comics_blueprint.put("/api/settings")
-@json_admin_required
-def put_settings():
-    """Save settings. Masked secrets ("••••1234") mean "unchanged"."""
-    data = request.get_json(silent=True) or {}
-    current = settings.get_all()
-    for key in settings.SECRETS:
-        if key in data:
-            data[key] = _merge_secret(data[key], current[key])
-    if "indexers" in data:
-        old = {(i.get("name"), i.get("url")): i for i in current["indexers"]}
-        cleaned = []
-        for indexer in data["indexers"]:
-            if not (indexer.get("url") or "").strip():
-                continue
-            previous = old.get((indexer.get("name"), indexer.get("url")), {})
-            cleaned.append({
-                "name": (indexer.get("name") or "").strip() or indexer["url"],
-                "kind": "torznab" if indexer.get("kind") == "torznab" else "newznab",
-                "url": indexer["url"].strip(),
-                "api_key": _merge_secret(indexer.get("api_key", ""), previous.get("api_key", "")),
-                "categories": (indexer.get("categories") or indexers.COMICS_CATEGORY).strip(),
-                "enabled": bool(indexer.get("enabled", True)),
-            })
-        data["indexers"] = cleaned
-    if "sabnzbd" in data:
-        data["sabnzbd"]["api_key"] = _merge_secret(data["sabnzbd"].get("api_key", ""), current["sabnzbd"].get("api_key", ""))
-    if "qbittorrent" in data:
-        data["qbittorrent"]["password"] = _merge_secret(data["qbittorrent"].get("password", ""), current["qbittorrent"].get("password", ""))
-    for key in ("preferred_words", "rejected_words"):
-        if isinstance(data.get(key), str):
-            data[key] = [w.strip() for w in data[key].split(",") if w.strip()]
-    settings.set_many(data)
-    return jsonify(settings.for_browser())
-
-
-@comics_blueprint.post("/api/settings/test")
-@json_admin_required
-def test_settings():
-    """Try a provider, indexer or client with the settings as saved."""
-    data = request.get_json(silent=True) or {}
-    what = data.get("what")
-    try:
-        if what == "comicvine":
-            providers.ComicVine(settings.get("comicvine_api_key")).search_series("batman")
-            message = "ComicVine answered."
-        elif what == "metron":
-            providers.Metron(settings.get("metron_username"), settings.get("metron_password")).search_series("batman")
-            message = "Metron answered."
-        elif what == "indexer":
-            indexer = settings.get("indexers")[int(data.get("index", 0))]
-            message = indexers.test(indexer)
-        elif what == "sabnzbd":
-            message = clients.SABnzbd(settings.get("sabnzbd")).test()
-        elif what == "qbittorrent":
-            message = clients.QBittorrent(settings.get("qbittorrent")).test()
-        elif what == "blackhole":
-            message = clients.Blackhole(settings.get("blackhole_dir")).test()
-        else:
-            return jsonify({"error": "Test what?"}), 400
-    except (providers.ProviderError, indexers.IndexerError, clients.ClientError) as e:
-        return jsonify({"error": str(e)}), 502
-    except (IndexError, ValueError):
-        return jsonify({"error": "Save it first."}), 400
-    return jsonify({"message": message})

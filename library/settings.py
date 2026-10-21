@@ -1,4 +1,6 @@
-"""Comics settings, kept in the database so they can be changed from the app.
+"""Shelves settings, kept in the database so they can be changed from the
+Settings page: where to search and download (shared by books and comics),
+and how comics are looked up and written.
 
 Metadata keys can also come from the environment (COMICVINE_API_KEY,
 METRON_USERNAME, METRON_PASSWORD); a value saved in the app wins.
@@ -8,20 +10,21 @@ import copy
 import json
 import os
 
-from ..models import db
-from .models import ComicSetting
+from .models import Setting, db
 
 DEFAULTS = {
     "comicvine_api_key": "",
     "metron_username": "",
     "metron_password": "",
-    # Newznab (usenet) and Torznab (torrent) indexers:
-    # {"name", "kind": "newznab"|"torznab", "url", "api_key", "categories", "enabled"}
+    # Newznab (usenet) and Torznab (torrent) indexers, for books and comics:
+    # {"name", "kind": "newznab"|"torznab", "url", "api_key", "enabled",
+    #  "categories" (comics, 7030 on most), "book_categories" (ebooks, 7020)}
     "indexers": [],
     # Where grabs go. Usenet results go to SABnzbd, torrents to qBittorrent;
-    # with neither, a blackhole folder that some other client watches.
-    "sabnzbd": {"url": "", "api_key": "", "category": "comics"},
-    "qbittorrent": {"url": "", "username": "", "password": "", "category": "comics"},
+    # with neither, a blackhole folder that some other client watches. Each
+    # client files comics and books under their own category.
+    "sabnzbd": {"url": "", "api_key": "", "category": "comics", "book_category": "books"},
+    "qbittorrent": {"url": "", "username": "", "password": "", "category": "comics", "book_category": "books"},
     "blackhole_dir": "",
     # The client sees its download folder at remote_path; this app sees the
     # same folder at local_path.
@@ -47,7 +50,7 @@ _ENV = {
 
 
 def get(key: str):
-    row = db.session.get(ComicSetting, key)
+    row = db.session.get(Setting, key)
     if row is not None:
         value = row.data
         if value not in ("", None):
@@ -66,10 +69,10 @@ def set_many(values: dict) -> None:
     for key, value in values.items():
         if key not in DEFAULTS:
             continue
-        row = db.session.get(ComicSetting, key)
+        row = db.session.get(Setting, key)
         encoded = json.dumps(value)
         if row is None:
-            db.session.add(ComicSetting(key=key, value=encoded))
+            db.session.add(Setting(key=key, value=encoded))
         else:
             row.value = encoded
     db.session.commit()

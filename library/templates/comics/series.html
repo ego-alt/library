@@ -1,4 +1,5 @@
 {% extends "comics/base.html" %}
+{% from "_covers.html" import cover_card %}
 {% block page_title %}{{ series.display_name }}{% endblock %}
 {% block page %}series-detail{% endblock %}
 {% block content %}
@@ -15,8 +16,9 @@
             {% else %} · from your files{% endif %}
         </p>
         {% if series.description %}<p class="series-head__desc">{{ series.description|truncate(600) }}</p>{% endif %}
-        {% if is_admin %}
         <div class="series-head__actions">
+            {% if up_next %}<a class="btn btn-primary" href="{{ url_for('comics.read_page', issue_id=up_next.id) }}">{{ 'Continue' if up_next.page and not up_next.finished else 'Read' }} #{{ up_next.number }}</a>{% endif %}
+            {% if is_admin %}
             {% if series.provider != 'local' %}
             <label class="monitor-pick">Get
                 <select id="monitorSelect" class="input">
@@ -25,12 +27,19 @@
                     <option value="none"{% if series.monitor == 'none' %} selected{% endif %}>nothing</option>
                 </select>
             </label>
-            <button type="button" class="btn btn-secondary" data-action="search-series">Search wanted</button>
-            <button type="button" class="btn btn-secondary" data-action="refresh">Refresh details</button>
             {% endif %}
-            <button type="button" class="btn btn-ghost danger-text" data-action="delete-series">Stop following</button>
+            <details class="more">
+                <summary class="btn btn-ghost" aria-label="More for this series">⋯</summary>
+                <div class="more__menu">
+                    {% if series.provider != 'local' %}
+                    <button type="button" data-action="search-series">Search for wanted issues</button>
+                    <button type="button" data-action="refresh">Refresh details</button>
+                    {% endif %}
+                    <button type="button" class="danger-text" data-action="delete-series">Stop following…</button>
+                </div>
+            </details>
+            {% endif %}
         </div>
-        {% endif %}
     </div>
 </section>
 
@@ -49,19 +58,39 @@
 </div>
 {% endif %}
 
-<table class="issue-table{% if not is_admin %} issue-table--reader{% endif %}" id="issueTable">
+{% if is_admin %}
+<table class="issue-table" id="issueTable">
     <thead>
         <tr>
-            {% if is_admin %}<th class="col-check"><input type="checkbox" id="checkAll" aria-label="Select all"></th>{% endif %}
+            <th class="col-check"><input type="checkbox" id="checkAll" aria-label="Select all"></th>
             <th class="col-num">#</th>
             <th>Title</th>
             <th class="col-date">Out</th>
-            {% if is_admin %}<th class="col-status">Status</th>{% endif %}
+            <th class="col-status">Status</th>
             <th class="col-actions"><span class="visually-hidden">Actions</span></th>
         </tr>
     </thead>
     <tbody></tbody>
 </table>
+{% elif issues %}
+<div class="row library issue-wall" id="issueWall">
+    {% for issue in issues %}
+    {% set started = issue.page and not issue.finished %}
+    {% set state = 'Read' if issue.finished else ((((100 * (issue.page + 1) / issue.pages)|int) ~ '%') if issue.pages else 'Page ' ~ (issue.page + 1)) if started else ((issue.pages ~ ' pages') if issue.pages else '') %}
+    {% set attrs = {'data-issue-id': issue.id, 'data-pages': issue.pages} %}
+    {% set classes = ('is-read ' if issue.finished else '') ~ ('is-next' if up_next and issue.id == up_next.id else '') %}
+    {% call cover_card(url_for('comics.read_page', issue_id=issue.id), ('Continue' if started else 'Read') ~ ' #' ~ issue.number, '#' ~ issue.number ~ (' · ' ~ issue.title if issue.title else ''), [issue.date|comic_date, state], issue.cover, attrs, {'referrerpolicy': 'no-referrer'}, classes) %}
+        {% if up_next and issue.id == up_next.id %}<span class="cover-flag">{{ 'Reading' if started else 'Up next' }}</span>{% endif %}
+        <div class="book-buttons">
+            <button type="button" class="book-button book-button--read" data-action="toggle-read" aria-pressed="{{ 'true' if issue.finished else 'false' }}" aria-label="Read" title="{{ 'Mark as unread' if issue.finished else 'Mark as read' }}"><i class="fas fa-check" aria-hidden="true"></i></button>
+            <a class="book-button" href="{{ url_for('comics.issue_download', issue_id=issue.id) }}" aria-label="Download #{{ issue.number }}" title="Download"><i class="fas fa-download" aria-hidden="true"></i></a>
+        </div>
+    {% endcall %}
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-state"><h3>Nothing to read here yet</h3></div>
+{% endif %}
 <script id="issuesData" type="application/json">{{ issues|tojson }}</script>
 
 {% if is_admin %}

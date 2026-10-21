@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timezone
 
 from flask_login import UserMixin
@@ -134,3 +135,16 @@ class Bookmark(db.Model):
         db.UniqueConstraint("user_id", "book_id", name="unique_user_book_bookmark"),
         db.Index("idx_user_book", "user_id", "book_id"),
     )
+
+
+class Setting(db.Model):
+    """One JSON value per key; see settings.py for the keys and defaults."""
+
+    __tablename__ = "settings"
+
+    key = db.Column(db.String(50), primary_key=True)
+    value = db.Column(db.Text, nullable=False)
+
+    @property
+    def data(self):
+        return json.loads(self.value)

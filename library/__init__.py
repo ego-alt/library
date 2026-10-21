@@ -20,6 +20,7 @@ from .routes import (
     metadata_blueprint,
     pwa_blueprint,
     read_blueprint,
+    settings_blueprint,
     upload_blueprint,
 )
 
@@ -121,6 +122,7 @@ def create_app(config_overrides: dict | None = None):
     app.register_blueprint(metadata_blueprint)
     app.register_blueprint(pwa_blueprint)
     app.register_blueprint(read_blueprint)
+    app.register_blueprint(settings_blueprint)
     app.register_blueprint(upload_blueprint)
 
     init_comics(app)

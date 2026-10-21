@@ -5,7 +5,8 @@ from urllib.parse import parse_qs
 import httpx
 import pytest
 
-from library.comics import clients, downloads, indexers, providers, settings
+from library import settings
+from library.comics import clients, downloads, indexers, providers
 from library.comics.models import (
     DL_DONE,
     DL_DOWNLOADING,

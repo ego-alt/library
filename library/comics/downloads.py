@@ -6,8 +6,9 @@ import os
 import shutil
 from datetime import timedelta
 
+from .. import settings
 from ..models import _utcnow, db
-from . import clients, files, indexers, names, settings
+from . import clients, files, indexers, names
 from .models import (
     DL_ACTIVE,
     DL_DONE,

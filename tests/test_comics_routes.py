@@ -3,7 +3,8 @@ from datetime import date, timedelta
 
 import pytest
 
-from library.comics import providers, settings
+from library import settings
+from library.comics import providers
 from library.comics.models import (
     DOWNLOADED,
     SKIPPED,
@@ -61,7 +62,7 @@ def test_every_page_renders(admin_client, saga, tmp_path, comic_dir):
     from library.comics import files
 
     files.import_file(str(make_cbz(tmp_path / "Saga 001.cbz")), issue)
-    for path in ["/comics/", "/comics/add?q=saga", f"/comics/series/{saga.id}", "/comics/downloads", "/comics/settings", f"/comics/read/{issue.id}"]:
+    for path in ["/comics/", "/comics/add?q=saga", f"/comics/series/{saga.id}", "/comics/downloads", "/settings", f"/comics/read/{issue.id}"]:
         response = admin_client.get(path)
         assert response.status_code == 200, path
     assert b"Saga" in admin_client.get("/comics/").data
@@ -73,7 +74,7 @@ def test_every_page_renders(admin_client, saga, tmp_path, comic_dir):
 def test_empty_comics_page_says_what_to_do(admin_client, comic_dir):
     page = admin_client.get("/comics/").data.decode()
     assert "No series yet" in page and "neither is set up yet" in page
-    assert "/comics/settings" in page and "/comics/downloads" in page
+    assert 'href="/settings"' in page and "/comics/downloads" in page
 
 
 def _series_with_one_file(comic_dir, tmp_path):
@@ -108,10 +109,11 @@ def test_readers_see_only_what_there_is_to_read(standard_client, comic_dir, tmp_
     assert standard_client.get(f"/comics/issue/{have.id}/download").status_code == 200
 
 
-@pytest.mark.parametrize("path", ["/comics/add", "/comics/downloads", "/comics/settings"])
-def test_admin_pages_send_readers_home(standard_client, comic_dir, path):
+@pytest.mark.parametrize("path, home", [("/comics/add", "/comics/"), ("/comics/downloads", "/comics/"), ("/settings", "/")])
+def test_admin_pages_send_readers_home(standard_client, comic_dir, path, home):
     response = standard_client.get(path)
-    assert response.status_code == 302 and response.location.endswith("/comics/")
+    assert response.status_code == 302 and response.location.endswith(home)
+    assert 'href="/settings"' not in standard_client.get(home).data.decode()
 
 
 @pytest.mark.parametrize(
@@ -130,7 +132,7 @@ def test_admin_pages_send_readers_home(standard_client, comic_dir, path):
         ("get", "/comics/api/activity"),
         ("post", "/comics/api/jobs/search"),
         ("post", "/comics/api/downloads/1/retry"),
-        ("get", "/comics/api/settings"),
+        ("get", "/api/settings"),
     ],
 )
 def test_managing_is_admin_only(standard_client, comic_dir, method, path):
@@ -209,15 +211,15 @@ def test_delete_file_is_admin_only(standard_client, comic_dir, tmp_path):
 
 def test_settings_keep_masked_secrets(admin_client, comic_dir):
     settings.set_many({"comicvine_api_key": "abcdef1234567890"})
-    shown = admin_client.get("/comics/api/settings").get_json()
+    shown = admin_client.get("/api/settings").get_json()
     shown["max_size_mb"] = 300
     shown["rejected_words"] = "c2c, preview"
     shown["indexers"] = [{"name": "Geek", "url": "https://api.nzbgeek.info", "api_key": "secret-key-123", "kind": "newznab"}]
-    saved = admin_client.put("/comics/api/settings", json=shown).get_json()
+    saved = admin_client.put("/api/settings", json=shown).get_json()
     assert settings.get("comicvine_api_key") == "abcdef1234567890"
     assert settings.get("max_size_mb") == 300 and settings.get("rejected_words") == ["c2c", "preview"]
     # Saving again with the masked key keeps the real one.
-    admin_client.put("/comics/api/settings", json=saved)
+    admin_client.put("/api/settings", json=saved)
     assert settings.get("indexers")[0]["api_key"] == "secret-key-123"
 
 
@@ -228,3 +230,46 @@ def test_search_without_indexers_says_so(admin_client, saga):
 
 def test_books_page_links_to_comics(admin_client):
     assert b"/comics/" in admin_client.get("/").data
+
+
+def test_settings_tests_use_the_form_without_saving(admin_client, comic_dir, tmp_path):
+    folder = tmp_path / "hole"
+    folder.mkdir()
+    response = admin_client.post("/api/settings/test", json={"what": "blackhole", "values": {"blackhole_dir": str(folder)}})
+    assert response.status_code == 200, response.get_json()
+    assert settings.get("blackhole_dir") == ""
+    # A masked key on the form stands for the saved one.
+    settings.set_many({"sabnzbd": {"url": "", "api_key": "saved-key-1234", "category": "comics", "book_category": "books"}})
+    response = admin_client.post("/api/settings/test", json={"what": "sabnzbd", "values": {"url": "", "api_key": settings.masked("saved-key-1234")}})
+    assert response.status_code == 502 and "isn't set up" in response.get_json()["error"]
+
+
+def test_settings_page_is_shared_and_admin_only(admin_client, comic_dir):
+    page = admin_client.get("/settings").data.decode()
+    assert "for books and comics" in page and 'id="comics"' in page
+    assert 'href="/settings"' in admin_client.get("/").data.decode()
+
+
+def test_readers_get_issue_covers_they_can_mark_read(standard_client, comic_dir, tmp_path):
+    s, have, missing = _series_with_one_file(comic_dir, tmp_path)
+    page = standard_client.get(f"/comics/series/{s.id}").data.decode()
+    assert 'id="issueWall"' in page and "Up next" in page and ">Read #1<" in page
+    assert standard_client.put(f"/comics/api/issues/{have.id}/progress", json={"page": 3, "finished": True}).get_json()["finished"]
+    page = standard_client.get(f"/comics/series/{s.id}").data.decode()
+    assert "is-read" in page and 'aria-pressed="true"' in page
+    assert standard_client.put(f"/comics/api/issues/{have.id}/progress", json={"page": 0, "finished": False}).get_json() == {"page": 0, "finished": False}
+
+
+def test_wanted_is_grouped_by_series(admin_client, saga):
+    admin_client.patch(f"/comics/api/series/{saga.id}", json={"monitor": "all"})
+    page = admin_client.get("/comics/downloads").data.decode()
+    assert page.count('class="wanted-group"') == 1 and "#2, #1" in page and "Skip all" in page
+
+
+def test_comic_date():
+    from library.comics.routes import comic_date
+
+    this_year = date.today().year
+    assert comic_date(date(this_year, 8, 19)) == "19 Aug"
+    assert comic_date("2019-03-05") == "5 Mar 2019"
+    assert comic_date(None) == ""

@@ -24,12 +24,11 @@
         <nav class="comics-nav" aria-label="Comics">
             <a href="{{ url_for('comics.index') }}"{% if active == 'series' %} aria-current="page"{% endif %}>Library</a>
             <a href="{{ url_for('comics.downloads_page') }}"{% if active == 'downloads' %} aria-current="page"{% endif %}>Downloads{% if downloads_count %} <span class="count">{{ downloads_count }}</span>{% endif %}</a>
-            <a href="{{ url_for('comics.settings_page') }}"{% if active == 'settings' %} aria-current="page"{% endif %}>Settings</a>
         </nav>
-        {% if not providers_ready and active != 'settings' %}
+        {% if not providers_ready %}
         <p class="comics-banner">
             Series details come from ComicVine or Metron, and neither is set up yet.
-            <a href="{{ url_for('comics.settings_page') }}#metadata">Add a key in Settings</a>.
+            <a href="{{ url_for('settings.settings_page') }}#metadata">Add a key in Settings</a>.
             Until then you can still import and read files.
         </p>
         {% endif %}

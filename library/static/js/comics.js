@@ -1,70 +1,6 @@
 // Comics pages: one small module per page, picked by <body data-page>.
 
-const comicsApi = async (path, {method = 'GET', body, form} = {}) => {
-    const options = {method, headers: {Accept: 'application/json'}};
-    if (form) {
-        options.body = form;
-    } else if (body !== undefined) {
-        options.headers['Content-Type'] = 'application/json';
-        options.body = JSON.stringify(body);
-    }
-    const response = await fetch(appUrl(`/comics/api${path}`), options);
-    let data = {};
-    try { data = await response.json(); } catch (e) { /* empty answer */ }
-    if (!response.ok) {
-        const error = new Error(data.error || `Something went wrong (${response.status}).`);
-        error.status = response.status;
-        throw error;
-    }
-    return data;
-};
-
-function h(tag, attrs = {}, ...children) {
-    const el = document.createElement(tag);
-    for (const [key, value] of Object.entries(attrs)) {
-        if (value === null || value === undefined || value === false) continue;
-        if (key === 'class') el.className = value;
-        else if (key === 'dataset') Object.assign(el.dataset, value);
-        else if (key.startsWith('on')) el.addEventListener(key.slice(2), value);
-        else el.setAttribute(key, value === true ? '' : value);
-    }
-    for (const child of children.flat()) {
-        if (child === null || child === undefined || child === false) continue;
-        el.append(child instanceof Node ? child : document.createTextNode(String(child)));
-    }
-    return el;
-}
-
-function formatSize(bytes) {
-    if (!bytes) return '';
-    if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
-    const mb = bytes / 1024 / 1024;
-    return mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${mb >= 10 ? Math.round(mb) : mb.toFixed(1)} MB`;
-}
-
-function timeAgo(iso) {
-    if (!iso) return '';
-    const seconds = (Date.now() - new Date(iso).getTime()) / 1000;
-    if (seconds < 60) return 'just now';
-    if (seconds < 3600) return `${Math.round(seconds / 60)} min ago`;
-    if (seconds < 86400) return `${Math.round(seconds / 3600)} h ago`;
-    return `${Math.round(seconds / 86400)} d ago`;
-}
-
-function setRadio(group, button) {
-    group.querySelectorAll('[role="radio"]').forEach(b => b.setAttribute('aria-checked', String(b === button)));
-}
-
-async function busy(button, work) {
-    const label = button.textContent;
-    button.disabled = true;
-    try {
-        return await work();
-    } finally {
-        button.disabled = false;
-        button.textContent = label;
-    }
-}
+const comicsApi = (path, options) => apiFetch(`/comics/api${path}`, options);
 
 const STATUS_LABEL = {wanted: 'Wanted', skipped: 'Skipped', snatched: 'Downloading', downloaded: 'Have'};
 
@@ -148,29 +84,35 @@ function initAdd() {
         }
     }
 
+    // Results are covers like the library's: tap one to follow it.
     function lookupRow(row) {
-        const action = row.followed_id
-            ? h('a', {class: 'btn btn-secondary', href: appUrl(`/comics/series/${row.followed_id}`)}, 'Following')
-            : h('button', {type: 'button', class: 'btn btn-primary', onclick: (e) => follow(e.currentTarget, row)}, 'Follow');
-        return h('li', {class: 'lookup-row'},
-            row.cover_url ? h('img', {src: row.cover_url, alt: '', loading: 'lazy', referrerpolicy: 'no-referrer'}) : h('span', {class: 'lookup-row__nocover'}),
-            h('div', {class: 'lookup-row__text'},
-                h('strong', {}, row.name),
-                h('span', {class: 'text-muted'}, [row.start_year, row.publisher, row.volume ? `Vol. ${row.volume}` : null, row.issue_count ? `${row.issue_count} issues` : null].filter(Boolean).join(' · ')),
-                row.description ? h('p', {}, row.description.length > 220 ? row.description.slice(0, 220) + '…' : row.description) : null),
-            action);
+        const followed = Boolean(row.followed_id);
+        const card = coverCard({
+            href: followed ? appUrl(`/comics/series/${row.followed_id}`) : '#',
+            label: followed ? `${row.name}, followed` : `Follow ${row.name}`,
+            title: row.name,
+            meta: [row.start_year, row.publisher, row.issue_count ? `${row.issue_count} issues` : null],
+            cover: row.cover_url,
+            imgAttrs: {referrerpolicy: 'no-referrer'},
+            attrs: {title: row.description ? (row.description.length > 300 ? `${row.description.slice(0, 300)}…` : row.description) : null},
+            extras: [h('span', {class: `cover-flag cover-flag--action${followed ? ' is-on' : ''}`}, followed ? 'Following' : 'Follow')],
+        });
+        if (!followed) card.querySelector('.book > a').addEventListener('click', (e) => { e.preventDefault(); follow(card, row); });
+        return card;
     }
 
-    async function follow(button, row) {
-        button.disabled = true;
-        button.textContent = 'Adding…';
+    async function follow(card, row) {
+        const flag = card.querySelector('.cover-flag');
+        if (card.classList.contains('is-busy')) return;
+        card.classList.add('is-busy');
+        flag.textContent = 'Adding…';
         try {
             const data = await comicsApi('/series', {method: 'POST', body: {provider: row.provider, provider_id: row.provider_id, monitor: monitor.value}});
             window.location = data.url;
         } catch (e) {
             showToast(e.message, 'error');
-            button.disabled = false;
-            button.textContent = 'Follow';
+            card.classList.remove('is-busy');
+            flag.textContent = 'Follow';
         }
     }
 
@@ -180,10 +122,40 @@ function initAdd() {
 
 // --- One series -------------------------------------------------------------
 
+// Mark an issue read (its last page) or unread (back to the start).
+async function setRead(issue, read) {
+    return comicsApi(`/issues/${issue.id}/progress`, {method: 'PUT', body: read ? {page: Math.max(0, (issue.pages || 1) - 1), finished: true} : {page: 0, finished: false}});
+}
+
+// Readers see the issues as covers; the ✓ on each marks it read.
+function initIssueWall() {
+    const wall = document.getElementById('issueWall');
+    if (!wall) return;
+    wall.addEventListener('click', async (e) => {
+        const button = e.target.closest('[data-action="toggle-read"]');
+        if (!button) return;
+        const card = button.closest('[data-issue-id]');
+        const read = button.getAttribute('aria-pressed') !== 'true';
+        try {
+            await setRead({id: card.dataset.issueId, pages: Number(card.dataset.pages) || 0}, read);
+        } catch (err) { return showToast(err.message, 'error'); }
+        button.setAttribute('aria-pressed', String(read));
+        button.title = read ? 'Mark as unread' : 'Mark as read';
+        card.classList.toggle('is-read', read);
+        const meta = card.querySelector('.book-caption__author');
+        if (meta) meta.textContent = [meta.textContent.split(' · ')[0], read ? 'Read' : (card.dataset.pages ? `${card.dataset.pages} pages` : '')].filter(Boolean).join(' · ');
+    });
+}
+
 function initSeriesDetail() {
     const admin = window.isAdmin;
     const head = document.querySelector('.series-head');
     const seriesId = head.dataset.seriesId;
+    head.querySelectorAll('.more').forEach(menu => menu.addEventListener('click', (e) => { if (e.target.closest('button')) menu.open = false; }));
+    if (!admin) {
+        initIssueWall();
+        return;
+    }
     const tbody = document.querySelector('#issueTable tbody');
     let issues = JSON.parse(document.getElementById('issuesData').textContent);
     let filter = 'all';
@@ -203,11 +175,6 @@ function initSeriesDetail() {
         if (issue.has_file) {
             const read = issue.finished ? 'Read again' : (issue.page ? `Continue p. ${issue.page + 1}` : 'Read');
             items.push(h('a', {class: 'link-button link-button--strong', href: appUrl(`/comics/read/${issue.id}`)}, read));
-            if (!admin) items.push(h('a', {class: 'link-button', href: appUrl(`/comics/issue/${issue.id}/download`), 'aria-label': `Download #${issue.number}`}, 'Download'));
-        }
-        if (!admin) return items;
-        if (issue.has_file) {
-            // Reading is above; the rest is in the menu.
         } else if (issue.status === 'wanted' || issue.status === 'skipped') {
             if (issue.released) {
                 items.push(h('button', {type: 'button', class: 'link-button', onclick: (e) => searchNow(e.currentTarget, issue)}, 'Search'));
@@ -219,6 +186,7 @@ function initSeriesDetail() {
             h('summary', {'aria-label': 'More'}, '⋯'),
             h('div', {class: 'more__menu'},
                 h('button', {type: 'button', onclick: () => { uploadFor = issue; upload.click(); }}, issue.has_file ? 'Replace file…' : 'Add a file…'),
+                issue.has_file ? h('button', {type: 'button', onclick: () => toggleRead(issue)}, issue.finished ? 'Mark as unread' : 'Mark as read') : null,
                 issue.has_file ? h('a', {href: appUrl(`/comics/issue/${issue.id}/download`)}, 'Download') : null,
                 issue.has_file ? h('button', {type: 'button', class: 'danger-text', onclick: () => deleteFile(issue)}, 'Delete file') : null,
                 issue.original_filename ? h('span', {class: 'more__note'}, `Was ${issue.original_filename}`) : null));
@@ -228,19 +196,19 @@ function initSeriesDetail() {
 
     function row(issue) {
         const cover = issue.cover ? h('img', {src: issue.cover, alt: '', loading: 'lazy', referrerpolicy: 'no-referrer'}) : h('span', {class: 'thumb-blank'});
-        return h('tr', {dataset: {id: issue.id}, class: admin && issue.has_file ? 'is-have' : ''},
-            admin ? h('td', {class: 'col-check'}, issue.has_file ? null : h('input', {type: 'checkbox', 'aria-label': `Select #${issue.number}`, checked: selected.has(issue.id), onchange: (e) => { e.target.checked ? selected.add(issue.id) : selected.delete(issue.id); updateBulk(); }})) : null,
+        return h('tr', {dataset: {id: issue.id}, class: issue.has_file ? 'is-have' : ''},
+            h('td', {class: 'col-check'}, issue.has_file ? null : h('input', {type: 'checkbox', 'aria-label': `Select #${issue.number}`, checked: selected.has(issue.id), onchange: (e) => { e.target.checked ? selected.add(issue.id) : selected.delete(issue.id); updateBulk(); }})),
             h('td', {class: 'col-num'}, issue.number),
             h('td', {class: 'col-title'}, h('span', {class: 'thumb'}, cover), h('span', {}, issue.title || h('span', {class: 'text-muted'}, `Issue #${issue.number}`), issue.pages ? h('small', {class: 'text-muted'}, ` · ${issue.pages} pages`) : null)),
-            h('td', {class: 'col-date'}, issue.date || ''),
-            admin ? h('td', {class: 'col-status'}, statusCell(issue)) : null,
+            h('td', {class: 'col-date'}, formatDate(issue.date)),
+            h('td', {class: 'col-status'}, statusCell(issue)),
             h('td', {class: 'col-actions'}, actions(issue)));
     }
 
     function render() {
         const shown = issues.filter(i => filter === 'all' || (filter === 'have' ? i.has_file : !i.has_file));
         tbody.replaceChildren(...shown.map(row));
-        if (!shown.length) tbody.append(h('tr', {}, h('td', {colspan: 6, class: 'comics-hint'}, admin ? (filter === 'have' ? 'None of these yet.' : 'Nothing here.') : 'Nothing to read here yet.')));
+        if (!shown.length) tbody.append(h('tr', {}, h('td', {colspan: 6, class: 'comics-hint'}, filter === 'have' ? 'None of these yet.' : 'Nothing here.')));
     }
 
     function replace(updated) {
@@ -276,9 +244,11 @@ function initSeriesDetail() {
         try { replace(await comicsApi(`/issues/${issue.id}/file`, {method: 'DELETE'})); } catch (e) { showToast(e.message, 'error'); }
     }
 
-    if (!admin) {
-        render();
-        return;
+    async function toggleRead(issue) {
+        try {
+            const data = await setRead(issue, !issue.finished);
+            replace({id: issue.id, page: data.page, finished: data.finished});
+        } catch (e) { showToast(e.message, 'error'); }
     }
 
     // Manual search: every release, with why the rejected ones don't fit.
@@ -405,39 +375,60 @@ function initDownloads() {
     initWanted();
     initDownloadLists();
     initImport();
-    const format = new Intl.DateTimeFormat(undefined, {weekday: 'short', day: 'numeric', month: 'short'});
-    document.querySelectorAll('.upcoming__day').forEach(el => {
-        const [y, m, d] = el.dataset.date.split('-').map(Number);
-        el.textContent = format.format(new Date(y, m - 1, d));
-    });
 }
 
+// Wanted issues come grouped by series; each group searches or skips as one.
 function initWanted() {
     const section = document.getElementById('wanted');
+    const count = section.querySelector('h2 .count');
+
+    function removeRows(rows) {
+        rows.forEach(row => {
+            const group = row.closest('.wanted-group');
+            row.remove();
+            if (group && !group.querySelector('[data-issue-id]')) group.remove();
+        });
+        if (count) count.textContent = section.querySelectorAll('[data-issue-id]').length;
+    }
+
     section.addEventListener('click', async (e) => {
         const button = e.target.closest('[data-action]');
         if (!button) return;
+        e.preventDefault();  // buttons in a group's summary shouldn't fold it
         const row = button.closest('[data-issue-id]');
+        const group = button.closest('.wanted-group');
         const action = button.dataset.action;
-        if (action === 'show-all') {
-            section.querySelectorAll('.is-extra').forEach(el => { el.hidden = false; });
-            button.remove();
-        } else if (action === 'search-all') {
+        if (action === 'search-all') {
             await comicsApi('/jobs/search', {method: 'POST'});
             showToast('Searching; grabs show up at the top of this page.', 'success');
+        } else if (action === 'search-series') {
+            button.textContent = 'Searching…';
+            await busy(button, async () => {
+                try {
+                    const data = await comicsApi(`/series/${group.dataset.seriesId}/search`, {method: 'POST'});
+                    showToast(data.grabbed ? `Grabbed ${data.grabbed}` : 'Nothing on the indexers yet', data.grabbed ? 'success' : 'info');
+                    if (data.grabbed) window.location.reload();
+                } catch (err) { showToast(err.message, 'error'); }
+            });
+        } else if (action === 'skip-series') {
+            const rows = [...group.querySelectorAll('[data-issue-id]')];
+            try {
+                await comicsApi('/issues/bulk', {method: 'POST', body: {ids: rows.map(r => Number(r.dataset.issueId)), status: 'skipped'}});
+                removeRows(rows);
+            } catch (err) { showToast(err.message, 'error'); }
         } else if (action === 'search-issue') {
             button.textContent = 'Searching…';
             await busy(button, async () => {
                 try {
                     const data = await comicsApi(`/issues/${row.dataset.issueId}/search`, {method: 'POST'});
                     showToast(`Grabbed ${data.download.title}`, 'success');
-                    row.remove();
+                    removeRows([row]);
                 } catch (err) { showToast(err.message, 'error'); }
             });
         } else if (action === 'skip-issue') {
             try {
                 await comicsApi(`/issues/${row.dataset.issueId}`, {method: 'PATCH', body: {status: 'skipped'}});
-                row.remove();
+                removeRows([row]);
             } catch (err) { showToast(err.message, 'error'); }
         }
     });
@@ -484,37 +475,12 @@ function initDownloadLists() {
         historyTitle.replaceChildren('History', data.history.length ? ' ' : '', data.history.length ? h('span', {class: 'text-muted history__count'}, failed ? `${data.history.length} · ${failed} failed` : String(data.history.length)) : '');
     }
 
-    refresh();
-    setInterval(() => { if (!document.hidden) refresh(); }, 5000);
-}
-
-// Background jobs, at the foot of Settings.
-function initJobs() {
-    const table = document.getElementById('jobTable');
-    if (!table) return;
-
-    async function refresh() {
-        let data;
-        try { data = await comicsApi('/activity'); } catch (e) { return; }
-        const worker = data.worker || {};
-        table.querySelectorAll('[data-job]').forEach(rowEl => {
-            const job = worker[rowEl.dataset.job];
-            const msg = rowEl.querySelector('.job-msg');
-            const pending = (worker.pending || []).includes(rowEl.dataset.job);
-            msg.textContent = pending ? 'Starting…' : (job ? `${job.message} (${timeAgo(job.at)})` : 'Not run yet');
-            msg.classList.toggle('danger-text', Boolean(job && !job.ok));
-        });
-        document.getElementById('workerState').textContent = worker.alive ? '' : 'The worker hasn’t checked in for a while; it starts when the app gets its first visit after a restart.';
+    // Every 5 s while something is downloading, every 30 s otherwise.
+    async function poll() {
+        if (!document.hidden) await refresh();
+        setTimeout(poll, activeSection.hidden ? 30000 : 5000);
     }
-
-    table.addEventListener('click', async (e) => {
-        const button = e.target.closest('[data-run]');
-        if (!button) return;
-        await comicsApi(`/jobs/${button.dataset.run}`, {method: 'POST'});
-        refresh();
-    });
-    refresh();
-    setInterval(() => { if (!document.hidden) refresh(); }, 5000);
+    poll();
 }
 
 // --- Import -----------------------------------------------------------------
@@ -523,7 +489,6 @@ function initImport() {
     const list = document.getElementById('importList');
     const waiting = document.getElementById('importWaiting');
     const input = document.getElementById('importInput');
-    const drop = document.getElementById('importDrop');
     const series = JSON.parse(document.getElementById('seriesData').textContent);
 
     function importRow(file) {
@@ -584,9 +549,7 @@ function initImport() {
 
     document.getElementById('importPick').addEventListener('click', () => input.click());
     input.addEventListener('change', () => { send(input.files); input.value = ''; });
-    ['dragenter', 'dragover'].forEach(type => drop.addEventListener(type, (e) => { e.preventDefault(); drop.classList.add('is-over'); }));
-    ['dragleave', 'drop'].forEach(type => drop.addEventListener(type, () => drop.classList.remove('is-over')));
-    drop.addEventListener('drop', (e) => { e.preventDefault(); send(e.dataTransfer.files); });
+    enableDropZone(document.getElementById('dropZone'), send);
     document.getElementById('importScan').addEventListener('click', async (e) => {
         e.currentTarget.textContent = 'Matching…';
         await busy(e.currentTarget, async () => {
@@ -600,88 +563,7 @@ function initImport() {
     load();
 }
 
-// --- Settings ---------------------------------------------------------------
-
-function initSettings() {
-    const form = document.getElementById('settingsForm');
-    const indexerList = document.getElementById('indexerList');
-    const template = document.getElementById('indexerTemplate');
-
-    function addIndexer(indexer = {kind: 'newznab', enabled: true, categories: '7030'}) {
-        const el = template.content.firstElementChild.cloneNode(true);
-        el.querySelectorAll('[data-key]').forEach(field => {
-            const value = indexer[field.dataset.key];
-            if (field.type === 'checkbox') field.checked = value !== false;
-            else field.value = value ?? '';
-        });
-        el.querySelector('[data-indexer-remove]').addEventListener('click', () => el.remove());
-        el.querySelector('[data-indexer-test]').addEventListener('click', (e) => test(e.currentTarget, 'indexer', [...indexerList.children].indexOf(el)));
-        indexerList.append(el);
-    }
-
-    function fill(values) {
-        form.querySelectorAll('[name]').forEach(field => {
-            const [key, sub] = field.name.split('.');
-            let value = sub ? (values[key] || {})[sub] : values[key];
-            if (Array.isArray(value)) value = value.join(', ');
-            if (field.type === 'checkbox') field.checked = Boolean(value);
-            else field.value = value ?? '';
-        });
-        indexerList.replaceChildren();
-        values.indexers.forEach(addIndexer);
-    }
-
-    function collect() {
-        const values = {};
-        form.querySelectorAll('[name]').forEach(field => {
-            const [key, sub] = field.name.split('.');
-            const value = field.type === 'checkbox' ? field.checked : (field.type === 'number' ? Number(field.value) : field.value.trim());
-            if (sub) (values[key] = values[key] || {})[sub] = value;
-            else values[key] = value;
-        });
-        values.indexers = [...indexerList.children].map(el => {
-            const indexer = {};
-            el.querySelectorAll('[data-key]').forEach(field => { indexer[field.dataset.key] = field.type === 'checkbox' ? field.checked : field.value.trim(); });
-            return indexer;
-        });
-        return values;
-    }
-
-    async function save() {
-        const status = document.getElementById('saveStatus');
-        try {
-            fill(await comicsApi('/settings', {method: 'PUT', body: collect()}));
-            status.textContent = 'Saved.';
-            return true;
-        } catch (e) {
-            status.textContent = e.message;
-            return false;
-        }
-    }
-
-    // Tests use the saved settings, so save first.
-    async function test(button, what, index) {
-        button.textContent = '…';
-        await busy(button, async () => {
-            if (!(await save())) return;
-            try {
-                const data = await comicsApi('/settings/test', {method: 'POST', body: {what, index}});
-                showToast(data.message, 'success');
-            } catch (e) { showToast(e.message, 'error'); }
-        });
-    }
-
-    form.addEventListener('submit', (e) => { e.preventDefault(); save(); });
-    form.addEventListener('click', (e) => {
-        const button = e.target.closest('[data-test]');
-        if (button) test(button, button.dataset.test);
-    });
-    document.getElementById('addIndexer').addEventListener('click', () => addIndexer());
-    comicsApi('/settings').then(fill).catch(e => showToast(e.message, 'error'));
-    initJobs();
-}
-
-const PAGES = {series: initSeries, add: initAdd, 'series-detail': initSeriesDetail, downloads: initDownloads, settings: initSettings};
+const PAGES = {series: initSeries, add: initAdd, 'series-detail': initSeriesDetail, downloads: initDownloads};
 document.addEventListener('DOMContentLoaded', () => {
     const init = PAGES[document.body.dataset.page];
     if (init) init();

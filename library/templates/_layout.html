@@ -45,6 +45,11 @@
                 <button class="dark-mode-toggle btn btn-ghost" onclick="toggleDarkMode()" aria-label="Night mode" title="Night mode">
                     <i id="dark-mode-icon" class="fas fa-moon" aria-hidden="true"></i>
                 </button>
+                {% if current_user.is_authenticated and current_user.role.value == 'admin' %}
+                <a class="btn btn-ghost" href="{{ url_for('settings.settings_page') }}" aria-label="Settings" title="Settings"{% if request.endpoint == 'settings.settings_page' %} aria-current="page"{% endif %}>
+                    <i class="fas fa-gear" aria-hidden="true"></i>
+                </a>
+                {% endif %}
                 {% block bar_actions %}{% endblock %}
             </div>
         </div>
@@ -54,7 +59,7 @@
     <div id="toastContainer" class="notice-stack" aria-live="polite" aria-atomic="false"></div>
 
     <script src="{{ url_for('static', filename='js/darkmode.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/notice.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/ui.js') }}"></script>
     {% block scripts %}{% endblock %}
 </body>
 </html>

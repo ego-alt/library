@@ -34,12 +34,13 @@ A personal EPUB library and reader for the home stack: covers hung on a warmly l
 
 ## Comics
 
-A Mylar-style comics manager under **Comics** (`/comics/`). Everyone signed in sees the series there are files for, with a Continue reading row, and reads them; admins also get **Downloads** and **Settings**, and follow series:
+A Mylar-style comics manager under **Comics** (`/comics/`). It works like the books: everyone signed in sees the series there are files for, filtered by All / Unread / Reading / Finished (opening on Reading when something's in progress); a cover picks up where you left off, and ⋯ shows every issue, each with a ✓ to mark it read. Admins also get **Downloads**, follow series, and set things up on the shared **Settings** page (the gear):
 
-- **Follow series** found on ComicVine or Metron (a free key or account, set in Comics → Settings). Choose to get new issues from now on, every missing issue, or only the ones you pick.
+- **Follow series** found on ComicVine or Metron (a free key or account, set in Settings). Choose to get new issues from now on, every missing issue, or only the ones you pick.
 - **Wanted issues are searched for** every few hours on your Newznab (usenet) and Torznab (torrent, via Prowlarr or Jackett) indexers. The best release goes to SABnzbd or qBittorrent, or is saved to a blackhole folder. Releases are matched on series, issue number and year; collections, rejected words and oversized files are skipped, and a release that failed isn't grabbed again for that issue. **Pick** shows every release and why each one fits or doesn't.
 - **Imports**: finished downloads, and any CBZ/CBR/CB7 dropped into the import folder or uploaded, are matched to their issue (by ComicInfo.xml or filename) and written as CBZs with WebP pages, a ComicInfo.xml and a MetronInfo.xml (the original filename is kept in the notes), under `<Publisher>/<Series (Year)>/<Series> #001 (Year).cbz`. Files that match nothing wait under Downloads → Import to be matched by hand, or made into a series of their own.
-- **Downloads** is one page: what's downloading, wanted issues, the import drop zone, the next two months by shop date, and the history. The background jobs are at the foot of Settings.
+- **Downloads** is one page: what's downloading, wanted issues grouped by series, importing (drop files anywhere on the page), the next two months by shop date, and the history.
+- **Settings** (`/settings`, admins) holds what books and comics share — indexers (with comics and book categories), download clients, where finished downloads are, and how releases are chosen — then the comics-only parts and the background jobs. Book downloading isn't built yet; it will use these.
 - **The reader**: one page, two-page spreads (the cover alone, wide pages alone) or one long scroll; fit to height or width; right to left for manga; tap, swipe or the arrow keys. Your page is saved, and the next issue is a tap away at the end.
 
 The background jobs run in one gunicorn process (a file lock picks it). They start with the first request after a restart.

@@ -14,8 +14,9 @@ from dataclasses import dataclass
 
 from flask import current_app
 
+from .. import settings
 from ..models import db
-from . import archive, names, settings
+from . import archive, names
 from .models import DOWNLOADED, SKIPPED, ComicIssue, ComicSeries
 
 logger = logging.getLogger(__name__)

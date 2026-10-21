@@ -1,0 +1,196 @@
+{% extends "_layout.html" %}
+{% block title %}Settings · Shelves{% endblock %}
+{% block head_scripts %}
+    <script>window.APP_ROOT = "{{ request.script_root }}";</script>
+{% endblock %}
+{% block styles %}
+    <link href="{{ url_for('static', filename='css/comics.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/settings.css') }}" rel="stylesheet">
+{% endblock %}
+{% block body %}
+<div class="container settings-page">
+    <div class="page-head">
+        <h2 class="settings-title">Settings</h2>
+        <nav class="comics-nav settings-index" aria-label="Sections">
+            <a href="#downloads">Downloads</a>
+            <a href="#comics">Comics</a>
+        </nav>
+    </div>
+
+    <form id="settingsForm" class="settings" autocomplete="off">
+        <h3 class="settings-group" id="downloads">Downloads <span class="comics-hint">for books and comics</span></h3>
+
+        <section class="panel" id="indexers">
+            <h2>Indexers</h2>
+            <p class="comics-hint">Where to search: Newznab for usenet indexers, Torznab for torrent sites (through Prowlarr or Jackett).</p>
+            <ol class="indexer-list" id="indexerList"></ol>
+            <button type="button" class="btn btn-secondary" id="addIndexer"><i class="fas fa-plus" aria-hidden="true"></i> Add an indexer</button>
+        </section>
+
+        <section class="panel" id="clients">
+            <h2>Download clients</h2>
+            <p class="comics-hint">Usenet releases go to SABnzbd and torrents to qBittorrent. With neither, NZB and torrent files are saved to a folder for another client to pick up.</p>
+            <details class="client" data-client="sabnzbd">
+                <summary><span class="client__name">SABnzbd</span> <span class="client__state"></span></summary>
+                <div class="field-grid">
+                    <label for="s-sab-url">Address</label>
+                    <div class="field-row"><input class="input" id="s-sab-url" name="sabnzbd.url" type="url" placeholder="http://192.168.8.194:8080"></div>
+                    <label for="s-sab-key">API key</label>
+                    <div class="field-row"><input class="input" id="s-sab-key" name="sabnzbd.api_key" type="text" spellcheck="false"></div>
+                    <label for="s-sab-cat">Categories</label>
+                    <div class="field-row"><input class="input input--short" id="s-sab-cat" name="sabnzbd.category" type="text" aria-label="Category for comics"> <span class="comics-hint">comics</span> <input class="input input--short" name="sabnzbd.book_category" type="text" aria-label="Category for books"> <span class="comics-hint">books</span></div>
+                    <span></span>
+                    <div class="field-row"><button type="button" class="btn btn-secondary" data-test="sabnzbd">Test SABnzbd</button></div>
+                </div>
+            </details>
+            <details class="client" data-client="qbittorrent">
+                <summary><span class="client__name">qBittorrent</span> <span class="client__state"></span></summary>
+                <div class="field-grid">
+                    <label for="s-qb-url">Address</label>
+                    <div class="field-row"><input class="input" id="s-qb-url" name="qbittorrent.url" type="url" placeholder="http://192.168.8.194:8081"></div>
+                    <label for="s-qb-user">Username</label>
+                    <div class="field-row"><input class="input" id="s-qb-user" name="qbittorrent.username" type="text"></div>
+                    <label for="s-qb-pass">Password</label>
+                    <div class="field-row"><input class="input" id="s-qb-pass" name="qbittorrent.password" type="password"></div>
+                    <label for="s-qb-cat">Categories</label>
+                    <div class="field-row"><input class="input input--short" id="s-qb-cat" name="qbittorrent.category" type="text" aria-label="Category for comics"> <span class="comics-hint">comics</span> <input class="input input--short" name="qbittorrent.book_category" type="text" aria-label="Category for books"> <span class="comics-hint">books</span></div>
+                    <span></span>
+                    <div class="field-row"><button type="button" class="btn btn-secondary" data-test="qbittorrent">Test qBittorrent</button></div>
+                </div>
+            </details>
+            <details class="client" data-client="blackhole">
+                <summary><span class="client__name">A folder</span> <span class="client__state"></span></summary>
+                <div class="field-grid">
+                    <label for="s-bh">Folder</label>
+                    <div class="field-row">
+                        <input class="input" id="s-bh" name="blackhole_dir" type="text" placeholder="/data/comics/_blackhole">
+                        <button type="button" class="btn btn-secondary" data-test="blackhole">Test</button>
+                    </div>
+                </div>
+            </details>
+            <div id="pathMap" hidden>
+                <h3>Where finished downloads are</h3>
+                <p class="comics-hint">If the client runs in another container, it names its folders differently: its path on the left, the same folder as seen here on the right.</p>
+                <div class="field-grid">
+                    <label for="s-pm-r">Client sees</label>
+                    <div class="field-row"><input class="input" id="s-pm-r" name="path_map.remote_path" type="text" placeholder="/downloads/complete"></div>
+                    <label for="s-pm-l">This app sees</label>
+                    <div class="field-row"><input class="input" id="s-pm-l" name="path_map.local_path" type="text" placeholder="/data/downloads/complete"></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel" id="releases">
+            <h2>Choosing releases</h2>
+            <div class="field-grid">
+                <label for="s-pref">Prefer releases with</label>
+                <div class="field-row"><input class="input" id="s-pref" name="preferred_words" type="text" placeholder="digital"></div>
+                <label for="s-rej">Never grab releases with</label>
+                <div class="field-row"><input class="input" id="s-rej" name="rejected_words" type="text" placeholder="c2c scan"></div>
+                <p class="field-help">Words or phrases, separated by commas.</p>
+                <label for="s-every">Search for wanted issues every</label>
+                <div class="field-row"><input class="input input--short" id="s-every" name="search_interval_hours" type="number" min="1" step="1"> <span>hours</span></div>
+            </div>
+        </section>
+
+        <h3 class="settings-group" id="comics">Comics</h3>
+
+        <section class="panel" id="metadata">
+            <h2>Series details</h2>
+            <p class="comics-hint">Where series, issues, covers and release dates come from. One is enough; ComicVine is asked first when both are set.</p>
+            <div class="field-grid">
+                <label for="s-cv">ComicVine API key</label>
+                <div class="field-row">
+                    <input class="input" id="s-cv" name="comicvine_api_key" type="text" spellcheck="false">
+                    <button type="button" class="btn btn-secondary" data-test="comicvine">Test</button>
+                </div>
+                <p class="field-help">Free with an account at <a href="https://comicvine.gamespot.com/api/" target="_blank" rel="noopener noreferrer">comicvine.gamespot.com/api</a>.</p>
+                <label for="s-mu">Metron username</label>
+                <div class="field-row"><input class="input" id="s-mu" name="metron_username" type="text" spellcheck="false"></div>
+                <label for="s-mp">Metron password</label>
+                <div class="field-row">
+                    <input class="input" id="s-mp" name="metron_password" type="password">
+                    <button type="button" class="btn btn-secondary" data-test="metron">Test</button>
+                </div>
+                <p class="field-help">Free account at <a href="https://metron.cloud/accounts/signup/" target="_blank" rel="noopener noreferrer">metron.cloud</a>.</p>
+            </div>
+        </section>
+
+        <section class="panel" id="files">
+            <h2>Files</h2>
+            <div class="field-grid">
+                <span class="field-label">Library folder</span>
+                <div class="field-row"><code>{{ comic_dir }}</code></div>
+                <span class="field-label">Import folder</span>
+                <div class="field-row"><code>{{ import_dir }}</code></div>
+                <label for="s-max">Largest download</label>
+                <div class="field-row"><input class="input input--short" id="s-max" name="max_size_mb" type="number" min="0" step="10"> <span>MB (0 for no limit)</span></div>
+                <span class="field-label">Pages</span>
+                <div class="field-row"><label class="check"><input type="checkbox" name="convert_webp"> Convert pages to WebP (smaller files; slower to import on the Pi)</label></div>
+                <label for="s-q">WebP quality</label>
+                <div class="field-row"><input class="input input--short" id="s-q" name="webp_quality" type="number" min="50" max="100"></div>
+                <span class="field-label">Names</span>
+                <div class="field-row"><label class="check"><input type="checkbox" name="rename"> Rename files to “Series #001 (Year).cbz”</label></div>
+                <p class="field-help">Every file keeps its original name in its ComicInfo.xml notes.</p>
+            </div>
+        </section>
+
+        <div class="settings-save" id="saveBar" hidden>
+            <span class="comics-hint">Unsaved changes</span>
+            <button type="button" class="btn btn-ghost" id="discardSettings">Discard</button>
+            <button type="submit" class="btn btn-primary">Save</button>
+        </div>
+    </form>
+
+    <section class="panel" id="jobs">
+        <h2>Background jobs</h2>
+        <p class="comics-hint">These run on their own; Run starts one now.</p>
+        <table class="job-table" id="jobTable">
+            <tbody>
+                <tr data-job="downloads"><th>Check downloads</th><td class="job-msg"></td><td><button type="button" class="link-button" data-run="downloads">Run</button></td></tr>
+                <tr data-job="import"><th>Import new files</th><td class="job-msg"></td><td><button type="button" class="link-button" data-run="import">Run</button></td></tr>
+                <tr data-job="refresh"><th>Refresh series</th><td class="job-msg"></td><td><button type="button" class="link-button" data-run="refresh">Run</button></td></tr>
+                <tr data-job="search"><th>Search for wanted issues</th><td class="job-msg"></td><td><button type="button" class="link-button" data-run="search">Run</button></td></tr>
+            </tbody>
+        </table>
+        <p class="comics-hint" id="workerState"></p>
+    </section>
+</div>
+
+<template id="indexerTemplate">
+    <li class="indexer">
+        <details>
+            <summary class="indexer__summary">
+                <span class="indexer__name"></span>
+                <span class="indexer__meta comics-hint"></span>
+            </summary>
+            <div class="field-grid">
+                <label>Name</label>
+                <div class="field-row"><input class="input" data-key="name" type="text" placeholder="NZBgeek"></div>
+                <label>Kind</label>
+                <div class="field-row">
+                    <select class="input" data-key="kind"><option value="newznab">Newznab (usenet)</option><option value="torznab">Torznab (torrents)</option></select>
+                    <label class="check"><input type="checkbox" data-key="enabled"> On</label>
+                </div>
+                <label>Address</label>
+                <div class="field-row"><input class="input" data-key="url" type="url" placeholder="https://api.nzbgeek.info"></div>
+                <label>API key</label>
+                <div class="field-row"><input class="input" data-key="api_key" type="text" spellcheck="false"></div>
+                <label>Categories</label>
+                <div class="field-row">
+                    <input class="input input--short" data-key="categories" type="text" placeholder="7030" aria-label="Categories for comics"> <span class="comics-hint">comics</span>
+                    <input class="input input--short" data-key="book_categories" type="text" placeholder="7020" aria-label="Categories for books"> <span class="comics-hint">books</span>
+                </div>
+                <span></span>
+                <div class="field-row">
+                    <button type="button" class="btn btn-secondary" data-indexer-test>Test</button>
+                    <button type="button" class="btn btn-ghost danger-text" data-indexer-remove>Remove</button>
+                </div>
+            </div>
+        </details>
+    </li>
+</template>
+{% endblock %}
+{% block scripts %}
+    <script src="{{ url_for('static', filename='js/settings.js') }}"></script>
+{% endblock %}

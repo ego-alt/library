@@ -15,7 +15,7 @@ from dataclasses import dataclass
 
 import httpx
 
-from . import settings
+from .. import settings
 from .providers import USER_AGENT
 
 
