@@ -53,6 +53,7 @@ def saga(app, comic_dir, admin_client, provider):
 def test_comics_need_sign_in(client, comic_dir):
     assert client.get("/comics/").status_code in (302, 401)
     assert client.get("/comics/api/import").status_code == 401
+    assert client.put("/comics/api/issues/1/progress", json={"page": 1}).status_code == 401
 
 
 def test_every_page_renders(admin_client, saga, tmp_path, comic_dir):
@@ -60,18 +61,77 @@ def test_every_page_renders(admin_client, saga, tmp_path, comic_dir):
     from library.comics import files
 
     files.import_file(str(make_cbz(tmp_path / "Saga 001.cbz")), issue)
-    for path in ["/comics/", "/comics/add?q=saga", f"/comics/series/{saga.id}", "/comics/wanted", "/comics/upcoming", "/comics/activity", "/comics/import", "/comics/settings", f"/comics/read/{issue.id}"]:
+    for path in ["/comics/", "/comics/add?q=saga", f"/comics/series/{saga.id}", "/comics/downloads", "/comics/settings", f"/comics/read/{issue.id}"]:
         response = admin_client.get(path)
         assert response.status_code == 200, path
     assert b"Saga" in admin_client.get("/comics/").data
+    downloads = admin_client.get("/comics/downloads").data.decode()
+    # Issue 2 is out and wanted only with monitor "all"; issue 3 is coming up.
+    assert "Coming up" in downloads and "Import" in downloads
 
 
-def test_empty_comics_page_says_what_to_do(standard_client, comic_dir):
-    page = standard_client.get("/comics/").data.decode()
+def test_empty_comics_page_says_what_to_do(admin_client, comic_dir):
+    page = admin_client.get("/comics/").data.decode()
     assert "No series yet" in page and "neither is set up yet" in page
-    # Standard users don't get Settings.
-    assert "/comics/settings" not in page
-    assert standard_client.get("/comics/settings").status_code == 302
+    assert "/comics/settings" in page and "/comics/downloads" in page
+
+
+def _series_with_one_file(comic_dir, tmp_path):
+    """A series with #1 on disk and #2 missing, made without the API."""
+    from library.comics import files
+
+    s = ComicSeries(provider="local", provider_id="saga", name="Saga", monitor="none")
+    have = ComicIssue(series=s, number="1", sort_number=1, status=SKIPPED)
+    missing = ComicIssue(series=s, number="2", sort_number=2, status=WANTED, title="Not here")
+    empty = ComicSeries(provider="local", provider_id="empty", name="Nothing Yet", monitor="none")
+    db.session.add_all([s, have, missing, empty])
+    db.session.commit()
+    files.import_file(str(make_cbz(tmp_path / "Saga 001.cbz", pages=4)), have)
+    return s, have, missing
+
+
+def test_readers_see_only_what_there_is_to_read(standard_client, comic_dir, tmp_path, standard_user):
+    s, have, missing = _series_with_one_file(comic_dir, tmp_path)
+    page = standard_client.get("/comics/").data.decode()
+    assert "Saga" in page and "Nothing Yet" not in page
+    # No tabs, no banner, no follow button.
+    assert "comics-nav" not in page and "neither is set up yet" not in page and "/comics/add" not in page
+    series = standard_client.get(f"/comics/series/{s.id}").data.decode()
+    assert "Not here" not in series and "Stop following" not in series and "checkAll" not in series
+    # They can read, and what they're reading shows up first.
+    assert standard_client.get(f"/comics/read/{have.id}").status_code == 200
+    assert standard_client.put(f"/comics/api/issues/{have.id}/progress", json={"page": 1}).status_code == 200
+    assert "Continue reading" in standard_client.get("/comics/").data.decode()
+    assert standard_client.get(f"/comics/issue/{have.id}/download").status_code == 200
+
+
+@pytest.mark.parametrize("path", ["/comics/add", "/comics/downloads", "/comics/settings"])
+def test_admin_pages_send_readers_home(standard_client, comic_dir, path):
+    response = standard_client.get(path)
+    assert response.status_code == 302 and response.location.endswith("/comics/")
+
+
+@pytest.mark.parametrize(
+    "method, path",
+    [
+        ("get", "/comics/api/lookup?q=saga"),
+        ("post", "/comics/api/series"),
+        ("patch", "/comics/api/series/1"),
+        ("post", "/comics/api/series/1/search"),
+        ("patch", "/comics/api/issues/1"),
+        ("post", "/comics/api/issues/1/search"),
+        ("get", "/comics/api/issues/1/releases"),
+        ("post", "/comics/api/issues/1/upload"),
+        ("get", "/comics/api/import"),
+        ("post", "/comics/api/import/scan"),
+        ("get", "/comics/api/activity"),
+        ("post", "/comics/api/jobs/search"),
+        ("post", "/comics/api/downloads/1/retry"),
+        ("get", "/comics/api/settings"),
+    ],
+)
+def test_managing_is_admin_only(standard_client, comic_dir, method, path):
+    assert getattr(standard_client, method)(path).status_code == 403
 
 
 def test_follow_series_wants_whats_coming(saga):

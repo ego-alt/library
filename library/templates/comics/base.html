@@ -43,27 +43,28 @@
                 <button class="dark-mode-toggle btn btn-ghost" onclick="toggleDarkMode()" aria-label="Night mode" title="Night mode">
                     <i id="dark-mode-icon" class="fas fa-moon" aria-hidden="true"></i>
                 </button>
+                {% if is_admin %}
                 <a class="btn btn-ghost" href="{{ url_for('comics.add_page') }}" aria-label="Follow a series" title="Follow a series">
                     <i class="fas fa-plus" aria-hidden="true"></i>
                 </a>
+                {% endif %}
             </div>
         </div>
     </header>
     <div class="container">
+        {% if is_admin %}
         <nav class="comics-nav" aria-label="Comics">
-            <a href="{{ url_for('comics.index') }}"{% if active == 'series' %} aria-current="page"{% endif %}>Series</a>
-            <a href="{{ url_for('comics.wanted_page') }}"{% if active == 'wanted' %} aria-current="page"{% endif %}>Wanted{% if counts.wanted %} <span class="count">{{ counts.wanted }}</span>{% endif %}</a>
-            <a href="{{ url_for('comics.upcoming_page') }}"{% if active == 'upcoming' %} aria-current="page"{% endif %}>Upcoming</a>
-            <a href="{{ url_for('comics.activity_page') }}"{% if active == 'activity' %} aria-current="page"{% endif %}>Activity{% if counts.active %} <span class="count">{{ counts.active }}</span>{% endif %}</a>
-            <a href="{{ url_for('comics.import_page') }}"{% if active == 'import' %} aria-current="page"{% endif %}>Import{% if counts.import %} <span class="count">{{ counts.import }}</span>{% endif %}</a>
-            {% if is_admin %}<a href="{{ url_for('comics.settings_page') }}"{% if active == 'settings' %} aria-current="page"{% endif %}>Settings</a>{% endif %}
+            <a href="{{ url_for('comics.index') }}"{% if active == 'series' %} aria-current="page"{% endif %}>Library</a>
+            <a href="{{ url_for('comics.downloads_page') }}"{% if active == 'downloads' %} aria-current="page"{% endif %}>Downloads{% if downloads_count %} <span class="count">{{ downloads_count }}</span>{% endif %}</a>
+            <a href="{{ url_for('comics.settings_page') }}"{% if active == 'settings' %} aria-current="page"{% endif %}>Settings</a>
         </nav>
-        {% if not providers_ready and active not in ('settings',) %}
+        {% if not providers_ready and active != 'settings' %}
         <p class="comics-banner">
             Series details come from ComicVine or Metron, and neither is set up yet.
-            {% if is_admin %}<a href="{{ url_for('comics.settings_page') }}#metadata">Add a key in Settings</a>.{% else %}An admin can add one in Settings.{% endif %}
+            <a href="{{ url_for('comics.settings_page') }}#metadata">Add a key in Settings</a>.
             Until then you can still import and read files.
         </p>
+        {% endif %}
         {% endif %}
         {% block content %}{% endblock %}
     </div>

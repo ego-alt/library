@@ -162,6 +162,7 @@ function initAdd() {
 // --- One series -------------------------------------------------------------
 
 function initSeriesDetail() {
+    const admin = window.isAdmin;
     const head = document.querySelector('.series-head');
     const seriesId = head.dataset.seriesId;
     const tbody = document.querySelector('#issueTable tbody');
@@ -183,6 +184,11 @@ function initSeriesDetail() {
         if (issue.has_file) {
             const read = issue.finished ? 'Read again' : (issue.page ? `Continue p. ${issue.page + 1}` : 'Read');
             items.push(h('a', {class: 'link-button link-button--strong', href: appUrl(`/comics/read/${issue.id}`)}, read));
+            if (!admin) items.push(h('a', {class: 'link-button', href: appUrl(`/comics/issue/${issue.id}/download`), 'aria-label': `Download #${issue.number}`}, 'Download'));
+        }
+        if (!admin) return items;
+        if (issue.has_file) {
+            // Reading is above; the rest is in the menu.
         } else if (issue.status === 'wanted' || issue.status === 'skipped') {
             if (issue.released) {
                 items.push(h('button', {type: 'button', class: 'link-button', onclick: (e) => searchNow(e.currentTarget, issue)}, 'Search'));
@@ -195,7 +201,7 @@ function initSeriesDetail() {
             h('div', {class: 'more__menu'},
                 h('button', {type: 'button', onclick: () => { uploadFor = issue; upload.click(); }}, issue.has_file ? 'Replace file…' : 'Add a file…'),
                 issue.has_file ? h('a', {href: appUrl(`/comics/issue/${issue.id}/download`)}, 'Download') : null,
-                issue.has_file && window.isAdmin ? h('button', {type: 'button', class: 'danger-text', onclick: () => deleteFile(issue)}, 'Delete file') : null,
+                issue.has_file ? h('button', {type: 'button', class: 'danger-text', onclick: () => deleteFile(issue)}, 'Delete file') : null,
                 issue.original_filename ? h('span', {class: 'more__note'}, `Was ${issue.original_filename}`) : null));
         items.push(more);
         return items;
@@ -203,19 +209,19 @@ function initSeriesDetail() {
 
     function row(issue) {
         const cover = issue.cover ? h('img', {src: issue.cover, alt: '', loading: 'lazy', referrerpolicy: 'no-referrer'}) : h('span', {class: 'thumb-blank'});
-        return h('tr', {dataset: {id: issue.id}, class: issue.has_file ? 'is-have' : ''},
-            h('td', {class: 'col-check'}, issue.has_file ? null : h('input', {type: 'checkbox', 'aria-label': `Select #${issue.number}`, checked: selected.has(issue.id), onchange: (e) => { e.target.checked ? selected.add(issue.id) : selected.delete(issue.id); updateBulk(); }})),
+        return h('tr', {dataset: {id: issue.id}, class: admin && issue.has_file ? 'is-have' : ''},
+            admin ? h('td', {class: 'col-check'}, issue.has_file ? null : h('input', {type: 'checkbox', 'aria-label': `Select #${issue.number}`, checked: selected.has(issue.id), onchange: (e) => { e.target.checked ? selected.add(issue.id) : selected.delete(issue.id); updateBulk(); }})) : null,
             h('td', {class: 'col-num'}, issue.number),
             h('td', {class: 'col-title'}, h('span', {class: 'thumb'}, cover), h('span', {}, issue.title || h('span', {class: 'text-muted'}, `Issue #${issue.number}`), issue.pages ? h('small', {class: 'text-muted'}, ` · ${issue.pages} pages`) : null)),
             h('td', {class: 'col-date'}, issue.date || ''),
-            h('td', {class: 'col-status'}, statusCell(issue)),
+            admin ? h('td', {class: 'col-status'}, statusCell(issue)) : null,
             h('td', {class: 'col-actions'}, actions(issue)));
     }
 
     function render() {
         const shown = issues.filter(i => filter === 'all' || (filter === 'have' ? i.has_file : !i.has_file));
         tbody.replaceChildren(...shown.map(row));
-        if (!shown.length) tbody.append(h('tr', {}, h('td', {colspan: 6, class: 'comics-hint'}, filter === 'have' ? 'None of these yet.' : 'Nothing here.')));
+        if (!shown.length) tbody.append(h('tr', {}, h('td', {colspan: 6, class: 'comics-hint'}, admin ? (filter === 'have' ? 'None of these yet.' : 'Nothing here.') : 'Nothing to read here yet.')));
     }
 
     function replace(updated) {
@@ -249,6 +255,11 @@ function initSeriesDetail() {
     async function deleteFile(issue) {
         if (!confirm(`Delete the file for #${issue.number}?`)) return;
         try { replace(await comicsApi(`/issues/${issue.id}/file`, {method: 'DELETE'})); } catch (e) { toast(e.message, 'error'); }
+    }
+
+    if (!admin) {
+        render();
+        return;
     }
 
     // Manual search: every release, with why the rejected ones don't fit.
@@ -369,17 +380,32 @@ function initSeriesDetail() {
     render();
 }
 
-// --- Wanted -----------------------------------------------------------------
+// --- Downloads: wanted, in progress, import, coming up, history -------------
+
+function initDownloads() {
+    initWanted();
+    initDownloadLists();
+    initImport();
+    const format = new Intl.DateTimeFormat(undefined, {weekday: 'short', day: 'numeric', month: 'short'});
+    document.querySelectorAll('.upcoming__day').forEach(el => {
+        const [y, m, d] = el.dataset.date.split('-').map(Number);
+        el.textContent = format.format(new Date(y, m - 1, d));
+    });
+}
 
 function initWanted() {
-    document.addEventListener('click', async (e) => {
+    const section = document.getElementById('wanted');
+    section.addEventListener('click', async (e) => {
         const button = e.target.closest('[data-action]');
         if (!button) return;
         const row = button.closest('[data-issue-id]');
         const action = button.dataset.action;
-        if (action === 'search-all') {
+        if (action === 'show-all') {
+            section.querySelectorAll('.is-extra').forEach(el => { el.hidden = false; });
+            button.remove();
+        } else if (action === 'search-all') {
             await comicsApi('/jobs/search', {method: 'POST'});
-            toast('Searching; grabs show up under Activity.', 'success');
+            toast('Searching; grabs show up at the top of this page.', 'success');
         } else if (action === 'search-issue') {
             button.textContent = 'Searching…';
             await busy(button, async () => {
@@ -398,22 +424,11 @@ function initWanted() {
     });
 }
 
-// --- Upcoming ---------------------------------------------------------------
-
-function initUpcoming() {
-    const format = new Intl.DateTimeFormat(undefined, {weekday: 'long', day: 'numeric', month: 'long'});
-    document.querySelectorAll('.upcoming__day').forEach(el => {
-        const [y, m, d] = el.dataset.date.split('-').map(Number);
-        el.textContent = format.format(new Date(y, m - 1, d)) + (el.classList.contains('is-today') ? ' · today' : '');
-    });
-}
-
-// --- Activity ---------------------------------------------------------------
-
-function initActivity() {
+function initDownloadLists() {
+    const activeSection = document.getElementById('activeSection');
     const activeList = document.getElementById('activeList');
     const historyList = document.getElementById('historyList');
-
+    const historyTitle = document.querySelector('#historySection h2');
     function downloadRow(d, active) {
         const label = d.issue ? h('a', {href: appUrl(`/comics/series/${d.issue.series_id}`)}, d.issue.label) : h('span', {class: 'text-muted'}, 'Issue removed');
         const state = active
@@ -422,7 +437,7 @@ function initActivity() {
         const buttons = active
             ? [h('button', {type: 'button', class: 'link-button', onclick: () => act(`/downloads/${d.id}/cancel`, 'POST', 'Cancelled')}, 'Cancel')]
             : [d.status === 'failed' && d.issue ? h('button', {type: 'button', class: 'link-button', onclick: () => act(`/downloads/${d.id}/retry`, 'POST', 'Grabbed another')}, 'Try another') : null,
-               window.isAdmin ? h('button', {type: 'button', class: 'link-button', onclick: () => act(`/downloads/${d.id}`, 'DELETE', 'Removed')}, 'Remove') : null];
+               h('button', {type: 'button', class: 'link-button', onclick: () => act(`/downloads/${d.id}`, 'DELETE', 'Removed')}, 'Remove')];
         return h('li', {class: `download is-${d.status}`},
             h('div', {class: 'download__text'},
                 h('span', {}, label, ' ', h('span', {class: `status-chip status-dl-${d.status}`}, state)),
@@ -443,10 +458,27 @@ function initActivity() {
     async function refresh() {
         let data;
         try { data = await comicsApi('/activity'); } catch (e) { return; }
-        activeList.replaceChildren(...(data.active.length ? data.active.map(d => downloadRow(d, true)) : [h('li', {class: 'comics-hint'}, 'Nothing downloading.')]));
+        activeSection.hidden = !data.active.length;
+        activeList.replaceChildren(...data.active.map(d => downloadRow(d, true)));
         historyList.replaceChildren(...(data.history.length ? data.history.map(d => downloadRow(d, false)) : [h('li', {class: 'comics-hint'}, 'Nothing yet.')]));
+        const failed = data.history.filter(d => d.status === 'failed').length;
+        historyTitle.replaceChildren('History', data.history.length ? ' ' : '', data.history.length ? h('span', {class: 'text-muted history__count'}, failed ? `${data.history.length} · ${failed} failed` : String(data.history.length)) : '');
+    }
+
+    refresh();
+    setInterval(() => { if (!document.hidden) refresh(); }, 5000);
+}
+
+// Background jobs, at the foot of Settings.
+function initJobs() {
+    const table = document.getElementById('jobTable');
+    if (!table) return;
+
+    async function refresh() {
+        let data;
+        try { data = await comicsApi('/activity'); } catch (e) { return; }
         const worker = data.worker || {};
-        document.querySelectorAll('#jobTable [data-job]').forEach(rowEl => {
+        table.querySelectorAll('[data-job]').forEach(rowEl => {
             const job = worker[rowEl.dataset.job];
             const msg = rowEl.querySelector('.job-msg');
             const pending = (worker.pending || []).includes(rowEl.dataset.job);
@@ -456,7 +488,7 @@ function initActivity() {
         document.getElementById('workerState').textContent = worker.alive ? '' : 'The worker hasn’t checked in for a while; it starts when the app gets its first visit after a restart.';
     }
 
-    document.getElementById('jobTable').addEventListener('click', async (e) => {
+    table.addEventListener('click', async (e) => {
         const button = e.target.closest('[data-run]');
         if (!button) return;
         await comicsApi(`/jobs/${button.dataset.run}`, {method: 'POST'});
@@ -470,6 +502,7 @@ function initActivity() {
 
 function initImport() {
     const list = document.getElementById('importList');
+    const waiting = document.getElementById('importWaiting');
     const input = document.getElementById('importInput');
     const drop = document.getElementById('importDrop');
     const series = JSON.parse(document.getElementById('seriesData').textContent);
@@ -496,11 +529,11 @@ function initImport() {
                 } catch (err) { toast(err.message, 'error'); }
             });
         }}, 'Import');
-        const remove = window.isAdmin ? h('button', {type: 'button', class: 'btn btn-ghost danger-text', onclick: async () => {
+        const remove = h('button', {type: 'button', class: 'btn btn-ghost danger-text', onclick: async () => {
             if (!confirm(`Delete ${file.path}?`)) return;
             await comicsApi(`/import/file?path=${encodeURIComponent(file.path)}`, {method: 'DELETE'});
             load();
-        }}, 'Delete') : null;
+        }}, 'Delete');
         return h('li', {class: 'import-row'},
             h('div', {class: 'import-row__file'}, h('strong', {}, file.path), h('small', {class: 'text-muted'}, [formatSize(file.size), file.issue ? `Matches ${file.issue.label}; it's filed at the next import` : file.reason].filter(Boolean).join(' · '))),
             h('div', {class: 'import-row__match'}, seriesSelect, newName, number, go, remove));
@@ -509,8 +542,10 @@ function initImport() {
     async function load() {
         try {
             const data = await comicsApi('/import');
-            list.replaceChildren(...(data.files.length ? data.files.map(importRow) : [h('li', {class: 'comics-hint'}, 'Nothing waiting.')]));
+            waiting.hidden = !data.files.length;
+            list.replaceChildren(...data.files.map(importRow));
         } catch (e) {
+            waiting.hidden = false;
             list.replaceChildren(h('li', {class: 'comics-hint'}, e.message));
         }
     }
@@ -523,7 +558,7 @@ function initImport() {
         toast(`Importing ${files.length} file${files.length === 1 ? '' : 's'}…`);
         try {
             const data = await comicsApi('/import/upload', {method: 'POST', form});
-            toast(`Imported ${data.imported.length}${data.unmatched.length ? `; ${data.unmatched.length} to match below` : ''}${data.failed.length ? `; ${data.failed.length} unreadable` : ''}`, data.failed.length ? 'error' : 'success');
+            toast(`Imported ${data.imported.length}${data.unmatched.length ? `; ${data.unmatched.length} to match by hand` : ''}${data.failed.length ? `; ${data.failed.length} unreadable` : ''}`, data.failed.length ? 'error' : 'success');
         } catch (e) { toast(e.message, 'error'); }
         load();
     }
@@ -624,9 +659,10 @@ function initSettings() {
     });
     document.getElementById('addIndexer').addEventListener('click', () => addIndexer());
     comicsApi('/settings').then(fill).catch(e => toast(e.message, 'error'));
+    initJobs();
 }
 
-const PAGES = {series: initSeries, add: initAdd, 'series-detail': initSeriesDetail, wanted: initWanted, upcoming: initUpcoming, activity: initActivity, import: initImport, settings: initSettings};
+const PAGES = {series: initSeries, add: initAdd, 'series-detail': initSeriesDetail, downloads: initDownloads, settings: initSettings};
 document.addEventListener('DOMContentLoaded', () => {
     const init = PAGES[document.body.dataset.page];
     if (init) init();

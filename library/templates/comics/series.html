@@ -15,6 +15,7 @@
             {% else %} · from your files{% endif %}
         </p>
         {% if series.description %}<p class="series-head__desc">{{ series.description|truncate(600) }}</p>{% endif %}
+        {% if is_admin %}
         <div class="series-head__actions">
             {% if series.provider != 'local' %}
             <label class="monitor-pick">Get
@@ -27,11 +28,13 @@
             <button type="button" class="btn btn-secondary" data-action="search-series">Search wanted</button>
             <button type="button" class="btn btn-secondary" data-action="refresh">Refresh details</button>
             {% endif %}
-            {% if is_admin %}<button type="button" class="btn btn-ghost danger-text" data-action="delete-series">Stop following</button>{% endif %}
+            <button type="button" class="btn btn-ghost danger-text" data-action="delete-series">Stop following</button>
         </div>
+        {% endif %}
     </div>
 </section>
 
+{% if is_admin %}
 <div class="issue-toolbar">
     <div class="status-filter" role="radiogroup" aria-label="Show issues">
         <button type="button" role="radio" data-filter="all" aria-checked="true">All</button>
@@ -44,15 +47,16 @@
         <button type="button" class="btn btn-secondary" data-bulk="skipped">Skip</button>
     </div>
 </div>
+{% endif %}
 
-<table class="issue-table" id="issueTable">
+<table class="issue-table{% if not is_admin %} issue-table--reader{% endif %}" id="issueTable">
     <thead>
         <tr>
-            <th class="col-check"><input type="checkbox" id="checkAll" aria-label="Select all"></th>
+            {% if is_admin %}<th class="col-check"><input type="checkbox" id="checkAll" aria-label="Select all"></th>{% endif %}
             <th class="col-num">#</th>
             <th>Title</th>
             <th class="col-date">Out</th>
-            <th class="col-status">Status</th>
+            {% if is_admin %}<th class="col-status">Status</th>{% endif %}
             <th class="col-actions"><span class="visually-hidden">Actions</span></th>
         </tr>
     </thead>
@@ -60,6 +64,7 @@
 </table>
 <script id="issuesData" type="application/json">{{ issues|tojson }}</script>
 
+{% if is_admin %}
 <input type="file" id="issueUpload" accept=".cbz,.cbr,.cb7,.zip,.rar,.7z" hidden>
 
 <div class="metadata-overlay" id="releasesOverlay" role="dialog" aria-modal="true" aria-labelledby="releasesTitle">
@@ -70,4 +75,5 @@
         <ol class="release-list" id="releaseList"></ol>
     </div>
 </div>
+{% endif %}
 {% endblock %}

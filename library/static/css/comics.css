@@ -1,6 +1,6 @@
 /* Comics: the same gallery wall as the books (index.css), plus the parts a
  * comics manager needs — a page nav, issue tables, panels for settings and
- * activity. Words with underlines rather than boxes, like the rest of Shelves. */
+ * downloads. Words with underlines rather than boxes, like the rest of Shelves. */
 
 .comics-nav {
     display: flex;
@@ -198,7 +198,11 @@
     .issue-table .col-date { grid-area: meta; width: auto; display: inline; }
     .issue-table .col-status { grid-area: meta; width: auto; justify-self: end; }
     .issue-table .col-actions { grid-area: actions; text-align: left; }
-    .issue-table--wanted tr { grid-template-columns: 1fr auto; grid-template-areas: none; }
+    .issue-table--wanted tr { grid-template-columns: 1fr auto; grid-template-areas: "title title" "date actions"; }
+    .issue-table--wanted td:first-child { grid-area: title; }
+    .issue-table--wanted .col-date { grid-area: date; }
+    .issue-table--wanted .col-actions { grid-area: actions; text-align: right; }
+    .issue-table--reader tr { grid-template-columns: 3rem 1fr; grid-template-areas: "num title" "num meta" "num actions"; }
 }
 
 .status-chip {
@@ -269,28 +273,66 @@
 .release__text span { font-size: 0.8125rem; }
 .release.is-rejected { opacity: 0.55; }
 
-/* --- Upcoming --- */
-.upcoming__day {
-    font-size: 0.8125rem;
-    font-weight: 600;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--color-text-muted);
-    margin: 28px 0 var(--space-2);
+/* --- Continue reading: a row of what you're partway through. --- */
+.continue { margin-bottom: 40px; }
+.continue__title, .dl-section h2 { font-size: 1.0625rem; font-weight: 600; margin: 0 0 var(--space-3); }
+.continue__list {
+    list-style: none;
+    padding: 0 0 var(--space-2);
+    margin: 0;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(15rem, 18rem);
+    gap: var(--space-4);
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
 }
-.upcoming__day.is-today { color: var(--color-accent); }
+.continue__list > li { scroll-snap-align: start; }
+.continue__item {
+    display: grid;
+    grid-template-columns: 48px 1fr;
+    gap: 2px var(--space-3);
+    align-items: center;
+    padding: var(--space-2);
+    border-radius: var(--radius-md);
+    background: var(--pane);
+    border: 1px solid var(--pane-edge);
+    color: inherit;
+    text-decoration: none;
+}
+.continue__item:hover { border-color: var(--color-accent); }
+.continue__cover { grid-row: span 2; width: 48px; aspect-ratio: 2 / 3; overflow: hidden; background: var(--color-border); }
+.continue__cover img { width: 100%; height: 100%; object-fit: cover; }
+.continue__text { display: flex; flex-direction: column; min-width: 0; }
+.continue__text strong { font-weight: 550; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.continue__item .have-meter { margin: 0; align-self: end; }
+
+/* --- Downloads: one page of sections. --- */
+.dl-section { margin-bottom: 44px; }
+.dl-section h3 { font-size: 1rem; font-weight: 600; margin: var(--space-5) 0 var(--space-1); }
+.dl-section .page-head { margin-bottom: var(--space-2); }
+.dl-section > .comics-hint { margin-top: 0; }
+.dl-section .issue-table--wanted { margin-bottom: var(--space-3); }
+.dl-section .import-drop { margin-bottom: 0; padding: 22px var(--space-5); }
+.history > summary { list-style: none; cursor: pointer; display: flex; align-items: baseline; gap: var(--space-2); }
+.history > summary::-webkit-details-marker { display: none; }
+.history > summary::before { content: "▸"; color: var(--color-text-muted); transition: transform var(--dur-fast) ease; }
+.history[open] > summary::before { transform: rotate(90deg); }
+.history > summary h2 { margin: 0; }
+.history__count { font-size: var(--text-sm); font-weight: 400; }
 .upcoming__list { list-style: none; padding: 0; margin: 0; }
 .upcoming__item {
     display: grid;
-    grid-template-columns: 36px 1fr auto auto;
+    grid-template-columns: 7.5rem 1fr auto;
     align-items: center;
     gap: var(--space-3);
     padding: var(--space-2) 0;
     border-bottom: 1px solid var(--color-border);
+    font-size: 0.9375rem;
 }
-.upcoming__item img, .upcoming__nocover { width: 36px; aspect-ratio: 2 / 3; object-fit: cover; background: var(--color-border); }
+.upcoming__day { color: var(--color-text-secondary); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
-/* --- Panels: activity and settings --- */
+/* --- Panels: settings --- */
 .panel {
     padding: var(--space-5) var(--space-5) var(--space-4);
     margin-bottom: var(--space-5);

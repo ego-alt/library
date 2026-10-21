@@ -1,7 +1,7 @@
 """Comics pages and their JSON API, under /comics/.
 
-Anyone signed in can browse, read, follow series and grab issues; deleting
-files or series and changing settings is for admins.
+Anyone signed in can read the comics there are files for. Following series,
+downloading, importing and settings are for admins.
 """
 
 import os
@@ -130,16 +130,22 @@ def download_json(d: ComicDownload) -> dict:
     }
 
 
-def _nav_counts() -> dict:
-    return {
-        "wanted": sum(1 for i in ComicIssue.query.filter_by(status=WANTED) if i.released),
-        "active": ComicDownload.query.filter(ComicDownload.status.in_(DL_ACTIVE)).count(),
-        "import": len(files.comic_files(files.import_dir())) if os.path.isdir(files.import_dir()) else 0,
-    }
+def _downloads_count() -> int:
+    """What's moving or needs a hand: downloads in progress and files waiting
+    in the import folder."""
+    active = ComicDownload.query.filter(ComicDownload.status.in_(DL_ACTIVE)).count()
+    waiting = len(files.comic_files(files.import_dir())) if os.path.isdir(files.import_dir()) else 0
+    return active + waiting
 
 
 def _page(template: str, active: str, **context):
-    return render_template(f"comics/{template}", active=active, counts=_nav_counts(), is_admin=_is_admin(), providers_ready=bool(providers.available()), **context)
+    admin = _is_admin()
+    return render_template(f"comics/{template}", active=active, downloads_count=_downloads_count() if admin else 0, is_admin=admin, providers_ready=bool(providers.available()), **context)
+
+
+def _admin_page():
+    """Send anyone but an admin back to the library."""
+    return None if _is_admin() else redirect(url_for("comics.index"))
 
 
 # Pages
@@ -148,66 +154,70 @@ def _page(template: str, active: str, **context):
 @comics_blueprint.get("/")
 @login_required
 def index():
+    admin = _is_admin()
     series = ComicSeries.query.order_by(ComicSeries.name).all()
     cards = []
     for s in series:
         have = sum(1 for i in s.issues if i.filename)
+        if not have and not admin:
+            continue
         upcoming = sum(1 for i in s.issues if not i.released)
         cards.append({"series": s, "cover": _series_cover(s), "have": have, "total": len(s.issues), "upcoming": upcoming, "added": s.added_at})
-    return _page("index.html", "series", cards=cards)
+    return _page("index.html", "series", cards=cards, reading=_continue_reading())
+
+
+def _continue_reading(limit: int = 8) -> list[dict]:
+    """Issues you're partway through, most recent first."""
+    rows = ComicProgress.query.filter_by(user_id=current_user.id, finished=False).filter(ComicProgress.page > 0).order_by(ComicProgress.updated_at.desc()).limit(limit * 2).all()
+    reading = []
+    for p in rows:
+        issue = db.session.get(ComicIssue, p.issue_id)
+        if issue and issue.filename:
+            reading.append({"issue": issue, "cover": _cover(issue), "page": p.page, "pages": issue.page_count})
+    return reading[:limit]
 
 
 @comics_blueprint.get("/add")
 @login_required
 def add_page():
-    return _page("add.html", "add", query=request.args.get("q", ""))
+    return _admin_page() or _page("add.html", "add", query=request.args.get("q", ""))
 
 
 @comics_blueprint.get("/series/<int:series_id>")
 @login_required
 def series_page(series_id):
     series = _series_or_404(series_id)
-    progress = _progress_by_issue(i.id for i in series.issues)
-    issues = [issue_json(i, progress.get(i.id)) for i in reversed(series.issues)]
+    shown = series.issues if _is_admin() else [i for i in series.issues if i.filename]
+    progress = _progress_by_issue(i.id for i in shown)
+    issues = [issue_json(i, progress.get(i.id)) for i in reversed(shown)]
     return _page("series.html", "series", series=series, cover=_series_cover(series), issues=issues, monitor_choices=MONITOR_CHOICES)
 
 
-@comics_blueprint.get("/wanted")
+@comics_blueprint.get("/downloads")
 @login_required
-def wanted_page():
-    issues = [issue_json(i) for i in downloads.wanted_issues()]
-    return _page("wanted.html", "wanted", issues=issues, can_search=bool(settings.get("indexers")))
-
-
-@comics_blueprint.get("/upcoming")
-@login_required
-def upcoming_page():
+def downloads_page():
+    """Wanted issues, downloads, files to import and what's coming, together."""
+    if not _is_admin():
+        return redirect(url_for("comics.index"))
     today = date.today()
-    soon = ComicIssue.query.filter(db.or_(ComicIssue.store_date >= today - timedelta(days=7), db.and_(ComicIssue.store_date.is_(None), ComicIssue.cover_date >= today - timedelta(days=7)))).all()
-    soon = [i for i in soon if i.release_date and i.release_date <= today + timedelta(days=60)]
+    soon = ComicIssue.query.filter(ComicIssue.filename.is_(None), db.or_(ComicIssue.store_date > today, db.and_(ComicIssue.store_date.is_(None), ComicIssue.cover_date > today))).all()
+    soon = [i for i in soon if i.release_date and i.release_date <= today + timedelta(days=60) and i.series.monitor != "none"]
     soon.sort(key=lambda i: (i.release_date, i.series.name, i.sort_number))
-    return _page("upcoming.html", "upcoming", issues=[issue_json(i) for i in soon], today=today.isoformat())
-
-
-@comics_blueprint.get("/activity")
-@login_required
-def activity_page():
-    return _page("activity.html", "activity")
-
-
-@comics_blueprint.get("/import")
-@login_required
-def import_page():
     options = [[s.id, s.display_name] for s in ComicSeries.query.order_by(ComicSeries.name)]
-    return _page("import.html", "import", series_options=options)
+    return _page(
+        "downloads.html",
+        "downloads",
+        wanted=[issue_json(i) for i in downloads.wanted_issues()],
+        upcoming=[issue_json(i) for i in soon],
+        series_options=options,
+        can_search=bool(settings.get("indexers")),
+    )
 
 
 @comics_blueprint.get("/settings")
 @login_required
 def settings_page():
-    if not _is_admin():
-        return redirect(url_for("comics.index"))
-    return _page("settings.html", "settings", import_dir=files.import_dir(), comic_dir=files.comic_dir())
+    return _admin_page() or _page("settings.html", "settings", import_dir=files.import_dir(), comic_dir=files.comic_dir())
 
 
 @comics_blueprint.get("/read/<int:issue_id>")
@@ -300,7 +310,7 @@ def issue_download(issue_id):
 
 
 @comics_blueprint.get("/api/lookup")
-@json_login_required
+@json_admin_required
 def lookup():
     query = (request.args.get("q") or "").strip()
     if not query:
@@ -317,7 +327,7 @@ def lookup():
 
 
 @comics_blueprint.post("/api/series")
-@json_login_required
+@json_admin_required
 def create_series():
     data = request.get_json(silent=True) or {}
     monitor = data.get("monitor", "future")
@@ -334,7 +344,7 @@ def create_series():
 
 
 @comics_blueprint.patch("/api/series/<int:series_id>")
-@json_login_required
+@json_admin_required
 def update_series(series_id):
     series = _series_or_404(series_id)
     data = request.get_json(silent=True) or {}
@@ -348,7 +358,7 @@ def update_series(series_id):
 
 
 @comics_blueprint.post("/api/series/<int:series_id>/refresh")
-@json_login_required
+@json_admin_required
 def refresh(series_id):
     series = _series_or_404(series_id)
     try:
@@ -384,7 +394,7 @@ def delete_series(series_id):
 
 
 @comics_blueprint.post("/api/series/<int:series_id>/search")
-@json_login_required
+@json_admin_required
 def search_series_wanted(series_id):
     series = _series_or_404(series_id)
     cache, grabbed = {}, 0
@@ -398,7 +408,7 @@ def search_series_wanted(series_id):
 
 
 @comics_blueprint.patch("/api/issues/<int:issue_id>")
-@json_login_required
+@json_admin_required
 def update_issue(issue_id):
     issue = _issue_or_404(issue_id)
     data = request.get_json(silent=True) or {}
@@ -413,7 +423,7 @@ def update_issue(issue_id):
 
 
 @comics_blueprint.post("/api/issues/bulk")
-@json_login_required
+@json_admin_required
 def bulk_update_issues():
     data = request.get_json(silent=True) or {}
     status = data.get("status")
@@ -432,7 +442,7 @@ def bulk_update_issues():
 
 
 @comics_blueprint.post("/api/issues/<int:issue_id>/search")
-@json_login_required
+@json_admin_required
 def search_issue(issue_id):
     """Grab the best release now."""
     issue = _issue_or_404(issue_id)
@@ -450,7 +460,7 @@ def search_issue(issue_id):
 
 
 @comics_blueprint.get("/api/issues/<int:issue_id>/releases")
-@json_login_required
+@json_admin_required
 def issue_releases(issue_id):
     """Every release for an issue, to pick one by hand. The links stay on the
     server (they can carry indexer keys); grabbing names one by its token."""
@@ -466,7 +476,7 @@ def issue_releases(issue_id):
 
 
 @comics_blueprint.post("/api/issues/<int:issue_id>/grab")
-@json_login_required
+@json_admin_required
 def grab_release(issue_id):
     issue = _issue_or_404(issue_id)
     data = request.get_json(silent=True) or {}
@@ -495,7 +505,7 @@ def delete_issue_file(issue_id):
 
 
 @comics_blueprint.post("/api/issues/<int:issue_id>/upload")
-@json_login_required
+@json_admin_required
 def upload_issue_file(issue_id):
     """A file for one issue, from your computer."""
     issue = _issue_or_404(issue_id)
@@ -537,7 +547,7 @@ def save_progress(issue_id):
 
 
 @comics_blueprint.get("/api/import")
-@json_login_required
+@json_admin_required
 def import_list():
     folder = files.import_dir()
     os.makedirs(folder, exist_ok=True)
@@ -556,7 +566,7 @@ def import_list():
 
 
 @comics_blueprint.post("/api/import/upload")
-@json_login_required
+@json_admin_required
 def import_upload():
     """Files from your computer into the import folder, then matched."""
     folder = files.import_dir()
@@ -577,7 +587,7 @@ def import_upload():
 
 
 @comics_blueprint.post("/api/import/scan")
-@json_login_required
+@json_admin_required
 def import_scan():
     result = files.scan_import_dir()
     downloads.mark_imported(result["imported"])
@@ -585,7 +595,7 @@ def import_scan():
 
 
 @comics_blueprint.post("/api/import/file")
-@json_login_required
+@json_admin_required
 def import_one():
     """Import one file as an issue you pick, or as a new local series when no
     provider knows it."""
@@ -636,7 +646,7 @@ def import_delete():
 
 
 @comics_blueprint.get("/api/activity")
-@json_login_required
+@json_admin_required
 def activity():
     active = ComicDownload.query.filter(ComicDownload.status.in_(DL_ACTIVE)).order_by(ComicDownload.created_at.desc()).all()
     history = ComicDownload.query.filter(~ComicDownload.status.in_(DL_ACTIVE)).order_by(ComicDownload.updated_at.desc()).limit(100).all()
@@ -644,7 +654,7 @@ def activity():
 
 
 @comics_blueprint.post("/api/jobs/<job>")
-@json_login_required
+@json_admin_required
 def run_job(job):
     if job not in jobs.JOBS:
         abort(404)
@@ -653,7 +663,7 @@ def run_job(job):
 
 
 @comics_blueprint.post("/api/downloads/<int:download_id>/cancel")
-@json_login_required
+@json_admin_required
 def cancel_download(download_id):
     download = db.session.get(ComicDownload, download_id) or abort(404)
     downloads.cancel(download)
@@ -661,7 +671,7 @@ def cancel_download(download_id):
 
 
 @comics_blueprint.post("/api/downloads/<int:download_id>/retry")
-@json_login_required
+@json_admin_required
 def retry_download(download_id):
     """Block this release and look for another."""
     download = db.session.get(ComicDownload, download_id) or abort(404)

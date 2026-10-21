@@ -117,6 +117,20 @@
     </div>
 </form>
 
+<section class="panel" id="jobs">
+    <h2>Background jobs</h2>
+    <p class="comics-hint">These run on their own; Run starts one now.</p>
+    <table class="job-table" id="jobTable">
+        <tbody>
+            <tr data-job="downloads"><th>Check downloads</th><td class="job-msg"></td><td><button type="button" class="link-button" data-run="downloads">Run</button></td></tr>
+            <tr data-job="import"><th>Import new files</th><td class="job-msg"></td><td><button type="button" class="link-button" data-run="import">Run</button></td></tr>
+            <tr data-job="refresh"><th>Refresh series</th><td class="job-msg"></td><td><button type="button" class="link-button" data-run="refresh">Run</button></td></tr>
+            <tr data-job="search"><th>Search for wanted issues</th><td class="job-msg"></td><td><button type="button" class="link-button" data-run="search">Run</button></td></tr>
+        </tbody>
+    </table>
+    <p class="comics-hint" id="workerState"></p>
+</section>
+
 <template id="indexerTemplate">
     <li class="indexer">
         <div class="field-grid">

@@ -1,0 +1,78 @@
+{% extends "comics/base.html" %}
+{% block title %}Downloads{% endblock %}
+{% block page %}downloads{% endblock %}
+{% block content %}
+<section class="dl-section" id="activeSection" hidden>
+    <h2>Downloading</h2>
+    <ol class="download-list" id="activeList"></ol>
+</section>
+
+<section class="dl-section" id="wanted">
+    <div class="page-head">
+        <h2>Wanted{% if wanted %} <span class="count">{{ wanted|length }}</span>{% endif %}</h2>
+        {% if can_search and wanted %}<button type="button" class="btn btn-secondary" data-action="search-all">Search all now</button>{% endif %}
+    </div>
+    {% if wanted %}
+    <p class="comics-hint">Issues that are out and missing, newest first. {% if can_search %}They're searched for every few hours.{% else %}They're searched for once there's an indexer in <a href="{{ url_for('comics.settings_page') }}#indexers">Settings</a>.{% endif %}</p>
+    <table class="issue-table issue-table--wanted">
+        <tbody>
+        {% for issue in wanted %}
+            <tr data-issue-id="{{ issue.id }}"{% if loop.index > 8 %} class="is-extra" hidden{% endif %}>
+                <td><a href="{{ url_for('comics.series_page', series_id=issue.series_id) }}">{{ issue.series }}</a> <span class="issue-num">#{{ issue.number }}</span>{% if issue.title %} <span class="text-muted">{{ issue.title }}</span>{% endif %}</td>
+                <td class="col-date">{{ issue.date or '' }}</td>
+                <td class="col-actions">
+                    {% if can_search %}<button type="button" class="link-button" data-action="search-issue">Search</button>{% endif %}
+                    <button type="button" class="link-button" data-action="skip-issue">Skip</button>
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% if wanted|length > 8 %}<button type="button" class="link-button" data-action="show-all">Show all {{ wanted|length }}</button>{% endif %}
+    {% else %}
+    <p class="comics-hint">Nothing missing. New issues of the series you follow show up here when they come out.</p>
+    {% endif %}
+</section>
+
+<section class="dl-section" id="import">
+    <div class="page-head">
+        <h2>Import</h2>
+        <button type="button" class="btn btn-secondary" id="importScan">Match again</button>
+    </div>
+    <div class="import-drop" id="importDrop">
+        <p><strong>Drop CBZ, CBR or CB7 files here</strong>, or <button type="button" class="link-button" id="importPick">choose files</button>.</p>
+        <p class="comics-hint">Each is matched to an issue, converted to a tagged CBZ and filed under its series, like finished downloads.</p>
+        <input type="file" id="importInput" accept=".cbz,.cbr,.cb7,.zip,.rar,.7z" multiple hidden>
+    </div>
+    <div id="importWaiting" hidden>
+        <h3>Waiting to be matched</h3>
+        <p class="comics-hint">These didn't match an issue on their own. Pick the series, or make a new one for comics no provider knows.</p>
+        <ol class="import-list" id="importList"></ol>
+    </div>
+</section>
+
+{% if upcoming %}
+<section class="dl-section" id="upcoming">
+    <h2>Coming up</h2>
+    <p class="comics-hint">The next two months of the series you follow, by the day they reach shops.</p>
+    <ol class="upcoming__list">
+    {% for issue in upcoming %}
+        <li class="upcoming__item">
+            <span class="upcoming__day" data-date="{{ issue.date }}">{{ issue.date }}</span>
+            <span><a href="{{ url_for('comics.series_page', series_id=issue.series_id) }}">{{ issue.series }}</a> <span class="issue-num">#{{ issue.number }}</span></span>
+            {% if issue.status == 'wanted' %}<span class="status-chip status-wanted">wanted</span>{% else %}<span class="status-chip">{{ issue.status }}</span>{% endif %}
+        </li>
+    {% endfor %}
+    </ol>
+</section>
+{% endif %}
+
+<section class="dl-section">
+    <details class="history" id="historySection">
+        <summary><h2>History</h2></summary>
+        <p class="comics-hint">A failed release isn't grabbed again for that issue; remove it here to allow it.</p>
+        <ol class="download-list" id="historyList"></ol>
+    </details>
+</section>
+<script id="seriesData" type="application/json">{{ series_options|tojson }}</script>
+{% endblock %}
