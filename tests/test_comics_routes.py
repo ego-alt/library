@@ -90,10 +90,10 @@ def test_readers_see_only_what_there_is_to_read(standard_client, comic_dir, tmp_
     s, have, missing = _series_with_one_file(comic_dir, tmp_path)
     page = standard_client.get("/comics/").data.decode()
     assert "Saga" in page and "Nothing Yet" not in page
-    # No tabs, no banner, no follow button.
-    assert "comics-nav" not in page and "neither is set up yet" not in page and "/comics/add" not in page
+    # No Get, Downloads or Settings.
+    assert 'href="/get"' not in page and 'href="/downloads"' not in page and 'href="/settings"' not in page
     series = standard_client.get(f"/comics/series/{s.id}").data.decode()
-    assert "Not here" not in series and "Stop following" not in series and "checkAll" not in series
+    assert "Not here" not in series and "Stop following" not in series and "selectToggle" not in series
     # The cover opens #1, and once they're partway in, the wall opens on
     # Reading and the cover picks up where they left off.
     assert f'href="/comics/read/{have.id}" aria-label="Read Saga #1"' in page and 'aria-checked="true">All<' in page
