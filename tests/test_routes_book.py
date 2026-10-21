@@ -216,6 +216,7 @@ def test_cover_cache_invalidates_when_file_mtime_changes(client, book, app, mock
     should re-extract because the mtime changed -> new cache key."""
     import os
     import time
+
     import library.routes.index as index_module
     spy = mocker.spy(index_module, "read_epub_cover")
 

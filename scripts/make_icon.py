@@ -1,5 +1,6 @@
 """Shelves app icon: a pane of four covers on a dark wall in a pool of warm lamplight."""
 import sys
+
 from PIL import Image, ImageDraw, ImageFilter
 
 N = 2048  # draw large, downsample for crisp edges
@@ -14,11 +15,15 @@ def render(scale_cover=1.0):
     im = Image.composite(amber, im, glow.point(lambda v: int(v * 0.80)))
     # A pane of four covers, 2x2, each 2:3, centred slightly low (light from above).
     covers = [(45, 91, 138), (164, 62, 48), (196, 150, 64), (52, 92, 72)]  # ink blue, oxblood, ochre, bottle green
-    w = N * 0.215 * scale_cover; h = w * 1.5; gap = N * 0.05 * scale_cover
-    x_left = (N - (2 * w + gap)) / 2; y_top = (N - (2 * h + gap)) / 2 + N * 0.025
+    w = N * 0.215 * scale_cover
+    h = w * 1.5
+    gap = N * 0.05 * scale_cover
+    x_left = (N - (2 * w + gap)) / 2
+    y_top = (N - (2 * h + gap)) / 2 + N * 0.025
     from PIL import ImageChops
     for i, colour in enumerate(covers):
-        x0 = x_left + (i % 2) * (w + gap); y0 = y_top + (i // 2) * (h + gap)
+        x0 = x_left + (i % 2) * (w + gap)
+        y0 = y_top + (i // 2) * (h + gap)
         sh = Image.new("L", (N, N), 0)
         ImageDraw.Draw(sh).rectangle((x0 + N*0.006, y0 + N*0.03, x0 + w - N*0.006, y0 + h + N*0.028), fill=255)
         sh = sh.filter(ImageFilter.GaussianBlur(N * 0.022))
@@ -26,9 +31,11 @@ def render(scale_cover=1.0):
         d = ImageDraw.Draw(im)
         d.rectangle((x0, y0, x0 + w, y0 + h), fill=colour)
         # lit from above
-        hl = Image.new("L", (N, N), 0); ImageDraw.Draw(hl).rectangle((x0, y0, x0 + w, y0 + h * 0.55), fill=255)
+        hl = Image.new("L", (N, N), 0)
+        ImageDraw.Draw(hl).rectangle((x0, y0, x0 + w, y0 + h * 0.55), fill=255)
         hl = hl.filter(ImageFilter.GaussianBlur(N * 0.025))
-        mask = Image.new("L", (N, N), 0); ImageDraw.Draw(mask).rectangle((x0, y0, x0 + w, y0 + h), fill=255)
+        mask = Image.new("L", (N, N), 0)
+        ImageDraw.Draw(mask).rectangle((x0, y0, x0 + w, y0 + h), fill=255)
         hl = ImageChops.multiply(hl, mask).point(lambda v: int(v * 0.2))
         im = Image.composite(Image.new("RGB", (N, N), (255, 220, 170)), im, hl)
         d = ImageDraw.Draw(im)

@@ -1,6 +1,6 @@
 def test_proxy_header_auto_provisions_user(app, client):
     app.config["AUTH_PROXY_HEADER"] = "X-Forwarded-User"
-    from library.models import User, db
+    from library.models import User
 
     r = client.get("/", headers={"X-Forwarded-User": "ellery"})
     assert r.status_code == 200
