@@ -22,8 +22,7 @@ import httpx
 from bs4 import BeautifulSoup
 
 from .. import settings
-
-USER_AGENT = "Shelves/1.0 (home stack comics)"
+from ..config import USER_AGENT
 
 
 class ProviderError(Exception):

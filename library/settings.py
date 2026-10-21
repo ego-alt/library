@@ -32,7 +32,9 @@ DEFAULTS = {
     # Releases: preferred words raise a release's score, rejected ones rule it out.
     "preferred_words": ["digital"],
     "rejected_words": ["c2c scan", "webrip-preview"],
+    # Largest release to grab, in MB (0 for no limit): comics, then books.
     "max_size_mb": 600,
+    "book_max_size_mb": 100,
     # How new files are written.
     "convert_webp": True,
     "webp_quality": 82,

@@ -13,7 +13,7 @@ venv/
 instance/
 
 # Local books library (kept out of source control)
-books/
+/books/
 
 # Secrets
 .env

@@ -30,7 +30,7 @@ def comic_dir() -> str:
 
 
 def import_dir() -> str:
-    return current_app.config.get("COMIC_IMPORT_DIR") or os.path.join(comic_dir(), "_import")
+    return current_app.config.get("IMPORT_DIR") or os.path.join(comic_dir(), "_import")
 
 
 def abs_path(issue: ComicIssue) -> str:

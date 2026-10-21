@@ -38,8 +38,8 @@
 <div class="empty-state">
     <h3>No series yet</h3>
     <p>Follow a series to see its issues, get new ones as they come out, and read them here.</p>
-    <a class="btn btn-primary" href="{{ url_for('comics.add_page') }}">Follow a series</a>
-    <p class="mt-3"><a href="{{ url_for('comics.downloads_page') }}#import">Or import files you already have</a></p>
+    <a class="btn btn-primary" href="{{ url_for('downloads.get_page') }}">Find a series</a>
+    <p class="mt-3"><a href="{{ url_for('downloads.downloads_page') }}#import">Or import files you already have</a></p>
 </div>
 {% else %}
 <div class="empty-state">

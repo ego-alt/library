@@ -3,18 +3,16 @@
 A series comes from one metadata provider (ComicVine or Metron), or is "local"
 when it was made from files with no provider match. Issue status is what
 Mylar calls it: wanted issues get searched for, snatched ones are downloading,
-downloaded ones have a file in COMIC_DIR.
+downloaded ones have a file in COMIC_DIR. Downloads themselves are shared with
+books (downloads/models.py).
 """
 
 from datetime import date
 
+from ..downloads.models import DOWNLOADED, SKIPPED, SNATCHED, WANTED
 from ..models import _utcnow, db
 
-# Issue statuses.
-WANTED = "wanted"
-SKIPPED = "skipped"
-SNATCHED = "snatched"
-DOWNLOADED = "downloaded"
+# Issue statuses, shared with book requests.
 ISSUE_STATUSES = (WANTED, SKIPPED, SNATCHED, DOWNLOADED)
 
 # Which issues of a series are wanted: every missing one, only those released
@@ -23,16 +21,6 @@ MONITOR_ALL = "all"
 MONITOR_FUTURE = "future"
 MONITOR_NONE = "none"
 MONITOR_CHOICES = (MONITOR_ALL, MONITOR_FUTURE, MONITOR_NONE)
-
-# Download statuses. Failed ones stay as the blocklist: that release isn't
-# grabbed again for that issue.
-DL_QUEUED = "queued"
-DL_DOWNLOADING = "downloading"
-DL_IMPORTING = "importing"
-DL_DONE = "done"
-DL_FAILED = "failed"
-DL_ACTIVE = (DL_QUEUED, DL_DOWNLOADING, DL_IMPORTING)
-
 
 class ComicSeries(db.Model):
     __tablename__ = "comic_series"
@@ -88,7 +76,7 @@ class ComicIssue(db.Model):
     added_at = db.Column(db.DateTime, nullable=False, default=_utcnow)
 
     series = db.relationship("ComicSeries", back_populates="issues")
-    downloads = db.relationship("ComicDownload", back_populates="issue", passive_deletes=True)
+    downloads = db.relationship("Download", back_populates="issue", passive_deletes=True)
 
     __table_args__ = (db.UniqueConstraint("series_id", "provider_id", name="uq_comic_issue_provider"),)
 
@@ -100,30 +88,6 @@ class ComicIssue(db.Model):
     def released(self) -> bool:
         released = self.release_date
         return released is None or released <= date.today()
-
-
-class ComicDownload(db.Model):
-    __tablename__ = "comic_downloads"
-
-    id = db.Column(db.Integer, primary_key=True)
-    issue_id = db.Column(db.Integer, db.ForeignKey("comic_issues.id", ondelete="SET NULL"), index=True)
-    title = db.Column(db.String(500), nullable=False)  # the release's name
-    indexer = db.Column(db.String(100))
-    protocol = db.Column(db.String(10))  # usenet | torrent
-    # The NZB/torrent link. It can carry the indexer's API key, so it is
-    # never sent to the browser.
-    url = db.Column(db.Text)
-    size = db.Column(db.BigInteger)
-    client = db.Column(db.String(20))  # sabnzbd | qbittorrent | blackhole
-    client_ref = db.Column(db.String(200))  # the client's id for the job
-    status = db.Column(db.String(12), nullable=False, default=DL_QUEUED, index=True)
-    progress = db.Column(db.Float, default=0)
-    error = db.Column(db.Text)
-    path = db.Column(db.String(1000))  # where the client put the finished files
-    created_at = db.Column(db.DateTime, nullable=False, default=_utcnow)
-    updated_at = db.Column(db.DateTime, nullable=False, default=_utcnow, onupdate=_utcnow)
-
-    issue = db.relationship("ComicIssue", back_populates="downloads")
 
 
 class ComicProgress(db.Model):

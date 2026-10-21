@@ -9,14 +9,6 @@
 {% endblock %}
 {% block body %}
 <div class="container settings-page">
-    <div class="page-head">
-        <h2 class="settings-title">Settings</h2>
-        <nav class="comics-nav settings-index" aria-label="Sections">
-            <a href="#downloads">Downloads</a>
-            <a href="#comics">Comics</a>
-        </nav>
-    </div>
-
     <form id="settingsForm" class="settings" autocomplete="off">
         <h3 class="settings-group" id="downloads">Downloads <span class="comics-hint">for books and comics</span></h3>
 
@@ -88,7 +80,10 @@
                 <label for="s-rej">Never grab releases with</label>
                 <div class="field-row"><input class="input" id="s-rej" name="rejected_words" type="text" placeholder="c2c scan"></div>
                 <p class="field-help">Words or phrases, separated by commas.</p>
-                <label for="s-every">Search for wanted issues every</label>
+                <label for="s-max">Largest download</label>
+                <div class="field-row"><input class="input input--short" id="s-bmax" name="book_max_size_mb" type="number" min="0" step="10" aria-label="Largest book, in MB"> <span class="comics-hint">MB a book</span> <input class="input input--short" id="s-max" name="max_size_mb" type="number" min="0" step="10" aria-label="Largest comic, in MB"> <span class="comics-hint">MB a comic</span></div>
+                <p class="field-help">0 for no limit.</p>
+                <label for="s-every">Search for what's wanted every</label>
                 <div class="field-row"><input class="input input--short" id="s-every" name="search_interval_hours" type="number" min="1" step="1"> <span>hours</span></div>
             </div>
         </section>
@@ -123,8 +118,6 @@
                 <div class="field-row"><code>{{ comic_dir }}</code></div>
                 <span class="field-label">Import folder</span>
                 <div class="field-row"><code>{{ import_dir }}</code></div>
-                <label for="s-max">Largest download</label>
-                <div class="field-row"><input class="input input--short" id="s-max" name="max_size_mb" type="number" min="0" step="10"> <span>MB (0 for no limit)</span></div>
                 <span class="field-label">Pages</span>
                 <div class="field-row"><label class="check"><input type="checkbox" name="convert_webp"> Convert pages to WebP (smaller files; slower to import on the Pi)</label></div>
                 <label for="s-q">WebP quality</label>
@@ -142,19 +135,6 @@
         </div>
     </form>
 
-    <section class="panel" id="jobs">
-        <h2>Background jobs</h2>
-        <p class="comics-hint">These run on their own; Run starts one now.</p>
-        <table class="job-table" id="jobTable">
-            <tbody>
-                <tr data-job="downloads"><th>Check downloads</th><td class="job-msg"></td><td><button type="button" class="link-button" data-run="downloads">Run</button></td></tr>
-                <tr data-job="import"><th>Import new files</th><td class="job-msg"></td><td><button type="button" class="link-button" data-run="import">Run</button></td></tr>
-                <tr data-job="refresh"><th>Refresh series</th><td class="job-msg"></td><td><button type="button" class="link-button" data-run="refresh">Run</button></td></tr>
-                <tr data-job="search"><th>Search for wanted issues</th><td class="job-msg"></td><td><button type="button" class="link-button" data-run="search">Run</button></td></tr>
-            </tbody>
-        </table>
-        <p class="comics-hint" id="workerState"></p>
-    </section>
 </div>
 
 <template id="indexerTemplate">

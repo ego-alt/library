@@ -6,8 +6,10 @@ import httpx
 import pytest
 
 from library import settings
-from library.comics import clients, downloads, indexers, providers
-from library.comics.models import (
+from library.comics import downloads, providers
+from library.comics.models import ComicIssue, ComicSeries
+from library.downloads import clients, indexers, pipeline
+from library.downloads.models import (
     DL_DONE,
     DL_DOWNLOADING,
     DL_FAILED,
@@ -15,10 +17,8 @@ from library.comics.models import (
     SKIPPED,
     SNATCHED,
     WANTED,
-    ComicDownload,
-    ComicIssue,
-    ComicSeries,
 )
+from library.downloads.models import Download as ComicDownload
 from library.models import db
 from tests.conftest import make_cbz
 
@@ -87,7 +87,7 @@ class FakeClient:
     def __init__(self):
         self.added, self.states = [], {}
 
-    def add(self, url, title, download_id, protocol="usenet"):
+    def add(self, url, title, download_id, protocol="usenet", kind="comic"):
         self.added.append((url, title))
         return f"nzo_{download_id}"
 
@@ -103,54 +103,54 @@ def fake_client(monkeypatch):
     client = FakeClient()
     monkeypatch.setattr(clients, "client_for", lambda protocol, name=None: client)
     monkeypatch.setattr(clients, "can_download", lambda protocol: True)
-    monkeypatch.setattr(indexers, "search", lambda indexer, query, transport=None: indexers.parse_feed(FEED, indexer["name"], "usenet"))
+    monkeypatch.setattr(indexers, "search", lambda indexer, query, kind="comic", transport=None: indexers.parse_feed(FEED, indexer["name"], "usenet"))
     settings.set_many({"indexers": [{"name": "Geek", "kind": "newznab", "url": "https://idx", "api_key": "k", "enabled": True}]})
     return client
 
 
 def test_search_grab_download_import(app, comic_dir, tmp_path, issue, fake_client):
-    assert downloads.search_wanted() == 1
+    assert pipeline.search_wanted() == 1
     assert fake_client.added[0][1] == "Saga 066 (2024) (Digital) (Zone-Empire)"
     download = ComicDownload.query.one()
     assert download.status == DL_DOWNLOADING and issue.status == SNATCHED
 
-    assert downloads.check_downloads() == 1
+    assert pipeline.check_downloads() == 1
     assert download.progress == 0.4
 
     done = tmp_path / "complete" / "Saga 066 (2024) (Digital) (Zone-Empire)"
     done.mkdir(parents=True)
     make_cbz(done / "Saga 066 (2024) (Digital) (Zone-Empire).cbz")
     fake_client.states[download.client_ref] = clients.JobState("done", 1.0, str(done))
-    assert downloads.check_downloads() == 0
+    assert pipeline.check_downloads() == 0
     assert download.status == DL_DONE
     assert issue.status == DOWNLOADED and issue.filename.endswith("Saga #066 (2024).cbz")
     assert not done.exists()
 
 
 def test_failed_download_blocks_that_release(app, comic_dir, issue, fake_client):
-    downloads.search_wanted()
+    pipeline.search_wanted()
     download = ComicDownload.query.one()
     fake_client.states[download.client_ref] = clients.JobState("failed", error="Out of retention")
-    downloads.check_downloads()
+    pipeline.check_downloads()
     assert download.status == DL_FAILED and download.error == "Out of retention"
     assert issue.status == WANTED
     # The next search takes the next best release.
-    downloads.search_wanted()
+    pipeline.search_wanted()
     assert fake_client.added[-1][1] == "Saga 066 (2024) (webrip)"
 
 
 def test_done_but_invisible_path_fails_with_a_hint(app, comic_dir, issue, fake_client):
-    downloads.search_wanted()
+    pipeline.search_wanted()
     download = ComicDownload.query.one()
     fake_client.states[download.client_ref] = clients.JobState("done", 1.0, "/nowhere/Saga")
-    downloads.check_downloads()
-    assert download.status == DL_FAILED and "path mapping" in download.error
+    pipeline.check_downloads()
+    assert download.status == DL_FAILED and "where finished downloads are" in download.error
 
 
 def test_unreleased_issues_are_not_searched(app, issue, fake_client):
     issue.cover_date = date(2999, 1, 1)
     db.session.commit()
-    assert downloads.search_wanted() == 0
+    assert pipeline.search_wanted() == 0
 
 
 def test_sabnzbd_client(app):
@@ -241,4 +241,4 @@ def test_settings_mask_secrets(app):
 def test_skipped_issue_is_not_searched(app, issue, fake_client):
     issue.status = SKIPPED
     db.session.commit()
-    assert downloads.search_wanted() == 0
+    assert pipeline.search_wanted() == 0

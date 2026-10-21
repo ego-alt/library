@@ -464,7 +464,8 @@ function updateLayoutToggleUI() {
     const isShelf = currentLayout === 'shelf';
     btn.classList.toggle('active', isShelf);
     btn.setAttribute('aria-pressed', isShelf ? 'true' : 'false');
-    btn.title = isShelf ? 'Switch to grid view' : 'Switch to bookshelf view';
+    const label = btn.querySelector('.bar-menu__label');
+    if (label) label.textContent = isShelf ? 'Grid view' : 'Bookshelf view';
     if (icon) icon.className = isShelf ? 'fas fa-th-large' : 'fas fa-grip-vertical';
 }
 

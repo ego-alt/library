@@ -164,3 +164,39 @@ function coverCard({href, label, title, meta = [], cover = null, attrs = {}, img
             h('span', {class: 'book-caption__title'}, title),
             line ? h('span', {class: 'book-caption__author'}, line) : null));
 }
+
+// The bar's menu (a <details>) closes on a click elsewhere or Escape.
+document.addEventListener('click', (e) => {
+    document.querySelectorAll('details.bar-menu[open]').forEach(menu => { if (!menu.contains(e.target) || e.target.closest('.bar-menu__panel a, .bar-menu__panel button')) menu.open = false; });
+});
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') document.querySelectorAll('details.bar-menu[open]').forEach(menu => { menu.open = false; });
+});
+
+/** A small menu floating by `anchor` (it can't live inside a cover, which
+ * clips what overflows). Items: {label, onClick, danger} | {label, href} | {note}. */
+let floatingMenu = null;
+function closeMenu() {
+    if (floatingMenu) floatingMenu.remove();
+    floatingMenu = null;
+}
+function openMenu(anchor, items) {
+    closeMenu();
+    const menu = h('div', {class: 'float-menu', role: 'menu'}, items.filter(Boolean).map(item => {
+        if (item.note) return h('span', {class: 'float-menu__note'}, item.note);
+        if (item.href) return h('a', {href: item.href, role: 'menuitem'}, item.label);
+        return h('button', {type: 'button', role: 'menuitem', class: item.danger ? 'danger-text' : null, onclick: () => { closeMenu(); item.onClick(); }}, item.label);
+    }));
+    document.body.append(menu);
+    const rect = anchor.getBoundingClientRect();
+    const width = menu.offsetWidth;
+    const left = Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8));
+    const below = rect.bottom + 4 + menu.offsetHeight < window.innerHeight;
+    menu.style.left = `${left}px`;
+    menu.style.top = `${below ? rect.bottom + 4 : Math.max(8, rect.top - 4 - menu.offsetHeight)}px`;
+    floatingMenu = menu;
+    menu.querySelector('button, a')?.focus();
+}
+document.addEventListener('click', (e) => { if (floatingMenu && !floatingMenu.contains(e.target) && !e.target.closest('[data-menu-anchor]')) closeMenu(); }, true);
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMenu(); });
+window.addEventListener('scroll', closeMenu, {passive: true});

@@ -50,59 +50,56 @@
         <button type="button" role="radio" data-filter="have" aria-checked="false">Have</button>
         <button type="button" role="radio" data-filter="missing" aria-checked="false">Missing</button>
     </div>
-    <div class="bulk" id="bulkBar" hidden>
-        <span id="bulkCount"></span>
-        <button type="button" class="btn btn-secondary" data-bulk="wanted">Want</button>
-        <button type="button" class="btn btn-secondary" data-bulk="skipped">Skip</button>
+    <div class="bulk">
+        <span id="bulkCount" hidden></span>
+        <button type="button" class="btn btn-secondary" data-bulk="wanted" hidden>Want</button>
+        <button type="button" class="btn btn-secondary" data-bulk="skipped" hidden>Skip</button>
+        <button type="button" class="btn btn-ghost" id="selectToggle">Select</button>
     </div>
 </div>
 {% endif %}
 
-{% if is_admin %}
-<table class="issue-table" id="issueTable">
-    <thead>
-        <tr>
-            <th class="col-check"><input type="checkbox" id="checkAll" aria-label="Select all"></th>
-            <th class="col-num">#</th>
-            <th>Title</th>
-            <th class="col-date">Out</th>
-            <th class="col-status">Status</th>
-            <th class="col-actions"><span class="visually-hidden">Actions</span></th>
-        </tr>
-    </thead>
-    <tbody></tbody>
-</table>
-{% elif issues %}
+{% if issues %}
 <div class="row library issue-wall" id="issueWall">
     {% for issue in issues %}
     {% set started = issue.page and not issue.finished %}
-    {% set state = 'Read' if issue.finished else ((((100 * (issue.page + 1) / issue.pages)|int) ~ '%') if issue.pages else 'Page ' ~ (issue.page + 1)) if started else ((issue.pages ~ ' pages') if issue.pages else '') %}
-    {% set attrs = {'data-issue-id': issue.id, 'data-pages': issue.pages} %}
-    {% set classes = ('is-read ' if issue.finished else '') ~ ('is-next' if up_next and issue.id == up_next.id else '') %}
-    {% call cover_card(url_for('comics.read_page', issue_id=issue.id), ('Continue' if started else 'Read') ~ ' #' ~ issue.number, '#' ~ issue.number ~ (' · ' ~ issue.title if issue.title else ''), [issue.date|comic_date, state], issue.cover, attrs, {'referrerpolicy': 'no-referrer'}, classes) %}
-        {% if up_next and issue.id == up_next.id %}<span class="cover-flag">{{ 'Reading' if started else 'Up next' }}</span>{% endif %}
+    {% set next = up_next and issue.id == up_next.id %}
+    {% if issue.has_file %}
+        {% set state = 'Read' if issue.finished else ((((100 * (issue.page + 1) / issue.pages)|int) ~ '%') if issue.pages else 'Page ' ~ (issue.page + 1)) if started else ((issue.pages ~ ' pages') if issue.pages else '') %}
+        {% set flag = ('Reading' if started else 'Up next') if next else '' %}
+        {% set href = url_for('comics.read_page', issue_id=issue.id) %}
+        {% set label = ('Continue' if started else 'Read') ~ ' #' ~ issue.number %}
+    {% else %}
+        {% set state = '' %}
+        {% set flag = ('Out ' ~ (issue.date|comic_date)) if not issue.released else {'wanted': 'Wanted', 'snatched': 'Downloading', 'skipped': 'Skipped'}.get(issue.status, issue.status) %}
+        {% set href = '#' %}
+        {% set label = '#' ~ issue.number ~ ', ' ~ flag %}
+    {% endif %}
+    {% set classes = ('is-read ' if issue.finished else '') ~ ('is-next ' if next else '') ~ ('' if issue.has_file else 'is-missing status-' ~ issue.status) %}
+    {% call cover_card(href, label, '#' ~ issue.number ~ (' · ' ~ issue.title if issue.title else ''), [issue.date|comic_date, state], issue.cover, {'data-issue-id': issue.id, 'data-pages': issue.pages, 'data-have': '1' if issue.has_file else '0'}, {'referrerpolicy': 'no-referrer'}, classes) %}
+        {% if flag %}<span class="cover-flag{% if not issue.has_file %} cover-flag--status{% endif %}">{{ flag }}</span>{% endif %}
         <div class="book-buttons">
-            <button type="button" class="book-button book-button--read" data-action="toggle-read" aria-pressed="{{ 'true' if issue.finished else 'false' }}" aria-label="Read" title="{{ 'Mark as unread' if issue.finished else 'Mark as read' }}"><i class="fas fa-check" aria-hidden="true"></i></button>
+            {% if issue.has_file %}<button type="button" class="book-button book-button--read" data-action="toggle-read" aria-pressed="{{ 'true' if issue.finished else 'false' }}" aria-label="Read" title="{{ 'Mark as unread' if issue.finished else 'Mark as read' }}"><i class="fas fa-check" aria-hidden="true"></i></button>{% endif %}
+            {% if is_admin %}
+            <button type="button" class="book-button" data-action="menu" data-menu-anchor aria-label="More for #{{ issue.number }}" title="More"><i class="fas fa-ellipsis-h" aria-hidden="true"></i></button>
+            {% elif issue.has_file %}
             <a class="book-button" href="{{ url_for('comics.issue_download', issue_id=issue.id) }}" aria-label="Download #{{ issue.number }}" title="Download"><i class="fas fa-download" aria-hidden="true"></i></a>
+            {% endif %}
         </div>
     {% endcall %}
     {% endfor %}
 </div>
 {% else %}
-<div class="empty-state"><h3>Nothing to read here yet</h3></div>
+<div class="empty-state"><h3>{{ 'No issues yet' if is_admin else 'Nothing to read here yet' }}</h3></div>
 {% endif %}
 <script id="issuesData" type="application/json">{{ issues|tojson }}</script>
 
 {% if is_admin %}
 <input type="file" id="issueUpload" accept=".cbz,.cbr,.cb7,.zip,.rar,.7z" hidden>
 
-<div class="metadata-overlay" id="releasesOverlay" role="dialog" aria-modal="true" aria-labelledby="releasesTitle">
-    <div class="metadata-content releases-panel">
-        <button class="close-metadata btn btn-ghost" data-close aria-label="Close">&times;</button>
-        <h3 id="releasesTitle">Releases</h3>
-        <p class="comics-hint" id="releasesStatus"></p>
-        <ol class="release-list" id="releaseList"></ol>
-    </div>
-</div>
 {% endif %}
+{% endblock %}
+{% block scripts %}
+    <script src="{{ url_for('static', filename='js/comics.js') }}"></script>
+    {% if is_admin %}<script src="{{ url_for('static', filename='js/downloads.js') }}"></script>{% endif %}
 {% endblock %}

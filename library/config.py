@@ -4,6 +4,9 @@ import os
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir))
 DATA_DIR = os.path.join(BASE_DIR, "instance")
 
+# Sent to ComicVine, Metron, Open Library, indexers and download clients.
+USER_AGENT = "Shelves/1.0 (home stack library)"
+
 
 class Config:
     # Loaded from the environment; create_app() raises if missing in non-test
@@ -31,14 +34,15 @@ class Config:
     # Book directory
     BOOK_DIR = os.getenv("BOOK_DIR", os.path.join(BASE_DIR, "books"))
 
-    # Comics: the library's CBZs, and a folder whose files get imported
-    # (downloads that finished, or anything you drop in).
-    # The default sits in instance/, which survives redeploys; on the Pi
-    # COMIC_DIR points at the big disk.
+    # Comics: the library's CBZs. The default sits in instance/, which
+    # survives redeploys; on the Pi COMIC_DIR points at the big disk.
     COMIC_DIR = os.getenv("COMIC_DIR", os.path.join(DATA_DIR, "comics"))
-    COMIC_IMPORT_DIR = os.getenv("COMIC_IMPORT_DIR") or None  # default: COMIC_DIR/_import
-    # Run the comics jobs (search, downloads, imports) in this process.
-    COMICS_WORKER = os.getenv("COMICS_WORKER", "1") == "1"
+    # A folder whose comics and EPUBs get imported (blackhole downloads, or
+    # anything you drop in). Default: COMIC_DIR/_import.
+    IMPORT_DIR = os.getenv("IMPORT_DIR") or os.getenv("COMIC_IMPORT_DIR") or None
+    # Run the download jobs (search, downloads, imports, refreshing series)
+    # in this process.
+    DOWNLOADS_WORKER = os.getenv("DOWNLOADS_WORKER", os.getenv("COMICS_WORKER", "1")) == "1"
 
     # Generated cover thumbnails (safe to delete; rebuilt on demand)
     THUMB_DIR = os.path.join(DATA_DIR, "thumbs")

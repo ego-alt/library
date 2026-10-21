@@ -25,8 +25,9 @@ function updateDarkModeIcon() {
         icon.className = dark ? 'fas fa-circle' : 'fas fa-moon';
         const button = icon.closest('button');
         if (button) {
-            button.setAttribute('aria-label', dark ? 'Day mode' : 'Night mode');
-            button.title = dark ? 'Day mode' : 'Night mode';
+            const label = button.querySelector('.bar-menu__label');
+            if (label) label.textContent = dark ? 'Day mode' : 'Night mode';
+            else button.setAttribute('aria-label', dark ? 'Day mode' : 'Night mode');
         }
     }
 } 

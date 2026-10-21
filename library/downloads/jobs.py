@@ -1,5 +1,5 @@
-"""The comics worker: one background thread that follows downloads, imports
-new files, refreshes series and searches for wanted issues.
+"""The download worker: one background thread that follows downloads, imports
+new files, refreshes comic series and searches for wanted books and issues.
 
 Gunicorn runs several processes; each starts the thread on its first request,
 and a file lock lets only one of them work (another takes over if it dies).
@@ -19,10 +19,13 @@ from datetime import datetime, timezone
 from flask import current_app
 
 from .. import settings
+from ..books import getting as books
+from ..comics import downloads as comic_downloads
+from ..comics import files as comic_files
+from ..comics.series import due_for_refresh, refresh_series
 from ..config import DATA_DIR
 from ..models import db
-from . import downloads, files
-from .series import due_for_refresh, refresh_series
+from . import pipeline
 
 logger = logging.getLogger(__name__)
 
@@ -40,15 +43,15 @@ _start_lock = threading.Lock()
 
 
 def _state_dir() -> str:
-    return current_app.config.get("COMICS_STATE_DIR") or DATA_DIR
+    return current_app.config.get("WORKER_STATE_DIR") or DATA_DIR
 
 
 def _state_path() -> str:
-    return os.path.join(_state_dir(), "comics-worker.json")
+    return os.path.join(_state_dir(), "downloads-worker.json")
 
 
 def _request_path(job: str) -> str:
-    return os.path.join(_state_dir(), f"comics-run-{job}")
+    return os.path.join(_state_dir(), f"downloads-run-{job}")
 
 
 def request_run(job: str) -> None:
@@ -80,20 +83,31 @@ def _save_state(state: dict) -> None:
     os.replace(tmp, _state_path())
 
 
+def import_all() -> dict:
+    """Import what's in the import folder: comics to their issues, EPUBs to
+    the books. Returns {"imported", "unmatched", "failed"} counts' lists."""
+    result = comic_files.scan_import_dir()
+    comic_downloads.mark_imported(result["imported"])
+    found = books.scan_import_dir(comic_files.import_dir())
+    return {"imported": result["imported"] + found["imported"], "unmatched": result["unmatched"], "failed": result["failed"] + found["failed"]}
+
+
+def describe_import(result: dict) -> str:
+    parts = [f"imported {len(result['imported'])}"]
+    if result["unmatched"]:
+        parts.append(f"{len(result['unmatched'])} to match by hand")
+    if result["failed"]:
+        parts.append(f"{len(result['failed'])} unreadable")
+    return ", ".join(parts).capitalize() + "."
+
+
 def run_job(job: str) -> str:
     """Run one job now, in this thread. Returns a sentence about what it did."""
     if job == "downloads":
-        active = downloads.check_downloads()
+        active = pipeline.check_downloads()
         return f"{active} download{'s' if active != 1 else ''} in progress."
     if job == "import":
-        result = files.scan_import_dir()
-        downloads.mark_imported(result["imported"])
-        parts = [f"imported {len(result['imported'])}"]
-        if result["unmatched"]:
-            parts.append(f"{len(result['unmatched'])} to match by hand")
-        if result["failed"]:
-            parts.append(f"{len(result['failed'])} unreadable")
-        return ", ".join(parts).capitalize() + "."
+        return describe_import(import_all())
     if job == "refresh":
         due = due_for_refresh()
         new, errors = 0, []
@@ -109,7 +123,7 @@ def run_job(job: str) -> str:
     if job == "search":
         if not settings.get("indexers"):
             return "No indexers yet."
-        grabbed = downloads.search_wanted()
+        grabbed = pipeline.search_wanted()
         return f"Grabbed {grabbed} release{'s' if grabbed != 1 else ''}."
     raise ValueError(job)
 
@@ -117,14 +131,14 @@ def run_job(job: str) -> str:
 def _loop(app) -> None:
     with app.app_context():
         os.makedirs(_state_dir(), exist_ok=True)
-        lock_file = open(os.path.join(_state_dir(), "comics-worker.lock"), "w")
+        lock_file = open(os.path.join(_state_dir(), "downloads-worker.lock"), "w")
     while True:
         try:
             fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
             break
         except OSError:
             time.sleep(60)
-    logger.info("Comics worker running in process %s", os.getpid())
+    logger.info("Download worker running in process %s", os.getpid())
     with app.app_context():
         state = status()
     state.pop("alive", None)
@@ -150,7 +164,7 @@ def _loop(app) -> None:
                 try:
                     message, ok = run_job(job), True
                 except Exception as e:
-                    logger.exception("Comics job %s failed", job)
+                    logger.exception("Download job %s failed", job)
                     message, ok = str(e), False
                     db.session.rollback()
                 finally:
@@ -167,10 +181,10 @@ def _loop(app) -> None:
 def start(app) -> None:
     """Start the worker thread in this process, once."""
     global _started
-    if _started or app.config.get("TESTING") or not app.config.get("COMICS_WORKER"):
+    if _started or app.config.get("TESTING") or not app.config.get("DOWNLOADS_WORKER"):
         return
     with _start_lock:
         if _started:
             return
         _started = True
-        threading.Thread(target=_loop, args=(app,), daemon=True, name="comics-worker").start()
+        threading.Thread(target=_loop, args=(app,), daemon=True, name="downloads-worker").start()

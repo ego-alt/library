@@ -1,5 +1,5 @@
 {% extends "_layout.html" %}
-{% set shelf = 'comics' %}
+{% set shelf = shelf|default('comics') %}
 {% block head_scripts %}
     <script>
         window.APP_ROOT = "{{ request.script_root }}";
@@ -11,28 +11,8 @@
     <link href="{{ url_for('static', filename='css/comics.css') }}" rel="stylesheet">
 {% endblock %}
 {% block body_attrs %} data-page="{% block page %}{% endblock %}"{% endblock %}
-{% block bar_actions %}
-                {% if is_admin %}
-                <a class="btn btn-ghost" href="{{ url_for('comics.add_page') }}" aria-label="Follow a series" title="Follow a series">
-                    <i class="fas fa-plus" aria-hidden="true"></i>
-                </a>
-                {% endif %}
-{% endblock %}
 {% block body %}
     <div class="container">
-        {% if is_admin %}
-        <nav class="comics-nav" aria-label="Comics">
-            <a href="{{ url_for('comics.index') }}"{% if active == 'series' %} aria-current="page"{% endif %}>Library</a>
-            <a href="{{ url_for('comics.downloads_page') }}"{% if active == 'downloads' %} aria-current="page"{% endif %}>Downloads{% if downloads_count %} <span class="count">{{ downloads_count }}</span>{% endif %}</a>
-        </nav>
-        {% if not providers_ready %}
-        <p class="comics-banner">
-            Series details come from ComicVine or Metron, and neither is set up yet.
-            <a href="{{ url_for('settings.settings_page') }}#metadata">Add a key in Settings</a>.
-            Until then you can still import and read files.
-        </p>
-        {% endif %}
-        {% endif %}
         {% block content %}{% endblock %}
     </div>
 {% endblock %}

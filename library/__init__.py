@@ -12,6 +12,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from .comics import init_comics
 from .commands import init_commands
 from .config import DATA_DIR, Config
+from .downloads import init_downloads
 from .models import db
 from .proxy_auth import load_user_from_proxy_header
 from .routes import (
@@ -126,6 +127,7 @@ def create_app(config_overrides: dict | None = None):
     app.register_blueprint(upload_blueprint)
 
     init_comics(app)
+    init_downloads(app)
 
     db.init_app(app)
     Migrate(app, db, render_as_batch=True)

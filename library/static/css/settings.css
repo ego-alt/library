@@ -2,10 +2,8 @@
  * indexers folded to a line each, and a Save bar that shows once something
  * has changed. (Words and links come from comics.css.) */
 
-.settings-page .page-head { align-items: center; margin-bottom: var(--space-5); }
-.settings-title { font-size: var(--text-xl); font-weight: 550; }
-.settings-index { margin: 0; }
-.settings-group { font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-text-muted); margin: var(--space-6) 0 var(--space-3); scroll-margin-top: var(--space-4); }
+.settings-group { font-size: 0.8125rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-text-muted); margin: 0 0 var(--space-3); scroll-margin-top: var(--space-4); }
+#comics.settings-group { margin-top: var(--space-6); }
 .settings-group .comics-hint { text-transform: none; letter-spacing: 0; font-weight: 400; margin-left: var(--space-2); }
 
 /* --- Panels: settings --- */

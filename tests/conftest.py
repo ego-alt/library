@@ -110,8 +110,8 @@ def comic_dir(app, tmp_path):
     d = tmp_path / "comics"
     d.mkdir()
     app.config["COMIC_DIR"] = str(d)
-    app.config["COMIC_IMPORT_DIR"] = None
-    app.config["COMICS_STATE_DIR"] = str(tmp_path / "state")
+    app.config["IMPORT_DIR"] = None
+    app.config["WORKER_STATE_DIR"] = str(tmp_path / "state")
     return d
 
 

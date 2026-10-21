@@ -13,10 +13,8 @@
         window.initialBookCount = {{ images|length }};
     </script>
 {% endblock %}
-{% block bar_actions_before %}
-                <button class="layout-toggle btn btn-ghost" id="layoutToggle" onclick="toggleLayout()" aria-pressed="false" aria-label="Bookshelf view" title="Switch to bookshelf view">
-                    <i id="layout-toggle-icon" class="fas fa-grip-vertical" aria-hidden="true"></i>
-                </button>
+{% block menu_items %}
+                        <button type="button" class="layout-toggle" id="layoutToggle" onclick="toggleLayout()" aria-pressed="false"><i id="layout-toggle-icon" class="fas fa-grip-vertical" aria-hidden="true"></i> <span class="bar-menu__label">Bookshelf view</span></button>
 {% endblock %}
 {% block bar_actions %}
                 {# Standalone only: a Sign in button when signed out. There's no
@@ -26,11 +24,6 @@
                     <button class="login-button btn btn-ghost" onclick="showLoginDialog()" aria-label="Sign in" title="Sign in">
                         <i class="fas fa-right-to-bracket" aria-hidden="true"></i>
                     </button>
-                {% endif %}
-                {% if current_user.is_authenticated %}
-                <button class="upload-button btn btn-ghost" onclick="document.getElementById('fileUploadInput').click();" aria-label="Add a book" title="Add a book">
-                    <i class="fas fa-plus" aria-hidden="true"></i>
-                </button>
                 {% endif %}
 {% endblock %}
 {% block body %}

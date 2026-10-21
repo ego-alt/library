@@ -1,9 +1,11 @@
-"""Searching Newznab (usenet) and Torznab (torrent) indexers.
+"""Searching Newznab (usenet) and Torznab (torrent) indexers, for books and
+comics alike.
 
 Both speak the same API: GET <url>/api?t=search&q=…&cat=7030 answers an RSS
 feed whose items carry the release name, a link to the NZB or torrent, and
-<newznab:attr>/<torznab:attr> extras (size, seeders). 7030 is the standard
-Comics category; Prowlarr and Jackett expose Torznab feeds for torrent sites.
+<newznab:attr>/<torznab:attr> extras (size, seeders). The standard categories
+are 7030 for comics and 7020 for ebooks; Prowlarr and Jackett expose Torznab
+feeds for torrent sites.
 """
 
 from dataclasses import dataclass
@@ -12,9 +14,10 @@ from xml.etree import ElementTree as ET
 
 import httpx
 
-from .providers import USER_AGENT
+from ..config import USER_AGENT
 
 COMICS_CATEGORY = "7030"
+BOOKS_CATEGORY = "7020"
 _ATTR_NAMESPACES = ("http://www.newznab.com/DTD/2010/feeds/attributes/", "http://torznab.com/schemas/2015/feed")
 
 
@@ -81,14 +84,21 @@ def parse_feed(xml: bytes | str, indexer: str, protocol: str) -> list[Release]:
     return releases
 
 
-def search(indexer: dict, query: str, transport: httpx.BaseTransport | None = None) -> list[Release]:
-    """Search one indexer config ({name, kind, url, api_key, categories})."""
-    kind = indexer.get("kind", "newznab")
-    protocol = "torrent" if kind == "torznab" else "usenet"
+def categories(indexer: dict, kind: str) -> str:
+    """The categories to search an indexer in for books or comics."""
+    if kind == "book":
+        return indexer.get("book_categories") or BOOKS_CATEGORY
+    return indexer.get("categories") or COMICS_CATEGORY
+
+
+def search(indexer: dict, query: str, kind: str = "comic", transport: httpx.BaseTransport | None = None) -> list[Release]:
+    """Search one indexer config ({name, kind, url, api_key, categories,
+    book_categories}) for books or comics (`kind`)."""
+    protocol = "torrent" if indexer.get("kind") == "torznab" else "usenet"
     base = indexer["url"].rstrip("/")
     # Prowlarr/Jackett give the full .../api URL; a plain Newznab host doesn't.
     url = base if base.endswith("/api") else f"{base}/api"
-    params = {"t": "search", "q": query, "cat": indexer.get("categories") or COMICS_CATEGORY, "apikey": indexer.get("api_key", ""), "limit": 100}
+    params = {"t": "search", "q": query, "cat": categories(indexer, kind), "apikey": indexer.get("api_key", ""), "limit": 100}
     try:
         with httpx.Client(timeout=30, headers={"User-Agent": USER_AGENT}, follow_redirects=True, transport=transport) as http:
             response = http.get(url, params=params)
@@ -119,5 +129,7 @@ def test(indexer: dict, transport: httpx.BaseTransport | None = None) -> str:
         raise IndexerError("That isn't a Newznab or Torznab API.") from e
     if root.tag == "error":
         raise IndexerError(root.get("description") or "It refused.")
-    comics = any(c.get("id") == COMICS_CATEGORY for c in root.iter("subcat")) or any(c.get("id") == COMICS_CATEGORY for c in root.iter("category"))
-    return f"Connected to a {'Torznab' if kind == 'torznab' else 'Newznab'} indexer" + ("" if comics else " (it doesn't list Comics, 7030: set the category it files comics under)") + "."
+    listed = {c.get("id") for c in root.iter("subcat")} | {c.get("id") for c in root.iter("category")}
+    missing = [name for name, cat in (("Comics, 7030", COMICS_CATEGORY), ("Ebooks, 7020", BOOKS_CATEGORY)) if cat not in listed]
+    note = f" (it doesn't list {' or '.join(missing)}: set the category it uses)" if missing else ""
+    return f"Connected to a {'Torznab' if kind == 'torznab' else 'Newznab'} indexer{note}."

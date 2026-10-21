@@ -58,37 +58,98 @@ h1 { font-size: var(--text-xl); font-weight: 550; letter-spacing: -0.01em; line-
 h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 /* The bar all but disappears: the name in spaced capitals on the left, the
    few actions on the right, no rule. */
-.lib-bar { margin-bottom: 4px; }
 .lib-bar__inner {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: var(--space-3);
-    height: 72px;
+    height: 64px;
 }
-.lib-bar__where { display: flex; align-items: baseline; gap: var(--space-2); min-width: 0; }
 .lib-bar__title {
     margin: 0;
     font-size: 1.125rem;
     font-weight: 600;
     letter-spacing: 0.32em;
     text-transform: uppercase;
-    color: var(--color-text-primary);
 }
+.lib-bar__title a { color: var(--color-text-primary); text-decoration: none; }
 .lib-bar__actions { display: flex; align-items: center; gap: var(--space-1); }
-/* Books | Comics, next to the name. */
-.shelf-switch { display: inline-flex; gap: var(--space-3); margin-left: var(--space-3); }
-.shelf-switch a {
+
+/* The one menu: night mode, the view, Settings. */
+.bar-menu { position: relative; }
+.bar-menu > summary { list-style: none; cursor: pointer; }
+.bar-menu > summary::-webkit-details-marker { display: none; }
+.bar-menu__panel {
+    position: absolute;
+    right: 0;
+    top: calc(100% + var(--space-1));
+    z-index: 1100;
+    display: flex;
+    flex-direction: column;
+    min-width: 13rem;
+    padding: var(--space-1);
+    background: var(--color-bg-elevated);
+    border: 1px solid var(--pane-edge);
+    border-radius: var(--radius-md);
+    box-shadow: 0 16px 40px -16px var(--color-shadow);
+}
+.bar-menu__panel > button, .bar-menu__panel > a {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    min-height: 44px;
+    padding: 0 var(--space-3);
+    border: none;
+    border-radius: var(--radius-sm);
+    background: none;
+    color: var(--color-text-primary);
+    font: inherit;
+    font-size: var(--text-sm);
+    text-align: left;
+    text-decoration: none;
+    cursor: pointer;
+}
+.bar-menu__panel > button:hover, .bar-menu__panel > a:hover, .bar-menu__panel > [aria-current="page"] { background: var(--color-highlight-soft); }
+.bar-menu__panel i { width: 1.1em; text-align: center; color: var(--color-text-muted); }
+
+/* Where you are: the shelves, then Get and Downloads for admins. */
+.shelf-nav {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-2) 22px;
+    margin-bottom: 32px;
+}
+.shelf-nav a {
     color: var(--color-text-muted);
     text-decoration: none;
-    font-size: var(--text-sm);
+    font-size: 1.0625rem;
     font-weight: 500;
-    letter-spacing: 0.08em;
+    min-height: 28px;
     border-bottom: 1px solid transparent;
+    white-space: nowrap;
+    transition: color var(--dur-fast) ease, border-color var(--dur-fast) ease;
 }
-.shelf-switch a:hover { color: var(--color-text-primary); }
-.shelf-switch a[aria-current="page"] { color: var(--color-text-primary); border-bottom-color: var(--color-accent); }
-@media (max-width: 640px) { .lib-bar__title { letter-spacing: 0.2em; } .shelf-switch { margin-left: var(--space-2); gap: var(--space-2); } }
+.shelf-nav a:hover { color: var(--color-text-primary); }
+.shelf-nav a[aria-current="page"] { color: var(--color-text-primary); border-bottom-color: var(--color-accent); }
+.shelf-nav__gap { flex: 1; }
+.count {
+    display: inline-block;
+    min-width: 1.4em;
+    padding: 0 0.35em;
+    border-radius: var(--radius-pill);
+    background: var(--color-highlight-soft);
+    color: var(--color-accent);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-align: center;
+    vertical-align: 2px;
+}
+@media (max-width: 640px) {
+    .lib-bar__inner { height: 56px; }
+    .lib-bar__title { letter-spacing: 0.22em; font-size: 1rem; }
+    .shelf-nav { gap: var(--space-2) 18px; margin-bottom: 24px; }
+    .shelf-nav a { font-size: 1rem; }
+}
 /* The hang: covers at book proportions (2:3, so nothing important is
    cropped), five across on a laptop, equally spaced, stepping down to 4, 3
    and 2 as the window narrows (equal columns and one fixed gap keep the
@@ -808,6 +869,368 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 .tag .remove-tag:hover {
     opacity: 1;
 }
+.login-button {
+    background: none;
+    border: none;
+    font-size: var(--text-base);
+    color: var(--color-text-muted);
+    padding: var(--space-2);
+    cursor: pointer;
+    transition: color 0.2s;
+}
+.login-button:hover { color: var(--color-accent); }
+.login-overlay { background: rgba(0, 0, 0, 0.45); }
+@keyframes slideIn {
+    from { transform: translateY(var(--space-5)); opacity: 0; }
+    to   { transform: translateY(0);              opacity: 1; }
+}
+
+/* --- Header (book title + author as the modal heading) --- */
+.meta-header {
+    margin-bottom: var(--space-5);
+    padding-right: var(--space-8); /* room for the close × */
+}
+.meta-title,
+.meta-title-input {
+    font-size: 1.5rem;
+    font-weight: 600;
+    line-height: 1.2;
+    color: var(--color-text-primary);
+    margin: 0;
+    letter-spacing: -0.01em;
+}
+.meta-title-input {
+    display: block;
+    resize: none;
+    overflow: hidden;
+}
+.meta-title-input,
+.meta-author-input {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    padding: 3px var(--space-1);
+    margin-left: calc(-1 * var(--space-1));
+    width: calc(100% + var(--space-1));
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+.meta-title-input:hover,
+.meta-author-input:hover {
+    background: var(--color-highlight-soft);
+}
+.meta-title-input:focus,
+.meta-author-input:focus {
+    outline: none;
+    background: var(--color-bg-inset);
+    border-color: var(--color-border);
+}
+.meta-author,
+.meta-author-input {
+    font-size: var(--text-sm);
+    font-weight: 400;
+    color: var(--color-text-muted);
+    margin: var(--space-1) 0 0;
+}
+.meta-author-input::placeholder { font-style: italic; }
+
+/* --- Body: cover + fields, two columns --- */
+.meta-body {
+    display: grid;
+    grid-template-columns: 150px 1fr;
+    gap: var(--space-5);
+    align-items: start;
+}
+.meta-cover {
+    margin: 0;
+    position: relative;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    box-shadow: 0 4px 12px var(--color-shadow);
+    aspect-ratio: 2 / 3;
+    background: var(--color-bg-inset);
+}
+.meta-cover img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+.meta-cover__change {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    background: var(--color-scrim);
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    font-size: var(--text-sm);
+    font-weight: 500;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+.meta-cover__change i { font-size: var(--text-lg); }
+.meta-cover--editable:hover .meta-cover__change,
+.meta-cover__change:focus-visible {
+    opacity: 1;
+}
+.meta-cover__change:focus-visible { outline: 2px solid #fff; outline-offset: calc(-1 * var(--space-1)); }
+
+/* --- Fields stack --- */
+.meta-fields {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    min-width: 0;
+}
+.meta-field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    margin: 0;
+}
+.meta-label {
+    color: var(--color-text-muted);
+    font-weight: 600;
+    font-size: var(--text-sm);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+.meta-input,
+.meta-value {
+    background: var(--color-bg-inset);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: var(--space-2) var(--space-3);
+    font-size: var(--text-sm);
+    color: var(--color-text-secondary);
+    line-height: 1.3;
+    width: 100%;
+    min-height: 34px;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.meta-input:focus {
+    outline: none;
+    border-color: var(--toc-item-highlight, var(--color-text-primary));
+    box-shadow: 0 0 0 3px var(--color-highlight-soft);
+}
+.meta-value {
+    color: var(--color-text-muted);
+    display: flex;
+    align-items: center;
+}
+/* Access toggle: checkbox + inline label on one row, not the stacked default. */
+.meta-checkbox-field {
+    flex-direction: row;
+    align-items: center;
+    gap: var(--space-2);
+    cursor: pointer;
+}
+.meta-checkbox-field input { cursor: pointer; }
+.meta-checkbox-field .meta-label { text-transform: none; letter-spacing: normal; }
+
+/* --- Footer: created-on + actions, with a hairline divider above --- */
+.meta-footer {
+    margin-top: var(--space-5);
+    padding-top: var(--space-4);
+    border-top: 1px solid var(--color-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+}
+.meta-footer-info {
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+    flex: 1;
+}
+.meta-footer-actions {
+    display: flex;
+    gap: var(--space-2);
+}
+
+/* --- Buttons (preserve legacy class names so JS keeps working) --- */
+/* One primary button for the whole app, in the accent blue. */
+.btn-primary {
+    background: var(--color-accent);
+    border-color: var(--color-accent);
+    color: var(--color-on-accent);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    padding: var(--space-2) var(--space-4);
+}
+.btn-primary:hover:not(:disabled) {
+    background: var(--color-accent-hover);
+    border-color: var(--color-accent-hover);
+    color: var(--color-on-accent);
+}
+.btn-primary:active:not(:disabled) { transform: translateY(1px); }
+.delete-book-button {
+    background: transparent;
+    color: var(--color-danger);
+    border: 1px solid transparent;
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radius-md);
+    font-size: var(--text-sm);
+    font-weight: 500;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    transition: background 0.15s ease, color 0.15s ease;
+}
+.delete-book-button i { font-size: var(--text-sm); }
+.delete-book-button:hover {
+    background: var(--color-highlight-soft);
+    color: var(--color-danger-hover);
+}
+.delete-book-button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* --- Close button --- */
+.close-metadata,
+.close-login {
+    position: absolute;
+    top: var(--space-3);
+    right: var(--space-3);
+    cursor: pointer;
+    border: none;
+    background: none;
+    font-size: var(--text-lg);
+    line-height: 1;
+    color: var(--color-text-muted);
+    transition: transform 0.2s ease, background 0.15s ease, color 0.15s ease;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-pill);
+    z-index: 1;
+}
+.close-metadata:hover,
+.close-login:hover {
+    transform: rotate(90deg);
+    background: var(--color-highlight-soft);
+    color: var(--color-text-primary);
+}
+
+/* --- Phones: the panel becomes a bottom sheet, cover above fields, with the
+   actions pinned to the bottom so Save is always reachable --- */
+@media (max-width: 640px) {
+    .metadata-overlay { align-items: flex-end; }
+    .metadata-content {
+        width: 100%;
+        max-width: none;
+        max-height: 92dvh;
+        border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+        padding: var(--space-5) var(--space-4) 0;
+        animation: sheetUp 0.25s var(--ease-emphasized);
+    }
+    .meta-footer {
+        position: sticky;
+        bottom: 0;
+        background: var(--color-bg-base);
+        margin: var(--space-5) calc(-1 * var(--space-4)) 0;
+        padding: var(--space-3) var(--space-4) calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
+    }
+}
+@keyframes sheetUp {
+    from { transform: translateY(100%); }
+    to   { transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .metadata-content { animation: none; }
+}
+@media (max-width: 640px) {
+    .meta-body {
+        grid-template-columns: 1fr;
+        gap: var(--space-5);
+    }
+    .meta-cover {
+        max-width: 200px;
+        margin: 0 auto;
+    }
+    .meta-footer { flex-direction: row; align-items: center; }
+    .meta-footer-actions { justify-content: flex-end; }
+    .meta-footer-info { text-align: left; white-space: nowrap; }
+}
+.tag-input-container {
+    background: var(--color-bg-inset);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: var(--space-1) var(--space-2);
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1);
+    align-items: center;
+    min-height: 38px;
+    position: relative;
+}
+.tag-suggestions {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    margin-top: 2px;
+    background: var(--color-bg-base);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    box-shadow: 0 4px 12px var(--color-shadow);
+    max-height: 180px;
+    overflow-y: auto;
+    z-index: 1100;
+}
+.tag-suggestion {
+    padding: var(--space-2) var(--space-3);
+    font-size: var(--text-sm);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+}
+.tag-suggestion:hover,
+.tag-suggestion.active {
+    background: var(--color-highlight-soft);
+    color: var(--color-text-primary);
+}
+/* Plain-text input inside the chip row. Selector is specific enough (0,1,1)
+ * to beat Bootstrap's `.form-control` (0,1,0) without `!important`. */
+.tag-input-container input {
+    border: none;
+    background: none;
+    padding: var(--space-1);
+    margin: 0;
+    min-width: 120px;
+    flex: 1;
+}
+.tag-input-container input:focus {
+    outline: none;
+}
+.tags-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1);
+}
+.tag {
+    background: var(--color-text-primary);
+    color: var(--color-bg-base);
+    padding: 2px var(--space-2);
+    border-radius: var(--radius-pill);
+    font-size: var(--text-sm);
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+}
+
+.tag .remove-tag {
+    cursor: pointer;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+.tag .remove-tag:hover {
+    opacity: 1;
+}
 .login-button, .upload-button, .dark-mode-toggle, .layout-toggle {
     background: none;
     border: none;
@@ -1132,3 +1555,35 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     -webkit-user-select: none;
     user-select: none;
 }
+
+/* A small menu floating by its button (openMenu in ui.js). */
+.float-menu {
+    position: fixed;
+    z-index: 1200;
+    display: flex;
+    flex-direction: column;
+    min-width: 12rem;
+    max-width: calc(100vw - 16px);
+    padding: var(--space-1);
+    background: var(--color-bg-elevated);
+    border: 1px solid var(--pane-edge);
+    border-radius: var(--radius-md);
+    box-shadow: 0 16px 40px -16px var(--color-shadow);
+}
+.float-menu > button, .float-menu > a {
+    min-height: 40px;
+    padding: 0 var(--space-3);
+    border: none;
+    border-radius: var(--radius-sm);
+    background: none;
+    color: var(--color-text-primary);
+    font: inherit;
+    font-size: var(--text-sm);
+    text-align: left;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+}
+.float-menu > button:hover, .float-menu > a:hover, .float-menu > :focus-visible { background: var(--color-highlight-soft); outline: none; }
+.float-menu__note { padding: var(--space-2) var(--space-3); font-size: 0.75rem; color: var(--color-text-muted); word-break: break-all; }

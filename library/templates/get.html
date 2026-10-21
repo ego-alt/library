@@ -1,0 +1,43 @@
+{% extends "comics/base.html" %}
+{% set shelf = 'get' %}
+{% block page_title %}Get{% endblock %}
+{% block page %}get{% endblock %}
+{% block content %}
+<form class="library-toolbar" id="getForm" role="search">
+    <div class="library-search">
+        <i class="fas fa-magnifying-glass" aria-hidden="true"></i>
+        <input type="search" id="getQuery" name="q" class="library-search__input" placeholder="A book, an author or a comic series" aria-label="What to get" value="{{ query }}" autocomplete="off" enterkeyhint="search" autofocus>
+    </div>
+    <div class="status-filter" role="radiogroup" aria-label="Show">
+        <button type="button" role="radio" data-show="all" aria-checked="true">All</button>
+        <button type="button" role="radio" data-show="books" aria-checked="false">Books</button>
+        <button type="button" role="radio" data-show="comics" aria-checked="false">Comics</button>
+    </div>
+</form>
+
+<p class="comics-hint" id="getStatus" aria-live="polite">Search Open Library for books and {{ 'ComicVine or Metron' if providers_ready else 'comic series (once there’s a ComicVine key or Metron account in Settings)' }}. Tap a cover to get it. Files you already have go in <a href="{{ url_for('downloads.downloads_page') }}#import">Downloads → Import</a>.</p>
+
+<section class="get-section" id="bookResults" hidden>
+    <h2 class="get-section__title">Books</h2>
+    <p class="comics-hint get-section__note"></p>
+    <div class="row library get-results"></div>
+</section>
+
+<section class="get-section" id="comicResults" hidden>
+    <div class="page-head">
+        <h2 class="get-section__title">Comics</h2>
+        <label class="add-options" for="monitorChoice">Get
+            <select id="monitorChoice" class="input">
+                <option value="future" selected>new issues from now on</option>
+                <option value="all">every issue I don't have</option>
+                <option value="none">nothing (I'll pick)</option>
+            </select>
+        </label>
+    </div>
+    <p class="comics-hint get-section__note"></p>
+    <div class="row library get-results"></div>
+</section>
+{% endblock %}
+{% block scripts %}
+    <script src="{{ url_for('static', filename='js/downloads.js') }}"></script>
+{% endblock %}

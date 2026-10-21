@@ -53,7 +53,8 @@ def saga(app, comic_dir, admin_client, provider):
 
 def test_comics_need_sign_in(client, comic_dir):
     assert client.get("/comics/").status_code in (302, 401)
-    assert client.get("/comics/api/import").status_code == 401
+    assert client.get("/api/import").status_code == 401
+    assert client.get("/get").status_code in (302, 401)
     assert client.put("/comics/api/issues/1/progress", json={"page": 1}).status_code == 401
 
 
@@ -62,19 +63,20 @@ def test_every_page_renders(admin_client, saga, tmp_path, comic_dir):
     from library.comics import files
 
     files.import_file(str(make_cbz(tmp_path / "Saga 001.cbz")), issue)
-    for path in ["/comics/", "/comics/add?q=saga", f"/comics/series/{saga.id}", "/comics/downloads", "/settings", f"/comics/read/{issue.id}"]:
+    for path in ["/comics/", "/get?q=saga", f"/comics/series/{saga.id}", "/downloads", "/settings", f"/comics/read/{issue.id}"]:
         response = admin_client.get(path)
         assert response.status_code == 200, path
     assert b"Saga" in admin_client.get("/comics/").data
-    downloads = admin_client.get("/comics/downloads").data.decode()
+    assert admin_client.get("/comics/add?q=saga").location.endswith("/get?q=saga")
+    downloads = admin_client.get("/downloads").data.decode()
     # Issue 2 is out and wanted only with monitor "all"; issue 3 is coming up.
     assert "Coming up" in downloads and "Import" in downloads
 
 
 def test_empty_comics_page_says_what_to_do(admin_client, comic_dir):
     page = admin_client.get("/comics/").data.decode()
-    assert "No series yet" in page and "neither is set up yet" in page
-    assert 'href="/settings"' in page and "/comics/downloads" in page
+    assert "No series yet" in page and 'href="/get"' in page
+    assert 'href="/settings"' in page and 'href="/downloads"' in page
 
 
 def _series_with_one_file(comic_dir, tmp_path):
@@ -109,7 +111,7 @@ def test_readers_see_only_what_there_is_to_read(standard_client, comic_dir, tmp_
     assert standard_client.get(f"/comics/issue/{have.id}/download").status_code == 200
 
 
-@pytest.mark.parametrize("path, home", [("/comics/add", "/comics/"), ("/comics/downloads", "/comics/"), ("/settings", "/")])
+@pytest.mark.parametrize("path, home", [("/get", "/"), ("/downloads", "/"), ("/settings", "/")])
 def test_admin_pages_send_readers_home(standard_client, comic_dir, path, home):
     response = standard_client.get(path)
     assert response.status_code == 302 and response.location.endswith(home)
@@ -119,19 +121,20 @@ def test_admin_pages_send_readers_home(standard_client, comic_dir, path, home):
 @pytest.mark.parametrize(
     "method, path",
     [
-        ("get", "/comics/api/lookup?q=saga"),
+        ("get", "/api/get/search?q=saga"),
+        ("post", "/api/get/books"),
         ("post", "/comics/api/series"),
         ("patch", "/comics/api/series/1"),
         ("post", "/comics/api/series/1/search"),
         ("patch", "/comics/api/issues/1"),
-        ("post", "/comics/api/issues/1/search"),
-        ("get", "/comics/api/issues/1/releases"),
+        ("post", "/api/wanted/comic/1/search"),
+        ("get", "/api/wanted/book/1/releases"),
         ("post", "/comics/api/issues/1/upload"),
-        ("get", "/comics/api/import"),
-        ("post", "/comics/api/import/scan"),
-        ("get", "/comics/api/activity"),
-        ("post", "/comics/api/jobs/search"),
-        ("post", "/comics/api/downloads/1/retry"),
+        ("get", "/api/import"),
+        ("post", "/api/import/scan"),
+        ("get", "/api/downloads"),
+        ("post", "/api/jobs/search"),
+        ("post", "/api/downloads/1/retry"),
         ("get", "/api/settings"),
     ],
 )
@@ -143,14 +146,20 @@ def test_follow_series_wants_whats_coming(saga):
     assert [i.status for i in saga.issues] == [SKIPPED, SKIPPED, WANTED]
 
 
-def test_lookup_marks_followed_series(admin_client, saga):
-    data = admin_client.get("/comics/api/lookup?q=saga").get_json()
-    assert data["results"][0]["followed_id"] == saga.id
+def test_get_search_marks_followed_series(admin_client, saga, monkeypatch):
+    from library.books import openlibrary
+
+    monkeypatch.setattr(openlibrary, "search", lambda q: [])
+    data = admin_client.get("/api/get/search?q=saga").get_json()
+    assert data["comics"][0]["followed_id"] == saga.id and data["books"] == []
 
 
-def test_lookup_without_a_provider_explains(admin_client, comic_dir):
-    response = admin_client.get("/comics/api/lookup?q=saga")
-    assert response.status_code == 502 and "Settings" in response.get_json()["error"]
+def test_get_search_without_a_comics_provider_still_finds_books(admin_client, comic_dir, monkeypatch):
+    from library.books import openlibrary
+
+    monkeypatch.setattr(openlibrary, "search", lambda q: [{"ol_key": "/works/OL1W", "title": "Saga", "author": "Someone", "year": 2001, "cover_url": None}])
+    data = admin_client.get("/api/get/search?q=saga").get_json()
+    assert data["books"][0]["status"] is None and "Settings" in data["errors"]["comics"]
 
 
 def test_monitor_all_and_bulk(admin_client, saga):
@@ -162,7 +171,7 @@ def test_monitor_all_and_bulk(admin_client, saga):
 
 def test_upload_to_import_folder_matches_and_files(admin_client, saga, comic_dir):
     data = {"files": [(io.BytesIO(make_cbz(comic_dir / "tmp.cbz").read_bytes()), "Saga 002 (2024) (Digital).cbz"), (io.BytesIO(b"x"), "notes.txt")]}
-    result = admin_client.post("/comics/api/import/upload", data=data, content_type="multipart/form-data").get_json()
+    result = admin_client.post("/api/import/upload", data=data, content_type="multipart/form-data").get_json()
     assert len(result["imported"]) == 1
     assert saga.issues[1].status == DOWNLOADED
 
@@ -171,16 +180,16 @@ def test_manual_import_into_a_new_local_series(admin_client, comic_dir):
     inbox = comic_dir / "_import"
     inbox.mkdir()
     make_cbz(inbox / "Zine 004 (2021).cbz")
-    listing = admin_client.get("/comics/api/import").get_json()
+    listing = admin_client.get("/api/import").get_json()
     assert listing["files"][0]["reason"].startswith("No followed series")
-    response = admin_client.post("/comics/api/import/file", json={"path": "Zine 004 (2021).cbz", "new_series": "Zine"})
+    response = admin_client.post("/api/import/file", json={"path": "Zine 004 (2021).cbz", "new_series": "Zine"})
     assert response.status_code == 200
     series = ComicSeries.query.one()
     assert series.provider == "local" and series.issues[0].number == "4" and series.issues[0].status == DOWNLOADED
 
 
 def test_import_refuses_paths_outside_the_folder(admin_client, comic_dir):
-    response = admin_client.post("/comics/api/import/file", json={"path": "../../etc/passwd", "new_series": "x"})
+    response = admin_client.post("/api/import/file", json={"path": "../../etc/passwd", "new_series": "x"})
     assert response.status_code == 404
 
 
@@ -224,7 +233,7 @@ def test_settings_keep_masked_secrets(admin_client, comic_dir):
 
 
 def test_search_without_indexers_says_so(admin_client, saga):
-    response = admin_client.post(f"/comics/api/issues/{saga.issues[1].id}/search")
+    response = admin_client.post(f"/api/wanted/comic/{saga.issues[1].id}/search")
     assert response.status_code == 400 and "indexer" in response.get_json()["error"]
 
 
@@ -262,7 +271,7 @@ def test_readers_get_issue_covers_they_can_mark_read(standard_client, comic_dir,
 
 def test_wanted_is_grouped_by_series(admin_client, saga):
     admin_client.patch(f"/comics/api/series/{saga.id}", json={"monitor": "all"})
-    page = admin_client.get("/comics/downloads").data.decode()
+    page = admin_client.get("/downloads").data.decode()
     assert page.count('class="wanted-group"') == 1 and "#2, #1" in page and "Skip all" in page
 
 

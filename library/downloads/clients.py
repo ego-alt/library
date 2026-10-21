@@ -6,7 +6,8 @@
                             watches; its finished files are picked up from the
                             import folder.
 
-Each job is tagged with the download's id, so we only ever touch our own.
+Each job is tagged with the download's id, so we only ever touch our own, and
+filed under the client's category for comics or for books.
 """
 
 import os
@@ -16,7 +17,7 @@ from dataclasses import dataclass
 import httpx
 
 from .. import settings
-from .providers import USER_AGENT
+from ..config import USER_AGENT
 
 
 class ClientError(Exception):
@@ -29,6 +30,13 @@ class JobState:
     progress: float = 0.0
     path: str | None = None  # finished files, as the client sees them
     error: str | None = None
+
+
+def category(config: dict, kind: str) -> str:
+    """The client category a book or comic download is filed under."""
+    if kind == "book":
+        return config.get("book_category") or "books"
+    return config.get("category") or "comics"
 
 
 def map_path(path: str | None) -> str | None:
@@ -70,8 +78,8 @@ class SABnzbd:
         version = self._call("version").get("version")
         return f"Connected to SABnzbd {version}."
 
-    def add(self, url: str, title: str, download_id: int, protocol: str = "usenet") -> str:
-        data = self._call("addurl", name=url, nzbname=f"{title} [shelves-{download_id}]", cat=self.config.get("category") or "comics")
+    def add(self, url: str, title: str, download_id: int, protocol: str = "usenet", kind: str = "comic") -> str:
+        data = self._call("addurl", name=url, nzbname=f"{title} [shelves-{download_id}]", cat=category(self.config, kind))
         ids = data.get("nzo_ids") or []
         if not data.get("status") or not ids:
             raise ClientError("SABnzbd didn't take the NZB.")
@@ -136,9 +144,9 @@ class QBittorrent:
     def test(self) -> str:
         return f"Connected to qBittorrent {self._request('GET', 'app/version').text.strip()}."
 
-    def add(self, url: str, title: str, download_id: int, protocol: str = "usenet") -> str:
+    def add(self, url: str, title: str, download_id: int, protocol: str = "usenet", kind: str = "comic") -> str:
         tag = f"shelves-{download_id}"
-        response = self._request("POST", "torrents/add", data={"urls": url, "category": self.config.get("category") or "comics", "tags": tag})
+        response = self._request("POST", "torrents/add", data={"urls": url, "category": category(self.config, kind), "tags": tag})
         if response.text.strip() == "Fails.":
             raise ClientError("qBittorrent didn't take the torrent.")
         return tag
@@ -178,7 +186,7 @@ class Blackhole:
             raise ClientError(f"{self.folder} isn't a folder this app can see.")
         return f"Grabs will be saved in {self.folder}."
 
-    def add(self, url: str, title: str, download_id: int, protocol: str = "usenet") -> str:
+    def add(self, url: str, title: str, download_id: int, protocol: str = "usenet", kind: str = "comic") -> str:
         try:
             with httpx.Client(timeout=60, headers={"User-Agent": USER_AGENT}, follow_redirects=True, transport=self.transport) as http:
                 response = http.get(url)

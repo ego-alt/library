@@ -6,14 +6,11 @@ from flask_login import current_user, login_required
 
 from .. import settings
 from ..choices import UserRoleChoice
-from ..comics import clients, files, indexers, providers
+from ..comics import files, providers
+from ..downloads import clients, indexers
 from ._helpers import json_admin_required
 
 settings_blueprint = Blueprint("settings", __name__)
-
-# Ebooks on most Newznab and Torznab indexers.
-BOOKS_CATEGORY = "7020"
-
 
 @settings_blueprint.get("/settings")
 @login_required
@@ -57,7 +54,7 @@ def put_settings():
                 "url": indexer["url"].strip(),
                 "api_key": _merge_secret(indexer.get("api_key", ""), previous.get("api_key", "")),
                 "categories": (indexer.get("categories") or indexers.COMICS_CATEGORY).strip(),
-                "book_categories": (indexer.get("book_categories") or BOOKS_CATEGORY).strip(),
+                "book_categories": (indexer.get("book_categories") or indexers.BOOKS_CATEGORY).strip(),
                 "enabled": bool(indexer.get("enabled", True)),
             })
         data["indexers"] = cleaned

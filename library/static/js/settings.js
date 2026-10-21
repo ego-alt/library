@@ -134,35 +134,6 @@ function initSettings() {
     });
     window.addEventListener('beforeunload', (e) => { if (!saveBar.hidden) e.preventDefault(); });
     settingsApi('').then(fill).catch(e => showToast(e.message, 'error'));
-    initJobs();
-}
-
-// The comics worker's jobs, at the foot of the page.
-function initJobs() {
-    const table = document.getElementById('jobTable');
-
-    async function refresh() {
-        let data;
-        try { data = await apiFetch('/comics/api/activity'); } catch (e) { return; }
-        const worker = data.worker || {};
-        table.querySelectorAll('[data-job]').forEach(rowEl => {
-            const job = worker[rowEl.dataset.job];
-            const msg = rowEl.querySelector('.job-msg');
-            const pending = (worker.pending || []).includes(rowEl.dataset.job);
-            msg.textContent = pending ? 'Starting…' : (job ? `${job.message} (${timeAgo(job.at)})` : 'Not run yet');
-            msg.classList.toggle('danger-text', Boolean(job && !job.ok));
-        });
-        document.getElementById('workerState').textContent = worker.alive ? '' : 'The worker hasn’t checked in for a while; it starts when the app gets its first visit after a restart.';
-    }
-
-    table.addEventListener('click', async (e) => {
-        const button = e.target.closest('[data-run]');
-        if (!button) return;
-        await apiFetch(`/comics/api/jobs/${button.dataset.run}`, {method: 'POST'});
-        refresh();
-    });
-    refresh();
-    setInterval(() => { if (!document.hidden) refresh(); }, 10000);
 }
 
 document.addEventListener('DOMContentLoaded', initSettings);

@@ -8,6 +8,7 @@ from ebooklib import epub
 from flask import Blueprint, current_app, jsonify, request
 from flask_login import current_user
 
+from ..books.files import generate_filename, has_toc
 from ..models import Book, Tag, book_tags, db
 from ..utils import (
     cover_mimetype,
@@ -16,32 +17,12 @@ from ..utils import (
     extract_metadata,
     fallback_cover_svg,
     get_epub_cover_path,
-    get_epub_structure,
     guess_cover_mimetype_from_bytes,
     read_epub_cover,
 )
 from ._helpers import commit_or_rollback, cover_url, json_login_required
 
 upload_blueprint = Blueprint("upload_routes", __name__)
-
-
-def _slugify(value: str) -> str:
-    value = re.sub(r"[.,'\"]", "", value)
-    value = re.sub(r"\s+", "_", value)
-    # Strip anything that's not a safe filename char.
-    value = re.sub(r"[^A-Za-z0-9_\-]", "", value)
-    return value or "untitled"
-
-
-def generate_filename(title: str, author: str, book_dir: str) -> str:
-    """Build a unique <title>__<author>.epub filename, avoiding collisions on disk."""
-    base = f"{_slugify(title)}__{_slugify(author)}"
-    candidate = f"{base}.epub"
-    i = 2
-    while os.path.exists(os.path.join(book_dir, candidate)):
-        candidate = f"{base}_{i}.epub"
-        i += 1
-    return candidate
 
 
 # Uploads wait in BOOK_DIR/.incoming/<id>.epub until the uploader confirms
@@ -95,7 +76,7 @@ def upload_book():
 
     try:
         epub_book = epub.read_epub(path, options={"ignore_ncx": True})
-        if not epub_book.get_items_of_type(epub.EpubNav) and not _has_toc(path):
+        if not has_toc(path, epub_book):
             os.remove(path)
             return jsonify(
                 {
@@ -140,15 +121,6 @@ def upload_book():
         return jsonify(
             {"error": "Couldn't read this file. It may be damaged or not a real EPUB."}
         ), 400
-
-
-def _has_toc(path: str) -> bool:
-    """EPUB 2 books carry their table of contents as an NCX rather than a nav
-    document; accept either."""
-    try:
-        return bool(get_epub_structure(path)["toc"])
-    except Exception:
-        return False
 
 
 @upload_blueprint.route("/upload_book/<upload_id>", methods=["DELETE"])

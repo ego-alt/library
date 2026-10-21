@@ -5,8 +5,7 @@ downloading, importing and settings are for admins.
 """
 
 import os
-import secrets
-from datetime import date, timedelta
+from datetime import date
 
 from flask import (
     Blueprint,
@@ -23,34 +22,27 @@ from flask import (
 from flask_login import current_user, login_required
 from werkzeug.utils import secure_filename
 
-from .. import settings
+from ..downloads import jobs
 from ..models import db
 from ..routes._helpers import json_admin_required, json_login_required
 from ..utils import make_thumbnail
 from . import (
     archive,
-    clients,
     downloads,
     files,
-    indexers,
-    jobs,
     names,
     providers,
 )
 from .models import (
-    DL_ACTIVE,
-    DL_FAILED,
-    DOWNLOADED,
     MONITOR_CHOICES,
     SKIPPED,
     SNATCHED,
     WANTED,
-    ComicDownload,
     ComicIssue,
     ComicProgress,
     ComicSeries,
 )
-from .series import add_series, local_series, refresh_series, set_monitor
+from .series import add_series, refresh_series, set_monitor
 
 comics_blueprint = Blueprint("comics", __name__, url_prefix="/comics", template_folder="../templates")
 
@@ -123,39 +115,9 @@ def issue_json(issue: ComicIssue, progress: ComicProgress | None = None) -> dict
     }
 
 
-def download_json(d: ComicDownload) -> dict:
-    return {
-        "id": d.id,
-        "title": d.title,
-        "indexer": d.indexer,
-        "protocol": d.protocol,
-        "client": d.client,
-        "size": d.size,
-        "status": d.status,
-        "progress": d.progress,
-        "error": d.error,
-        "created_at": d.created_at.isoformat() + "Z",
-        "updated_at": d.updated_at.isoformat() + "Z" if d.updated_at else None,
-        "issue": {"id": d.issue.id, "series_id": d.issue.series_id, "label": f"{d.issue.series.display_name} #{d.issue.number}"} if d.issue else None,
-    }
-
-
-def _downloads_count() -> int:
-    """What's moving or needs a hand: downloads in progress and files waiting
-    in the import folder."""
-    active = ComicDownload.query.filter(ComicDownload.status.in_(DL_ACTIVE)).count()
-    waiting = len(files.comic_files(files.import_dir())) if os.path.isdir(files.import_dir()) else 0
-    return active + waiting
-
-
 def _page(template: str, active: str, **context):
     admin = _is_admin()
-    return render_template(f"comics/{template}", active=active, downloads_count=_downloads_count() if admin else 0, is_admin=admin, providers_ready=bool(providers.available()), **context)
-
-
-def _admin_page():
-    """Send anyone but an admin back to the library."""
-    return None if _is_admin() else redirect(url_for("comics.index"))
+    return render_template(f"comics/{template}", active=active, is_admin=admin, providers_ready=bool(providers.available()), **context)
 
 
 # Pages
@@ -217,7 +179,8 @@ def index():
 @comics_blueprint.get("/add")
 @login_required
 def add_page():
-    return _admin_page() or _page("add.html", "add", query=request.args.get("q", ""))
+    """Following a series is done from Get now."""
+    return redirect(url_for("downloads.get_page", q=request.args.get("q", "")))
 
 
 @comics_blueprint.get("/series/<int:series_id>")
@@ -235,36 +198,6 @@ def series_page(series_id):
         next_issue = _up_next(have, {i.id: progress[i.id] for i in have if i.id in progress})[0]
         up_next = next(i for i in issues if i["id"] == next_issue.id)
     return _page("series.html", "series", series=series, cover=_series_cover(series), issues=issues, up_next=up_next, monitor_choices=MONITOR_CHOICES)
-
-
-@comics_blueprint.get("/downloads")
-@login_required
-def downloads_page():
-    """Wanted issues, downloads, files to import and what's coming, together."""
-    if not _is_admin():
-        return redirect(url_for("comics.index"))
-    today = date.today()
-    soon = ComicIssue.query.filter(ComicIssue.filename.is_(None), db.or_(ComicIssue.store_date > today, db.and_(ComicIssue.store_date.is_(None), ComicIssue.cover_date > today))).all()
-    soon = [i for i in soon if i.release_date and i.release_date <= today + timedelta(days=60) and i.series.monitor != "none"]
-    soon.sort(key=lambda i: (i.release_date, i.series.name, i.sort_number))
-    options = [[s.id, s.display_name] for s in ComicSeries.query.order_by(ComicSeries.name)]
-    return _page(
-        "downloads.html",
-        "downloads",
-        wanted=_wanted_by_series(),
-        upcoming=[issue_json(i) for i in soon],
-        series_options=options,
-        can_search=bool(settings.get("indexers")),
-    )
-
-
-def _wanted_by_series() -> list[dict]:
-    """Wanted issues, a group per series, the series with the newest first."""
-    groups: dict[int, dict] = {}
-    for issue in downloads.wanted_issues():
-        group = groups.setdefault(issue.series_id, {"series": issue.series, "issues": []})
-        group["issues"].append(issue_json(issue))
-    return list(groups.values())
 
 
 @comics_blueprint.get("/read/<int:issue_id>")
@@ -354,23 +287,6 @@ def issue_download(issue_id):
 
 
 # API: series
-
-
-@comics_blueprint.get("/api/lookup")
-@json_admin_required
-def lookup():
-    query = (request.args.get("q") or "").strip()
-    if not query:
-        return jsonify({"results": []})
-    try:
-        provider = providers.get_provider(request.args.get("provider") or None)
-        results = provider.search_series(query)
-    except providers.ProviderError as e:
-        return jsonify({"error": str(e)}), 502
-    followed = {(s.provider, s.provider_id): s.id for s in ComicSeries.query.filter_by(provider=provider.name)}
-    for row in results:
-        row["followed_id"] = followed.get((row["provider"], row["provider_id"]))
-    return jsonify({"results": results, "provider": provider.name})
 
 
 @comics_blueprint.post("/api/series")
@@ -488,61 +404,6 @@ def bulk_update_issues():
     return jsonify({"changed": changed})
 
 
-@comics_blueprint.post("/api/issues/<int:issue_id>/search")
-@json_admin_required
-def search_issue(issue_id):
-    """Grab the best release now."""
-    issue = _issue_or_404(issue_id)
-    if not settings.get("indexers"):
-        return jsonify({"error": "Add an indexer in Settings first."}), 400
-    releases, errors = downloads.find_releases(issue)
-    best = next((r for r in releases if r.score >= 0), None)
-    if best is None:
-        return jsonify({"error": "; ".join(errors) or "Nothing on the indexers fits this issue yet.", "releases": len(releases)}), 404
-    try:
-        download = downloads.grab(issue, best)
-    except clients.ClientError as e:
-        return jsonify({"error": str(e)}), 502
-    return jsonify({"download": download_json(download), "issue": issue_json(issue)})
-
-
-@comics_blueprint.get("/api/issues/<int:issue_id>/releases")
-@json_admin_required
-def issue_releases(issue_id):
-    """Every release for an issue, to pick one by hand. The links stay on the
-    server (they can carry indexer keys); grabbing names one by its token."""
-    issue = _issue_or_404(issue_id)
-    if not settings.get("indexers"):
-        return jsonify({"error": "Add an indexer in Settings first."}), 400
-    releases, errors = downloads.find_releases(issue)
-    from .. import cache
-
-    token = secrets.token_urlsafe(12)
-    cache.set(f"comic-releases:{token}", {"issue_id": issue.id, "releases": [vars(r) for r in releases]}, timeout=1800)
-    return jsonify({"token": token, "releases": [r.public() for r in releases], "errors": errors})
-
-
-@comics_blueprint.post("/api/issues/<int:issue_id>/grab")
-@json_admin_required
-def grab_release(issue_id):
-    issue = _issue_or_404(issue_id)
-    data = request.get_json(silent=True) or {}
-    from .. import cache
-
-    saved = cache.get(f"comic-releases:{data.get('token')}")
-    if not saved or saved["issue_id"] != issue.id:
-        return jsonify({"error": "That list is out of date; search again."}), 410
-    try:
-        release = indexers.Release(**saved["releases"][int(data.get("index", -1))])
-    except (IndexError, ValueError, TypeError):
-        return jsonify({"error": "No such release."}), 400
-    try:
-        download = downloads.grab(issue, release)
-    except clients.ClientError as e:
-        return jsonify({"error": str(e)}), 502
-    return jsonify({"download": download_json(download), "issue": issue_json(issue)})
-
-
 @comics_blueprint.delete("/api/issues/<int:issue_id>/file")
 @json_admin_required
 def delete_issue_file(issue_id):
@@ -590,159 +451,3 @@ def save_progress(issue_id):
     return jsonify({"page": progress.page, "finished": progress.finished})
 
 
-# API: import folder
-
-
-@comics_blueprint.get("/api/import")
-@json_admin_required
-def import_list():
-    folder = files.import_dir()
-    os.makedirs(folder, exist_ok=True)
-    rows = []
-    for path in files.comic_files(folder):
-        match = files.match_file(path)
-        rows.append({
-            "path": os.path.relpath(path, folder),
-            "size": os.path.getsize(path),
-            "parsed": {"series": match.parsed.series, "number": match.parsed.number, "year": match.parsed.year},
-            "issue": {"id": match.issue.id, "label": f"{match.series.display_name} #{match.issue.number}"} if match.issue else None,
-            "series": {"id": match.series.id, "name": match.series.display_name} if match.series else None,
-            "reason": match.reason,
-        })
-    return jsonify({"files": rows, "folder": folder})
-
-
-@comics_blueprint.post("/api/import/upload")
-@json_admin_required
-def import_upload():
-    """Files from your computer into the import folder, then matched."""
-    folder = files.import_dir()
-    os.makedirs(folder, exist_ok=True)
-    saved = 0
-    for upload in request.files.getlist("files"):
-        if not names.is_comic_file(upload.filename or ""):
-            continue
-        # Keep the name as it was (it's what matching reads), just safely.
-        name = names.safe_filename(os.path.basename(upload.filename))
-        upload.save(os.path.join(folder, name))
-        saved += 1
-    if not saved:
-        return jsonify({"error": "Choose CBZ, CBR or CB7 files."}), 400
-    result = files.scan_import_dir()
-    downloads.mark_imported(result["imported"])
-    return jsonify({"saved": saved, **result})
-
-
-@comics_blueprint.post("/api/import/scan")
-@json_admin_required
-def import_scan():
-    result = files.scan_import_dir()
-    downloads.mark_imported(result["imported"])
-    return jsonify(result)
-
-
-@comics_blueprint.post("/api/import/file")
-@json_admin_required
-def import_one():
-    """Import one file as an issue you pick, or as a new local series when no
-    provider knows it."""
-    data = request.get_json(silent=True) or {}
-    try:
-        path = files.import_folder_path(data.get("path", ""))
-    except FileNotFoundError:
-        return jsonify({"error": "That file isn't in the import folder any more."}), 404
-    if data.get("issue_id"):
-        issue = _issue_or_404(int(data["issue_id"]))
-    elif data.get("series_id") or data.get("new_series"):
-        number = names.normalize_number(str(data.get("number") or "")) or names.parse(os.path.basename(path)).number
-        if not number:
-            return jsonify({"error": "Which issue number is it?"}), 400
-        if data.get("series_id"):
-            series = _series_or_404(int(data["series_id"]))
-        else:
-            parsed = names.parse(os.path.basename(path))
-            series = local_series((data.get("new_series") or "").strip() or parsed.series or "Unknown", parsed.year)
-        issue = next((i for i in series.issues if names.normalize_number(i.number) == number), None)
-        if issue is None:
-            issue = ComicIssue(series=series, number=number, sort_number=names.sort_number(number), status=SKIPPED)
-            db.session.add(issue)
-            db.session.flush()
-    else:
-        return jsonify({"error": "Pick an issue or a series."}), 400
-    try:
-        files.import_file(path, issue)
-    except archive.ArchiveError as e:
-        db.session.rollback()
-        return jsonify({"error": str(e)}), 400
-    downloads.mark_imported([issue.id])
-    return jsonify(issue_json(issue))
-
-
-@comics_blueprint.delete("/api/import/file")
-@json_admin_required
-def import_delete():
-    try:
-        path = files.import_folder_path(request.args.get("path", ""))
-    except FileNotFoundError:
-        return jsonify({"ok": True})
-    os.remove(path)
-    return jsonify({"ok": True})
-
-
-# API: downloads and jobs
-
-
-@comics_blueprint.get("/api/activity")
-@json_admin_required
-def activity():
-    active = ComicDownload.query.filter(ComicDownload.status.in_(DL_ACTIVE)).order_by(ComicDownload.created_at.desc()).all()
-    history = ComicDownload.query.filter(~ComicDownload.status.in_(DL_ACTIVE)).order_by(ComicDownload.updated_at.desc()).limit(100).all()
-    return jsonify({"active": [download_json(d) for d in active], "history": [download_json(d) for d in history], "worker": jobs.status()})
-
-
-@comics_blueprint.post("/api/jobs/<job>")
-@json_admin_required
-def run_job(job):
-    if job not in jobs.JOBS:
-        abort(404)
-    jobs.request_run(job)
-    return jsonify({"ok": True})
-
-
-@comics_blueprint.post("/api/downloads/<int:download_id>/cancel")
-@json_admin_required
-def cancel_download(download_id):
-    download = db.session.get(ComicDownload, download_id) or abort(404)
-    downloads.cancel(download)
-    return jsonify(download_json(download))
-
-
-@comics_blueprint.post("/api/downloads/<int:download_id>/retry")
-@json_admin_required
-def retry_download(download_id):
-    """Block this release and look for another."""
-    download = db.session.get(ComicDownload, download_id) or abort(404)
-    if download.status in DL_ACTIVE:
-        downloads.cancel(download)
-    download.status = DL_FAILED
-    if download.issue and download.issue.status != DOWNLOADED:
-        download.issue.status = WANTED
-    db.session.commit()
-    if download.issue is None:
-        return jsonify({"error": "That issue is gone."}), 404
-    grabbed = downloads.search_issue(download.issue)
-    if grabbed is None:
-        return jsonify({"error": "Nothing else fits this issue yet; it stays wanted."}), 404
-    return jsonify(download_json(grabbed))
-
-
-@comics_blueprint.delete("/api/downloads/<int:download_id>")
-@json_admin_required
-def forget_download(download_id):
-    """Remove a finished or failed download from the history (and the blocklist)."""
-    download = db.session.get(ComicDownload, download_id) or abort(404)
-    if download.status in DL_ACTIVE:
-        return jsonify({"error": "Cancel it first."}), 409
-    db.session.delete(download)
-    db.session.commit()
-    return jsonify({"ok": True})
