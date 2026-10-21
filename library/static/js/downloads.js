@@ -201,68 +201,78 @@ function showJobs(worker) {
     document.getElementById('workerState').textContent = worker.alive ? '' : 'The worker hasn’t checked in for a while; it starts when the app gets its first visit after a restart.';
 }
 
-// Wanted: a line per book, a group per comic series that searches or skips as one.
+// Wanted: compact rows, each with a ⋯ menu; a comic series' row acts on all
+// its issues at once.
 function initWanted() {
     const section = document.getElementById('wanted');
-    const count = section.querySelector('h2 .count');
+    const canSearch = Boolean(section.dataset.canSearch);
 
     function removeRows(rows) {
         rows.forEach(row => {
-            const group = row.closest('.wanted-group');
+            const series = row.closest('.wanted-series');
             row.remove();
-            if (group && group !== row && !group.querySelector('[data-item-id]')) group.remove();
+            if (series && !series.querySelector('[data-item-id]')) series.remove();
         });
-        if (count) count.textContent = section.querySelectorAll('[data-item-id]').length;
+        section.querySelectorAll('.wanted-heading').forEach(heading => {
+            const list = heading.nextElementSibling;
+            const left = list.querySelectorAll('[data-item-id]').length;
+            if (!left) { heading.remove(); list.remove(); } else heading.querySelector('[data-count]').textContent = left;
+        });
+    }
+
+    async function run(work, done) {
+        try {
+            const result = await work();
+            if (done) done(result);
+        } catch (err) { showToast(err.message, 'error'); }
+    }
+
+    function searchItem(row) {
+        showToast(`Searching for ${row.dataset.label}…`);
+        run(() => apiFetch(`/api/wanted/${row.dataset.kind}/${row.dataset.itemId}/search`, {method: 'POST'}), data => {
+            showToast(`Grabbed ${data.download.title}`, 'success');
+            removeRows([row]);
+        });
+    }
+
+    function itemMenu(row) {
+        const book = row.dataset.kind === 'book';
+        return [
+            canSearch ? {label: 'Search now', onClick: () => searchItem(row)} : null,
+            canSearch ? {label: 'Pick a release…', onClick: () => pickRelease({kind: row.dataset.kind, id: row.dataset.itemId, label: row.dataset.label, onGrab: () => removeRows([row])})} : null,
+            book
+                ? {label: 'Remove', danger: true, onClick: () => { if (confirm(`Stop getting ${row.dataset.label}?`)) run(() => apiFetch(`/api/book-requests/${row.dataset.itemId}`, {method: 'DELETE'}), () => removeRows([row])); }}
+                : {label: 'Skip', onClick: () => run(() => apiFetch(`/comics/api/issues/${row.dataset.itemId}`, {method: 'PATCH', body: {status: 'skipped'}}), () => removeRows([row]))},
+        ];
+    }
+
+    function seriesMenu(series) {
+        const rows = [...series.querySelectorAll('[data-item-id]')];
+        const many = rows.length > 1;
+        return [
+            canSearch ? {label: many ? `Search for all ${rows.length}` : 'Search now', onClick: () => {
+                showToast(`Searching for ${series.dataset.label}…`);
+                run(() => apiFetch(`/comics/api/series/${series.dataset.seriesId}/search`, {method: 'POST'}), data => {
+                    showToast(data.grabbed ? `Grabbed ${data.grabbed}` : 'Nothing on the indexers yet', data.grabbed ? 'success' : 'info');
+                    if (data.grabbed) window.location.reload();
+                });
+            }} : null,
+            {label: many ? `Skip all ${rows.length}` : 'Skip', onClick: () => run(() => apiFetch('/comics/api/issues/bulk', {method: 'POST', body: {ids: rows.map(r => Number(r.dataset.itemId)), status: 'skipped'}}), () => removeRows(rows))},
+            {label: 'Open the series', href: appUrl(`/comics/series/${series.dataset.seriesId}`)},
+        ];
     }
 
     section.addEventListener('click', async (e) => {
         const button = e.target.closest('[data-action]');
         if (!button) return;
-        e.preventDefault();  // buttons in a group's summary shouldn't fold it
-        const row = button.closest('[data-item-id]');
-        const group = button.closest('.wanted-group');
-        const action = button.dataset.action;
-        if (action === 'search-all') {
+        if (button.dataset.action === 'search-all') {
             await apiFetch('/api/jobs/search', {method: 'POST'});
             showToast('Searching; grabs show up at the top of this page.', 'success');
-        } else if (action === 'search-item') {
-            button.textContent = 'Searching…';
-            await busy(button, async () => {
-                try {
-                    const data = await apiFetch(`/api/wanted/${row.dataset.kind}/${row.dataset.itemId}/search`, {method: 'POST'});
-                    showToast(`Grabbed ${data.download.title}`, 'success');
-                    removeRows([row]);
-                } catch (err) { showToast(err.message, 'error'); }
-            });
-        } else if (action === 'pick') {
-            pickRelease({kind: row.dataset.kind, id: row.dataset.itemId, label: row.dataset.label, onGrab: () => removeRows([row])});
-        } else if (action === 'search-series') {
-            button.textContent = 'Searching…';
-            await busy(button, async () => {
-                try {
-                    const data = await apiFetch(`/comics/api/series/${group.dataset.seriesId}/search`, {method: 'POST'});
-                    showToast(data.grabbed ? `Grabbed ${data.grabbed}` : 'Nothing on the indexers yet', data.grabbed ? 'success' : 'info');
-                    if (data.grabbed) window.location.reload();
-                } catch (err) { showToast(err.message, 'error'); }
-            });
-        } else if (action === 'skip-series') {
-            const rows = [...group.querySelectorAll('[data-item-id]')];
-            try {
-                await apiFetch('/comics/api/issues/bulk', {method: 'POST', body: {ids: rows.map(r => Number(r.dataset.itemId)), status: 'skipped'}});
-                removeRows(rows);
-            } catch (err) { showToast(err.message, 'error'); }
-        } else if (action === 'skip-issue') {
-            try {
-                await apiFetch(`/comics/api/issues/${row.dataset.itemId}`, {method: 'PATCH', body: {status: 'skipped'}});
-                removeRows([row]);
-            } catch (err) { showToast(err.message, 'error'); }
-        } else if (action === 'remove-request') {
-            if (!confirm(`Stop getting ${row.dataset.label}?`)) return;
-            try {
-                await apiFetch(`/api/book-requests/${row.dataset.itemId}`, {method: 'DELETE'});
-                removeRows([row]);
-            } catch (err) { showToast(err.message, 'error'); }
+            return;
         }
+        e.preventDefault();  // a ⋯ in a series' summary shouldn't fold it
+        const row = button.closest('[data-item-id]');
+        openMenu(button, row ? itemMenu(row) : seriesMenu(button.closest('.wanted-series')));
     });
 }
 

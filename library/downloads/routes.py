@@ -96,19 +96,15 @@ def downloads_page():
     soon = ComicIssue.query.filter(ComicIssue.filename.is_(None), db.or_(ComicIssue.store_date > today, db.and_(ComicIssue.store_date.is_(None), ComicIssue.cover_date > today))).all()
     soon = [i for i in soon if i.release_date and i.release_date <= today + timedelta(days=60) and i.series.monitor != "none"]
     soon.sort(key=lambda i: (i.release_date, i.series.name, i.sort_number))
-    # Wanted: a group per comic series, a line per book, newest first.
+    # Wanted: books, a line each; comics, a group per series; newest first.
     groups: dict[int, dict] = {}
     for issue in comic_downloads.wanted_issues():
-        group = groups.setdefault(issue.series_id, {"kind": KIND_COMIC, "series": issue.series, "issues": [], "date": issue.release_date})
-        group["issues"].append(issue_json(issue))
-    wanted = list(groups.values())
-    wanted += [{"kind": KIND_BOOK, "request": r, "date": r.created_at.date()} for r in books.kind.wanted()]
-    wanted.sort(key=lambda g: g["date"] or date.min, reverse=True)
+        groups.setdefault(issue.series_id, {"series": issue.series, "issues": []})["issues"].append(issue_json(issue))
     snatched = BookRequest.query.filter_by(status="snatched").count()
     return render_template(
         "downloads.html",
-        wanted=wanted,
-        wanted_count=sum(len(g["issues"]) if g["kind"] == KIND_COMIC else 1 for g in wanted),
+        wanted_books=books.kind.wanted(),
+        wanted_comics=list(groups.values()),
         books_on_the_way=snatched,
         upcoming=[issue_json(i) for i in soon],
         series_options=[[s.id, s.display_name] for s in ComicSeries.query.order_by(ComicSeries.name)],

@@ -265,7 +265,7 @@ def test_readers_get_issue_covers_they_can_mark_read(standard_client, comic_dir,
 def test_wanted_is_grouped_by_series(admin_client, saga):
     admin_client.patch(f"/comics/api/series/{saga.id}", json={"monitor": "all"})
     page = admin_client.get("/downloads").data.decode()
-    assert page.count('class="wanted-group"') == 1 and "#2, #1" in page and "Skip all" in page
+    assert page.count('class="wanted-series"') == 1 and "#2, #1" in page
 
 
 def test_comic_date():

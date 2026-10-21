@@ -8,62 +8,52 @@
     <ol class="download-list" id="activeList"></ol>
 </section>
 
-<section class="dl-section" id="wanted">
+{% set comic_count = wanted_comics|sum(attribute='issues', start=[])|length %}
+<section class="dl-section" id="wanted" data-can-search="{{ '1' if can_search else '' }}">
     <div class="page-head">
-        <h2>Wanted{% if wanted_count %} <span class="count">{{ wanted_count }}</span>{% endif %}</h2>
-        {% if can_search and wanted %}<button type="button" class="btn btn-secondary" data-action="search-all">Search all now</button>{% endif %}
+        <h2>Wanted</h2>
+        {% if can_search and (wanted_books or wanted_comics) %}<button type="button" class="btn btn-secondary" data-action="search-all">Search all now</button>{% endif %}
     </div>
-    {% if wanted %}
-    <p class="comics-hint">Books you've asked for and comic issues that are out, newest first. {% if can_search %}They're searched for every few hours.{% else %}They're searched for once there's an indexer in <a href="{{ url_for('settings.settings_page') }}#indexers">Settings</a>.{% endif %}</p>
-    <ol class="wanted-groups">
-    {% for group in wanted %}
-        {% if group.kind == 'book' %}
-        {% set r = group.request %}
-        <li class="wanted-group wanted-group--book" data-kind="book" data-item-id="{{ r.id }}" data-label="{{ r.label }}">
-            <div class="wanted-group__head">
-                <span class="wanted-group__name"><span class="kind-tag">Book</span> {{ r.title }}{% if r.author %} <span class="text-muted">{{ r.author }}</span>{% endif %}</span>
-                <span class="col-date" title="When you asked for it">Asked {{ r.created_at|comic_date }}</span>
-                <span class="col-actions">
-                    {% if can_search %}<button type="button" class="link-button" data-action="search-item">Search</button><button type="button" class="link-button" data-action="pick">Pick</button>{% endif %}
-                    <button type="button" class="link-button" data-action="remove-request">Remove</button>
-                </span>
-            </div>
+    {% if wanted_books or wanted_comics %}
+    <p class="comics-hint">{% if can_search %}Searched for every few hours.{% else %}Searched for once there's an indexer in <a href="{{ url_for('settings.settings_page') }}#indexers">Settings</a>.{% endif %}</p>
+    {% if wanted_books %}
+    <h3 class="wanted-heading">Books <span class="count" data-count>{{ wanted_books|length }}</span></h3>
+    <ol class="wanted-list">
+    {% for r in wanted_books %}
+        <li class="wanted-row" data-kind="book" data-item-id="{{ r.id }}" data-label="{{ r.label }}">
+            <span class="wanted-row__name">{{ r.title }}{% if r.author %} <span class="text-muted">· {{ r.author }}</span>{% endif %}</span>
+            <span class="wanted-row__date" title="When you asked for it">Asked {{ r.created_at|comic_date }}</span>
+            <button type="button" class="wanted-row__more" data-action="menu" data-menu-anchor aria-label="More for {{ r.title }}"><i class="fas fa-ellipsis-h" aria-hidden="true"></i></button>
         </li>
-        {% else %}
-        {% set n = group.issues|length %}
-        <li class="wanted-group" data-series-id="{{ group.series.id }}">
-            <details>
-                <summary class="wanted-group__head">
-                    <span class="wanted-group__name">
-                        <span class="kind-tag">Comic</span>
-                        <a href="{{ url_for('comics.series_page', series_id=group.series.id) }}">{{ group.series.display_name }}</a>
-                        <span class="text-muted">{% for i in group.issues[:3] %}#{{ i.number }}{{ ', ' if not loop.last }}{% endfor %}{% if n > 3 %} and {{ n - 3 }} more{% endif %}</span>
-                    </span>
-                    <span class="col-date">{{ group.issues[0].date|comic_date }}</span>
-                    <span class="col-actions">
-                        {% if can_search %}<button type="button" class="link-button" data-action="search-series">Search</button>{% endif %}
-                        <button type="button" class="link-button" data-action="skip-series">Skip{{ ' all' if n > 1 else '' }}</button>
-                    </span>
-                </summary>
-                <table class="issue-table issue-table--wanted">
-                    <tbody>
-                    {% for issue in group.issues %}
-                        <tr data-kind="comic" data-item-id="{{ issue.id }}" data-label="{{ group.series.display_name }} #{{ issue.number }}">
-                            <td><span class="issue-num">#{{ issue.number }}</span>{% if issue.title %} <span class="text-muted">{{ issue.title }}</span>{% endif %}</td>
-                            <td class="col-date">{{ issue.date|comic_date }}</td>
-                            <td class="col-actions">
-                                {% if can_search %}<button type="button" class="link-button" data-action="search-item">Search</button><button type="button" class="link-button" data-action="pick">Pick</button>{% endif %}
-                                <button type="button" class="link-button" data-action="skip-issue">Skip</button>
-                            </td>
-                        </tr>
-                    {% endfor %}
-                    </tbody>
-                </table>
-            </details>
-        </li>
-        {% endif %}
     {% endfor %}
     </ol>
+    {% endif %}
+    {% if wanted_comics %}
+    <h3 class="wanted-heading">Comics <span class="count" data-count>{{ comic_count }}</span></h3>
+    <ol class="wanted-list">
+    {% for group in wanted_comics %}
+        {% set n = group.issues|length %}
+        <li class="wanted-series" data-series-id="{{ group.series.id }}" data-label="{{ group.series.display_name }}">
+            <details>
+                <summary class="wanted-row">
+                    <span class="wanted-row__name"><span class="wanted-row__fold" aria-hidden="true">▸</span>{{ group.series.display_name }} <span class="text-muted">· {% for i in group.issues[:3] %}#{{ i.number }}{{ ', ' if not loop.last }}{% endfor %}{% if n > 3 %} +{{ n - 3 }}{% endif %}</span></span>
+                    <span class="wanted-row__date">{{ group.issues[0].date|comic_date }}</span>
+                    <button type="button" class="wanted-row__more" data-action="menu" data-menu-anchor aria-label="More for {{ group.series.display_name }}"><i class="fas fa-ellipsis-h" aria-hidden="true"></i></button>
+                </summary>
+                <ol class="wanted-list wanted-list--issues">
+                {% for issue in group.issues %}
+                    <li class="wanted-row" data-kind="comic" data-item-id="{{ issue.id }}" data-label="{{ group.series.display_name }} #{{ issue.number }}">
+                        <span class="wanted-row__name">#{{ issue.number }}{% if issue.title %} <span class="text-muted">· {{ issue.title }}</span>{% endif %}</span>
+                        <span class="wanted-row__date">{{ issue.date|comic_date }}</span>
+                        <button type="button" class="wanted-row__more" data-action="menu" data-menu-anchor aria-label="More for #{{ issue.number }}"><i class="fas fa-ellipsis-h" aria-hidden="true"></i></button>
+                    </li>
+                {% endfor %}
+                </ol>
+            </details>
+        </li>
+    {% endfor %}
+    </ol>
+    {% endif %}
     {% else %}
     <p class="comics-hint">Nothing wanted. <a href="{{ url_for('downloads.get_page') }}">Get</a> a book or follow a comic series, and it shows up here until it's in the library.</p>
     {% endif %}
