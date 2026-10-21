@@ -19,22 +19,6 @@ const comicsApi = async (path, {method = 'GET', body, form} = {}) => {
     return data;
 };
 
-function toast(message, type = 'info') {
-    const container = document.getElementById('toastContainer');
-    if (!container) return;
-    const el = document.createElement('div');
-    el.className = `notice notice--${type}`;
-    el.setAttribute('role', type === 'error' ? 'alert' : 'status');
-    el.textContent = message;
-    el.addEventListener('click', () => el.remove());
-    container.appendChild(el);
-    requestAnimationFrame(() => el.classList.add('notice--shown'));
-    setTimeout(() => {
-        el.classList.remove('notice--shown');
-        setTimeout(() => el.remove(), 250);
-    }, type === 'error' ? 7000 : 3500);
-}
-
 function h(tag, attrs = {}, ...children) {
     const el = document.createElement(tag);
     for (const [key, value] of Object.entries(attrs)) {
@@ -84,25 +68,60 @@ async function busy(button, work) {
 
 const STATUS_LABEL = {wanted: 'Wanted', skipped: 'Skipped', snatched: 'Downloading', downloaded: 'Have'};
 
-// --- Series grid ----------------------------------------------------------
+// --- The wall of series: one search box and All / Unread / Reading / Finished,
+// like the books (main.js), filtered here since every series is on the page. ---
+
+const SERIES_EMPTY = {
+    unread: ['Nothing unread', 'You’ve opened every series here.'],
+    reading: ['Nothing on the go', 'Series you start reading will appear here.'],
+    finished: ['Nothing finished yet', 'Series you’ve read every issue of will appear here.'],
+};
 
 function initSeries() {
-    const grid = document.getElementById('seriesGrid');
+    const grid = document.getElementById('library');
     if (!grid) return;
-    const filter = document.getElementById('seriesFilter');
-    filter.addEventListener('input', () => {
-        const q = filter.value.trim().toLowerCase();
-        for (const card of grid.children) card.hidden = q && !card.dataset.name.includes(q);
+    const search = document.getElementById('librarySearch');
+    const empty = document.getElementById('emptyState');
+    const filter = document.querySelector('.status-filter[aria-label="Reading status"]');
+    const cards = [...grid.children];
+    let view = filter.querySelector('[aria-checked="true"]').dataset.view;
+
+    function apply() {
+        const q = search.value.trim().toLowerCase();
+        // What you read last comes first under Reading; A–Z everywhere else.
+        const order = view === 'reading' ? [...cards].sort((a, b) => b.dataset.last.localeCompare(a.dataset.last)) : cards;
+        grid.append(...order);
+        let shown = 0;
+        for (const card of cards) {
+            card.hidden = (view !== 'all' && card.dataset.state !== view) || (q && !card.dataset.name.includes(q));
+            if (!card.hidden) shown += 1;
+        }
+        empty.hidden = shown > 0;
+        if (!shown) {
+            const [title, body] = q ? [`Nothing matches "${search.value.trim()}"`, 'Try a different word, or clear the search.'] : SERIES_EMPTY[view];
+            empty.querySelector('h3').textContent = title;
+            empty.querySelector('p').textContent = body;
+        }
+    }
+
+    filter.addEventListener('click', (e) => {
+        const button = e.target.closest('[data-view]');
+        if (!button || button.dataset.view === view) return;
+        view = button.dataset.view;
+        setRadio(filter, button);
+        apply();
     });
-    const sorter = document.querySelector('[aria-label="Sort series"]');
-    sorter.addEventListener('click', (e) => {
-        const button = e.target.closest('[data-sort]');
-        if (!button) return;
-        setRadio(sorter, button);
-        const key = button.dataset.sort;
-        const cards = [...grid.children].sort((a, b) => key === 'added' ? b.dataset.added.localeCompare(a.dataset.added) : a.dataset.name.localeCompare(b.dataset.name));
-        grid.append(...cards);
+    search.addEventListener('input', apply);
+    search.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            search.blur();  // drops the phone keyboard so the results show
+        } else if (e.key === 'Escape' && search.value) {
+            e.stopPropagation();
+            search.value = '';
+            apply();
+        }
     });
+    apply();
 }
 
 // --- Follow a series --------------------------------------------------------
@@ -149,7 +168,7 @@ function initAdd() {
             const data = await comicsApi('/series', {method: 'POST', body: {provider: row.provider, provider_id: row.provider_id, monitor: monitor.value}});
             window.location = data.url;
         } catch (e) {
-            toast(e.message, 'error');
+            showToast(e.message, 'error');
             button.disabled = false;
             button.textContent = 'Follow';
         }
@@ -238,7 +257,7 @@ function initSeriesDetail() {
     async function setStatus(issue, status) {
         try {
             replace(await comicsApi(`/issues/${issue.id}`, {method: 'PATCH', body: {status}}));
-        } catch (e) { toast(e.message, 'error'); }
+        } catch (e) { showToast(e.message, 'error'); }
     }
 
     async function searchNow(button, issue) {
@@ -247,14 +266,14 @@ function initSeriesDetail() {
             try {
                 const data = await comicsApi(`/issues/${issue.id}/search`, {method: 'POST'});
                 replace(data.issue);
-                toast(`Grabbed ${data.download.title}`, 'success');
-            } catch (e) { toast(e.message, 'error'); }
+                showToast(`Grabbed ${data.download.title}`, 'success');
+            } catch (e) { showToast(e.message, 'error'); }
         });
     }
 
     async function deleteFile(issue) {
         if (!confirm(`Delete the file for #${issue.number}?`)) return;
-        try { replace(await comicsApi(`/issues/${issue.id}/file`, {method: 'DELETE'})); } catch (e) { toast(e.message, 'error'); }
+        try { replace(await comicsApi(`/issues/${issue.id}/file`, {method: 'DELETE'})); } catch (e) { showToast(e.message, 'error'); }
     }
 
     if (!admin) {
@@ -295,8 +314,8 @@ function initSeriesDetail() {
                 const data = await comicsApi(`/issues/${issue.id}/grab`, {method: 'POST', body: {token, index}});
                 replace(data.issue);
                 overlay.style.display = 'none';
-                toast(`Sent ${data.download.title} to ${data.download.client}`, 'success');
-            } catch (e) { toast(e.message, 'error'); }
+                showToast(`Sent ${data.download.title} to ${data.download.client}`, 'success');
+            } catch (e) { showToast(e.message, 'error'); }
         });
     }
 
@@ -305,11 +324,11 @@ function initSeriesDetail() {
         if (!file || !uploadFor) return;
         const form = new FormData();
         form.append('file', file);
-        toast(`Importing ${file.name}…`);
+        showToast(`Importing ${file.name}…`);
         try {
             replace(await comicsApi(`/issues/${uploadFor.id}/upload`, {method: 'POST', form}));
-            toast('Imported', 'success');
-        } catch (e) { toast(e.message, 'error'); }
+            showToast('Imported', 'success');
+        } catch (e) { showToast(e.message, 'error'); }
         upload.value = '';
     });
 
@@ -336,7 +355,7 @@ function initSeriesDetail() {
             document.getElementById('checkAll').checked = false;
             updateBulk();
             render();
-        } catch (err) { toast(err.message, 'error'); }
+        } catch (err) { showToast(err.message, 'error'); }
     });
 
     const monitor = document.getElementById('monitorSelect');
@@ -344,7 +363,7 @@ function initSeriesDetail() {
         try {
             await comicsApi(`/series/${seriesId}`, {method: 'PATCH', body: {monitor: monitor.value}});
             window.location.reload();
-        } catch (e) { toast(e.message, 'error'); }
+        } catch (e) { showToast(e.message, 'error'); }
     });
     head.addEventListener('click', async (e) => {
         const button = e.target.closest('[data-action]');
@@ -355,18 +374,18 @@ function initSeriesDetail() {
             await busy(button, async () => {
                 try {
                     const data = await comicsApi(`/series/${seriesId}/refresh`, {method: 'POST'});
-                    toast(data.added ? `${data.added} new issue${data.added === 1 ? '' : 's'}` : 'Up to date', 'success');
+                    showToast(data.added ? `${data.added} new issue${data.added === 1 ? '' : 's'}` : 'Up to date', 'success');
                     if (data.added) window.location.reload();
-                } catch (err) { toast(err.message, 'error'); }
+                } catch (err) { showToast(err.message, 'error'); }
             });
         } else if (action === 'search-series') {
             button.textContent = 'Searching…';
             await busy(button, async () => {
                 try {
                     const data = await comicsApi(`/series/${seriesId}/search`, {method: 'POST'});
-                    toast(data.grabbed ? `Grabbed ${data.grabbed}` : 'Nothing new on the indexers', data.grabbed ? 'success' : 'info');
+                    showToast(data.grabbed ? `Grabbed ${data.grabbed}` : 'Nothing new on the indexers', data.grabbed ? 'success' : 'info');
                     if (data.grabbed) window.location.reload();
-                } catch (err) { toast(err.message, 'error'); }
+                } catch (err) { showToast(err.message, 'error'); }
             });
         } else if (action === 'delete-series') {
             if (!confirm('Stop following this series?')) return;
@@ -374,7 +393,7 @@ function initSeriesDetail() {
             try {
                 await comicsApi(`/series/${seriesId}${files ? '?files=1' : ''}`, {method: 'DELETE'});
                 window.location = appUrl('/comics/');
-            } catch (err) { toast(err.message, 'error'); }
+            } catch (err) { showToast(err.message, 'error'); }
         }
     });
     render();
@@ -405,21 +424,21 @@ function initWanted() {
             button.remove();
         } else if (action === 'search-all') {
             await comicsApi('/jobs/search', {method: 'POST'});
-            toast('Searching; grabs show up at the top of this page.', 'success');
+            showToast('Searching; grabs show up at the top of this page.', 'success');
         } else if (action === 'search-issue') {
             button.textContent = 'Searching…';
             await busy(button, async () => {
                 try {
                     const data = await comicsApi(`/issues/${row.dataset.issueId}/search`, {method: 'POST'});
-                    toast(`Grabbed ${data.download.title}`, 'success');
+                    showToast(`Grabbed ${data.download.title}`, 'success');
                     row.remove();
-                } catch (err) { toast(err.message, 'error'); }
+                } catch (err) { showToast(err.message, 'error'); }
             });
         } else if (action === 'skip-issue') {
             try {
                 await comicsApi(`/issues/${row.dataset.issueId}`, {method: 'PATCH', body: {status: 'skipped'}});
                 row.remove();
-            } catch (err) { toast(err.message, 'error'); }
+            } catch (err) { showToast(err.message, 'error'); }
         }
     });
 }
@@ -450,8 +469,8 @@ function initDownloadLists() {
     async function act(path, method, done) {
         try {
             await comicsApi(path, {method});
-            toast(done, 'success');
-        } catch (e) { toast(e.message, 'error'); }
+            showToast(done, 'success');
+        } catch (e) { showToast(e.message, 'error'); }
         refresh();
     }
 
@@ -519,14 +538,14 @@ function initImport() {
             const body = {path: file.path, number: number.value};
             if (seriesSelect.value === 'new') body.new_series = newName.value;
             else if (seriesSelect.value) body.series_id = Number(seriesSelect.value);
-            else return toast('Pick a series first.', 'error');
+            else return showToast('Pick a series first.', 'error');
             e.currentTarget.textContent = 'Importing…';
             await busy(e.currentTarget, async () => {
                 try {
                     await comicsApi('/import/file', {method: 'POST', body});
-                    toast('Imported', 'success');
+                    showToast('Imported', 'success');
                     load();
-                } catch (err) { toast(err.message, 'error'); }
+                } catch (err) { showToast(err.message, 'error'); }
             });
         }}, 'Import');
         const remove = h('button', {type: 'button', class: 'btn btn-ghost danger-text', onclick: async () => {
@@ -552,14 +571,14 @@ function initImport() {
 
     async function send(fileList) {
         const files = [...fileList].filter(f => /\.(cbz|cbr|cb7|zip|rar|7z)$/i.test(f.name));
-        if (!files.length) return toast('Those aren’t comic files.', 'error');
+        if (!files.length) return showToast('Those aren’t comic files.', 'error');
         const form = new FormData();
         files.forEach(f => form.append('files', f));
-        toast(`Importing ${files.length} file${files.length === 1 ? '' : 's'}…`);
+        showToast(`Importing ${files.length} file${files.length === 1 ? '' : 's'}…`);
         try {
             const data = await comicsApi('/import/upload', {method: 'POST', form});
-            toast(`Imported ${data.imported.length}${data.unmatched.length ? `; ${data.unmatched.length} to match by hand` : ''}${data.failed.length ? `; ${data.failed.length} unreadable` : ''}`, data.failed.length ? 'error' : 'success');
-        } catch (e) { toast(e.message, 'error'); }
+            showToast(`Imported ${data.imported.length}${data.unmatched.length ? `; ${data.unmatched.length} to match by hand` : ''}${data.failed.length ? `; ${data.failed.length} unreadable` : ''}`, data.failed.length ? 'error' : 'success');
+        } catch (e) { showToast(e.message, 'error'); }
         load();
     }
 
@@ -573,8 +592,8 @@ function initImport() {
         await busy(e.currentTarget, async () => {
             try {
                 const data = await comicsApi('/import/scan', {method: 'POST'});
-                toast(`Imported ${data.imported.length}`, 'success');
-            } catch (err) { toast(err.message, 'error'); }
+                showToast(`Imported ${data.imported.length}`, 'success');
+            } catch (err) { showToast(err.message, 'error'); }
         });
         load();
     });
@@ -647,8 +666,8 @@ function initSettings() {
             if (!(await save())) return;
             try {
                 const data = await comicsApi('/settings/test', {method: 'POST', body: {what, index}});
-                toast(data.message, 'success');
-            } catch (e) { toast(e.message, 'error'); }
+                showToast(data.message, 'success');
+            } catch (e) { showToast(e.message, 'error'); }
         });
     }
 
@@ -658,7 +677,7 @@ function initSettings() {
         if (button) test(button, button.dataset.test);
     });
     document.getElementById('addIndexer').addEventListener('click', () => addIndexer());
-    comicsApi('/settings').then(fill).catch(e => toast(e.message, 'error'));
+    comicsApi('/settings').then(fill).catch(e => showToast(e.message, 'error'));
     initJobs();
 }
 

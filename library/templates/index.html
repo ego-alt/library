@@ -1,17 +1,8 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <script>
-        (function() {
-        if (localStorage.getItem('darkMode') === 'enabled') {
-            document.documentElement.classList.add('dark-mode');
-        }
-        })();
-    </script>
+{% extends "_layout.html" %}
+{% from "_covers.html" import cover_card %}
+{% set shelf = 'books' %}
+{% block head_scripts %}
     <!-- Expose the current user's role to client-side scripts -->
-    <script src="{{ url_for('static', filename='js/app_root.js') }}"></script>
     <script src="{{ url_for('static', filename='js/signed_out.js') }}"></script>
     <script>
         window.APP_ROOT = "{{ request.script_root }}";
@@ -21,40 +12,13 @@
         window.totalBooks = {{ total_books|default(0) }};
         window.initialBookCount = {{ images|length }};
     </script>
-    <title>Shelves</title>
-    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
-    <link rel="manifest" href="{{ url_for('pwa.manifest') }}">
-    <meta name="theme-color" content="#f6f4ef" media="(prefers-color-scheme: light)">
-    <meta name="theme-color" content="#141210" media="(prefers-color-scheme: dark)">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-title" content="Library">
-    <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
-    <link href="{{ url_for('static', filename='vendor/fontawesome-6.0.0-subset/icons.css') }}" rel="stylesheet">
-    <link href="{{ url_for('static', filename='fonts/inter/inter.css') }}" rel="stylesheet">
-    <link href="{{ url_for('static', filename='css/base.css') }}" rel="stylesheet">
-    <link href="{{ url_for('static', filename='css/structural.css') }}" rel="stylesheet">
-    <link href="{{ url_for('static', filename='css/tokens.css') }}" rel="stylesheet">
-    <link href="{{ url_for('static', filename='css/index.css') }}" rel="stylesheet">
-</head>
-<body>
-    {# A slim paper bar like the other apps' chrome: the name on the left, the
-       few actions on the right. #}
-    <header class="lib-bar">
-        <div class="lib-bar__inner container">
-            <div class="lib-bar__where">
-                <h1 class="lib-bar__title">Shelves</h1>
-                <nav class="shelf-switch" aria-label="Library">
-                    <a href="{{ url_for('index_routes.index') }}" aria-current="page">Books</a>
-                    {% if current_user.is_authenticated %}<a href="{{ url_for('comics.index') }}">Comics</a>{% endif %}
-                </nav>
-            </div>
-            <div class="lib-bar__actions">
+{% endblock %}
+{% block bar_actions_before %}
                 <button class="layout-toggle btn btn-ghost" id="layoutToggle" onclick="toggleLayout()" aria-pressed="false" aria-label="Bookshelf view" title="Switch to bookshelf view">
                     <i id="layout-toggle-icon" class="fas fa-grip-vertical" aria-hidden="true"></i>
                 </button>
-                <button class="dark-mode-toggle btn btn-ghost" onclick="toggleDarkMode()" aria-label="Night mode" title="Night mode">
-                    <i id="dark-mode-icon" class="fas fa-moon" aria-hidden="true"></i>
-                </button>
+{% endblock %}
+{% block bar_actions %}
                 {# Standalone only: a Sign in button when signed out. There's no
                    sign-out button (kept light, like tapes); behind the dashboard
                    proxy, signing in and out is the dashboard's job. #}
@@ -68,9 +32,8 @@
                     <i class="fas fa-plus" aria-hidden="true"></i>
                 </button>
                 {% endif %}
-            </div>
-        </div>
-    </header>
+{% endblock %}
+{% block body %}
     <div class="container">
         <div class="library-toolbar">
             <div class="library-search">
@@ -91,28 +54,18 @@
         <div class="row library" id="library">
             {% for book in images %}
                 {% set label = book.title ~ (' by ' ~ book.author if book.author else '') %}
-                <div class="col-6 col-sm-4 col-md-3 mb-3" data-length="{{ book.length }}" data-title="{{ book.title }}" data-author="{{ book.author }}"{% if book.progress is not none %} data-progress="{{ book.progress }}"{% endif %}>
-                    <div class="book">
-                        {% if book.access_level and book.access_level != 'standard' %}
-                        <span class="book-lock" title="Private — only admins can see this" aria-label="Private"><i class="fas fa-lock" aria-hidden="true"></i></span>
-                        {% endif %}
-                        <a href="{{ url_for('read_routes.read_book', filename=book.filename) }}" aria-label="Read {{ label }}">
-                            <img src="{{ book.cover }}" alt="{{ label }}" loading="lazy">
-                        </a>
-                        <div class="book-buttons">
-                            <button class="book-button" data-action="show-metadata" data-filename="{{book.filename}}" aria-label="Details" title="Details">
-                                <i class="fas fa-ellipsis-h" aria-hidden="true"></i>
-                            </button>
-                        </div>
+                {% set pct = ((book.progress or 0) * 100)|round(0, 'floor')|int %}
+                {% set attrs = {'data-length': book.length, 'data-title': book.title, 'data-author': book.author, 'data-progress': book.progress} %}
+                {% call cover_card(url_for('read_routes.read_book', filename=book.filename), 'Read ' ~ label, book.title, [book.author, (pct|string ~ '%') if pct > 0], book.cover, attrs) %}
+                    {% if book.access_level and book.access_level != 'standard' %}
+                    <span class="book-lock" title="Private — only admins can see this" aria-label="Private"><i class="fas fa-lock" aria-hidden="true"></i></span>
+                    {% endif %}
+                    <div class="book-buttons">
+                        <button class="book-button" data-action="show-metadata" data-filename="{{book.filename}}" aria-label="Details" title="Details">
+                            <i class="fas fa-ellipsis-h" aria-hidden="true"></i>
+                        </button>
                     </div>
-                    <div class="book-caption" aria-hidden="true">
-                        <span class="book-caption__title">{{ book.title }}</span>
-                        {% set meta = [book.author] if book.author else [] %}
-                        {% set pct = ((book.progress or 0) * 100)|round(0, 'floor')|int %}
-                        {% if pct > 0 %}{% set meta = meta + [pct|string ~ '%'] %}{% endif %}
-                        {% if meta %}<span class="book-caption__author">{{ meta|join(' · ') }}</span>{% endif %}
-                    </div>
-                </div>
+                {% endcall %}
             {% endfor %}
         </div>
         <div id="emptyState" class="empty-state" style="display: none;">
@@ -126,9 +79,6 @@
     <div class="offline-banner" id="offlineBanner" role="status" hidden>
         You're offline. Saved books still open.
     </div>
-
-    <!-- Toast container; populated by showToast() in main.js -->
-    <div id="toastContainer" class="notice-stack" aria-live="polite" aria-atomic="false"></div>
 
     <div class="metadata-overlay" id="metadataOverlay" role="dialog" aria-modal="true" aria-labelledby="metadata-title">
         <div class="metadata-content">
@@ -175,9 +125,9 @@
     <!-- Hidden input for cover image uploads -->
     <input type="file" id="coverUploadInput" style="display: none;" onchange="handleCoverUpload(this.files)">
 
+{% endblock %}
+{% block scripts %}
     <script src="{{ url_for('static', filename='vendor/jquery-3.6.0.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/darkmode.js') }}"></script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
     <script src="{{ url_for('static', filename='js/pwa.js') }}"></script>
-</body>
-</html>
+{% endblock %}

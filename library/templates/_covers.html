@@ -1,0 +1,19 @@
+{# One cover on the wall, for books and comics alike: the cover opens it, the
+   caller adds what floats over it (the ⋯ button, a lock), and the wall label
+   underneath is the title, then a line in spaced small capitals.
+   main.js builds the same markup for books loaded as you scroll. #}
+{% macro cover_card(href, label, title, meta=[], cover=None, attrs={}, img_attrs={}) %}
+<div class="col-6 col-sm-4 col-md-3 mb-3"{{ attrs|xmlattr }}>
+    <div class="book">
+        <a href="{{ href }}" aria-label="{{ label }}">
+            {% if cover %}<img src="{{ cover }}" alt="{{ label }}" loading="lazy"{{ img_attrs|xmlattr }}>{% else %}<span class="cover-blank">{{ title }}</span>{% endif %}
+        </a>
+        {% if caller %}{{ caller() }}{% endif %}
+    </div>
+    <div class="book-caption" aria-hidden="true">
+        <span class="book-caption__title">{{ title }}</span>
+        {% set meta = meta|select|list %}
+        {% if meta %}<span class="book-caption__author">{{ meta|join(' · ') }}</span>{% endif %}
+    </div>
+</div>
+{% endmacro %}

@@ -69,35 +69,7 @@
 .link-button:disabled { opacity: 0.5; cursor: default; }
 .link-button--strong { font-weight: 600; }
 
-/* --- The series grid: covers like the books, with how many you have. --- */
-.comics-grid .book > a { z-index: 1; }
-.cover-blank {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: var(--space-4);
-    background: linear-gradient(160deg, var(--wood), var(--wood-edge));
-    color: #f7f2e8;
-    font-weight: 600;
-    text-align: center;
-    line-height: 1.25;
-}
-.cover-badge {
-    position: absolute;
-    left: var(--space-2);
-    bottom: var(--space-2);
-    z-index: 2;
-    padding: 2px 8px;
-    border-radius: var(--radius-pill);
-    background: var(--color-scrim);
-    color: #fff;
-    font-size: 0.6875rem;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    pointer-events: none;
-}
+/* A thin progress line (downloads). */
 .have-meter {
     display: block;
     height: 2px;
@@ -273,39 +245,7 @@
 .release__text span { font-size: 0.8125rem; }
 .release.is-rejected { opacity: 0.55; }
 
-/* --- Continue reading: a row of what you're partway through. --- */
-.continue { margin-bottom: 40px; }
-.continue__title, .dl-section h2 { font-size: 1.0625rem; font-weight: 600; margin: 0 0 var(--space-3); }
-.continue__list {
-    list-style: none;
-    padding: 0 0 var(--space-2);
-    margin: 0;
-    display: grid;
-    grid-auto-flow: column;
-    grid-auto-columns: minmax(15rem, 18rem);
-    gap: var(--space-4);
-    overflow-x: auto;
-    scroll-snap-type: x mandatory;
-}
-.continue__list > li { scroll-snap-align: start; }
-.continue__item {
-    display: grid;
-    grid-template-columns: 48px 1fr;
-    gap: 2px var(--space-3);
-    align-items: center;
-    padding: var(--space-2);
-    border-radius: var(--radius-md);
-    background: var(--pane);
-    border: 1px solid var(--pane-edge);
-    color: inherit;
-    text-decoration: none;
-}
-.continue__item:hover { border-color: var(--color-accent); }
-.continue__cover { grid-row: span 2; width: 48px; aspect-ratio: 2 / 3; overflow: hidden; background: var(--color-border); }
-.continue__cover img { width: 100%; height: 100%; object-fit: cover; }
-.continue__text { display: flex; flex-direction: column; min-width: 0; }
-.continue__text strong { font-weight: 550; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.continue__item .have-meter { margin: 0; align-self: end; }
+.dl-section h2 { font-size: 1.0625rem; font-weight: 600; margin: 0 0 var(--space-3); }
 
 /* --- Downloads: one page of sections. --- */
 .dl-section { margin-bottom: 44px; }

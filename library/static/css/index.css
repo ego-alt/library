@@ -137,6 +137,20 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 @media (hover: none) {
     .dark-mode .book img { filter: brightness(0.95); }
 }
+/* A cover-sized card with the title, for something with no cover yet. */
+.cover-blank {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-4);
+    background: linear-gradient(160deg, var(--wood), var(--wood-edge));
+    color: #f7f2e8;
+    font-weight: 600;
+    text-align: center;
+    line-height: 1.25;
+}
 /* The wall label: title, then author (and how far in you are) in spaced
    small capitals. */
 .book-caption {

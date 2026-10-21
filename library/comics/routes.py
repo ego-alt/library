@@ -151,30 +151,50 @@ def _admin_page():
 # Pages
 
 
+VIEWS = ("all", "unread", "reading", "finished")
+
+
+def _series_card(series: ComicSeries, progress: dict) -> dict:
+    """A series on the wall, as books are: where the cover takes you (the issue
+    you're partway through, else the next one unread), how far you are, and
+    which of All / Unread / Reading / Finished it falls under."""
+    have = [i for i in series.issues if i.filename]
+    mine = {i.id: progress[i.id] for i in have if i.id in progress}
+    finished = sum(1 for p in mine.values() if p.finished)
+    started = sorted((p for p in mine.values() if not p.finished and p.page > 0), key=lambda p: p.updated_at, reverse=True)
+    last = max((p.updated_at for p in mine.values()), default=None)
+    if not have:
+        state, issue, line = "unread", None, "No issues yet"
+    elif started:
+        issue = db.session.get(ComicIssue, started[0].issue_id)
+        pct = int(100 * (started[0].page + 1) / issue.page_count) if issue.page_count else None
+        state, line = "reading", f"#{issue.number}" + (f" · {pct}%" if pct else "")
+    elif finished == len(have):
+        state, issue, line = "finished", have[0], f"All {len(have)} read" if len(have) > 1 else "Read"
+    else:
+        issue = next(i for i in have if not (i.id in mine and mine[i.id].finished))
+        state = "reading" if finished else "unread"
+        line = f"{finished} of {len(have)} read" if finished else (f"{len(have)} issues" if len(have) > 1 else "1 issue")
+    if issue is None:
+        href, label = url_for("comics.series_page", series_id=series.id), series.display_name
+    else:
+        href = url_for("comics.read_page", issue_id=issue.id)
+        label = f"{'Continue' if started else 'Read'} {series.name} #{issue.number}"
+    return {"series": series, "cover": _series_cover(series), "href": href, "label": label, "state": state, "line": line, "last": last.isoformat() if last else ""}
+
+
 @comics_blueprint.get("/")
 @login_required
 def index():
+    """The wall of series. Like the books, it opens on what you're reading
+    when there's something, else on everything; ?view= picks explicitly."""
     admin = _is_admin()
-    series = ComicSeries.query.order_by(ComicSeries.name).all()
-    cards = []
-    for s in series:
-        have = sum(1 for i in s.issues if i.filename)
-        if not have and not admin:
-            continue
-        upcoming = sum(1 for i in s.issues if not i.released)
-        cards.append({"series": s, "cover": _series_cover(s), "have": have, "total": len(s.issues), "upcoming": upcoming, "added": s.added_at})
-    return _page("index.html", "series", cards=cards, reading=_continue_reading())
-
-
-def _continue_reading(limit: int = 8) -> list[dict]:
-    """Issues you're partway through, most recent first."""
-    rows = ComicProgress.query.filter_by(user_id=current_user.id, finished=False).filter(ComicProgress.page > 0).order_by(ComicProgress.updated_at.desc()).limit(limit * 2).all()
-    reading = []
-    for p in rows:
-        issue = db.session.get(ComicIssue, p.issue_id)
-        if issue and issue.filename:
-            reading.append({"issue": issue, "cover": _cover(issue), "page": p.page, "pages": issue.page_count})
-    return reading[:limit]
+    progress = {p.issue_id: p for p in ComicProgress.query.filter_by(user_id=current_user.id)}
+    cards = [_series_card(s, progress) for s in ComicSeries.query.order_by(ComicSeries.name) if admin or any(i.filename for i in s.issues)]
+    view = request.args.get("view")
+    if view not in VIEWS:
+        view = "reading" if any(c["state"] == "reading" for c in cards) else "all"
+    return _page("index.html", "series", cards=cards, current_view=view)
 
 
 @comics_blueprint.get("/add")

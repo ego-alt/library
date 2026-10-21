@@ -1,58 +1,38 @@
 {% extends "comics/base.html" %}
-{% block title %}Series{% endblock %}
+{% from "_covers.html" import cover_card %}
+{% block page_title %}Comics{% endblock %}
 {% block page %}series{% endblock %}
 {% block content %}
-{% if reading %}
-<section class="continue" aria-labelledby="continueTitle">
-    <h2 class="continue__title" id="continueTitle">Continue reading</h2>
-    <ol class="continue__list">
-        {% for r in reading %}
-        <li>
-            <a class="continue__item" href="{{ url_for('comics.read_page', issue_id=r.issue.id) }}">
-                <span class="continue__cover">{% if r.cover %}<img src="{{ r.cover }}" alt="" loading="lazy" referrerpolicy="no-referrer">{% endif %}</span>
-                <span class="continue__text">
-                    <strong>{{ r.issue.series.name }} <span class="issue-num">#{{ r.issue.number }}</span></strong>
-                    <small class="text-muted">Page {{ r.page + 1 }}{% if r.pages %} of {{ r.pages }}{% endif %}</small>
-                </span>
-                {% if r.pages %}<span class="have-meter" aria-hidden="true"><span style="width: {{ (100 * (r.page + 1) / r.pages)|round|int }}%"></span></span>{% endif %}
-            </a>
-        </li>
-        {% endfor %}
-    </ol>
-</section>
-{% endif %}
 {% if cards %}
 <div class="library-toolbar">
     <div class="library-search">
         <i class="fas fa-magnifying-glass" aria-hidden="true"></i>
-        <input type="search" id="seriesFilter" class="library-search__input" placeholder="Filter series" aria-label="Filter series" autocomplete="off">
+        <input type="search" id="librarySearch" class="library-search__input" placeholder="Search series" aria-label="Search series" autocomplete="off" enterkeyhint="search">
     </div>
-    <div class="status-filter" role="radiogroup" aria-label="Sort series">
-        <button type="button" role="radio" data-sort="name" aria-checked="true">A–Z</button>
-        <button type="button" role="radio" data-sort="added" aria-checked="false">Recently added</button>
+    <div class="status-filter" role="radiogroup" aria-label="Reading status">
+        {% for view in ['all', 'unread', 'reading', 'finished'] %}
+        <button type="button" role="radio" data-view="{{ view }}" aria-checked="{{ 'true' if view == current_view else 'false' }}">{{ view|capitalize }}</button>
+        {% endfor %}
     </div>
 </div>
-<div class="library row comics-grid" id="seriesGrid">
+<div class="row library" id="library">
     {% for card in cards %}
     {% set s = card.series %}
-    <div data-name="{{ s.name|lower }}" data-added="{{ card.added.isoformat() if card.added else '' }}">
-        <div class="book">
-            <a href="{{ url_for('comics.series_page', series_id=s.id) }}" aria-label="{{ s.display_name }}">
-                {% if card.cover %}<img src="{{ card.cover }}" alt="" loading="lazy" referrerpolicy="no-referrer">{% else %}<span class="cover-blank">{{ s.name }}</span>{% endif %}
+    {% set attrs = {'data-name': s.name|lower, 'data-state': card.state, 'data-last': card.last, 'hidden': True if current_view != 'all' and card.state != current_view else None} %}
+    {% call cover_card(card.href, card.label, s.name, [s.publisher or s.start_year, card.line], card.cover, attrs, {'referrerpolicy': 'no-referrer'}) %}
+        {% if card.href != url_for('comics.series_page', series_id=s.id) %}
+        <div class="book-buttons">
+            <a class="book-button" href="{{ url_for('comics.series_page', series_id=s.id) }}" aria-label="All issues of {{ s.display_name }}" title="All issues">
+                <i class="fas fa-ellipsis-h" aria-hidden="true"></i>
             </a>
-            {% if is_admin and card.upcoming %}<span class="cover-badge" title="{{ card.upcoming }} not out yet">{{ card.upcoming }} upcoming</span>{% endif %}
         </div>
-        <div class="book-caption">
-            <span class="book-caption__title">{{ s.name }}</span>
-            {% if is_admin %}
-            <span class="book-caption__author">{{ s.start_year or '' }}{% if s.start_year %} · {% endif %}{{ card.have }}/{{ card.total }}</span>
-            <span class="have-meter" aria-hidden="true"><span style="width: {{ (100 * card.have / card.total)|round|int if card.total else 0 }}%"></span></span>
-            {% else %}
-            <span class="book-caption__author">{{ s.start_year or '' }}{% if s.start_year %} · {% endif %}{{ card.have }} issue{{ '' if card.have == 1 else 's' }}</span>
-            {% endif %}
-        </div>
-    </div>
+        {% endif %}
+    {% endcall %}
     {% endfor %}
+</div>
+<div id="emptyState" class="empty-state" hidden>
+    <h3></h3>
+    <p></p>
 </div>
 {% elif is_admin %}
 <div class="empty-state">
