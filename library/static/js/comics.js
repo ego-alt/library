@@ -2,8 +2,6 @@
 
 const comicsApi = (path, options) => apiFetch(`/comics/api${path}`, options);
 
-const STATUS_LABEL = {wanted: 'Wanted', skipped: 'Skipped', snatched: 'Downloading', downloaded: 'Have'};
-
 // --- The wall of series: one search box and All / Unread / Reading / Finished,
 // like the books (main.js), filtered here since every series is on the page. ---
 

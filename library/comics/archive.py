@@ -159,25 +159,6 @@ def write_cbz(src: str, dest: str, *, webp: bool, quality: int = 82, metadata: C
         return len(pages)
 
 
-def replace_metadata(path: str, comicinfo: str | None, metroninfo: str | None) -> None:
-    """Rewrite a CBZ's ComicInfo.xml/MetronInfo.xml, keeping its pages."""
-    partial = f"{path}.partial"
-    try:
-        with zipfile.ZipFile(path) as zin, zipfile.ZipFile(partial, "w") as zout:
-            for item in zin.infolist():
-                if item.filename.lower() in ("comicinfo.xml", "metroninfo.xml"):
-                    continue
-                zout.writestr(item, zin.read(item.filename), compress_type=item.compress_type)
-            if comicinfo:
-                zout.writestr("ComicInfo.xml", comicinfo, compress_type=zipfile.ZIP_DEFLATED)
-            if metroninfo:
-                zout.writestr("MetronInfo.xml", metroninfo, compress_type=zipfile.ZIP_DEFLATED)
-        os.replace(partial, path)
-    finally:
-        if os.path.exists(partial):
-            os.remove(partial)
-
-
 def _xml(root: ET.Element) -> str:
     ET.indent(root)
     return '<?xml version="1.0" encoding="utf-8"?>\n' + ET.tostring(root, encoding="unicode") + "\n"

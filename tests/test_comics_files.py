@@ -9,16 +9,9 @@ import pytest
 
 from library import settings
 from library.comics import archive, files
-from library.comics.models import (
-    DOWNLOADED,
-    MONITOR_ALL,
-    MONITOR_FUTURE,
-    SKIPPED,
-    WANTED,
-    ComicIssue,
-    ComicSeries,
-)
+from library.comics.models import MONITOR_ALL, MONITOR_FUTURE, ComicIssue, ComicSeries
 from library.comics.series import set_monitor, sync_issues
+from library.downloads.models import DOWNLOADED, SKIPPED, WANTED
 from library.models import db
 from tests.conftest import make_cbz
 

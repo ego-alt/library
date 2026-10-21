@@ -39,10 +39,10 @@ class Config:
     COMIC_DIR = os.getenv("COMIC_DIR", os.path.join(DATA_DIR, "comics"))
     # A folder whose comics and EPUBs get imported (blackhole downloads, or
     # anything you drop in). Default: COMIC_DIR/_import.
-    IMPORT_DIR = os.getenv("IMPORT_DIR") or os.getenv("COMIC_IMPORT_DIR") or None
+    IMPORT_DIR = os.getenv("IMPORT_DIR") or None
     # Run the download jobs (search, downloads, imports, refreshing series)
     # in this process.
-    DOWNLOADS_WORKER = os.getenv("DOWNLOADS_WORKER", os.getenv("COMICS_WORKER", "1")) == "1"
+    DOWNLOADS_WORKER = os.getenv("DOWNLOADS_WORKER", "1") == "1"
 
     # Generated cover thumbnails (safe to delete; rebuilt on demand)
     THUMB_DIR = os.path.join(DATA_DIR, "thumbs")

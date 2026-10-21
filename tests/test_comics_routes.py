@@ -5,14 +5,8 @@ import pytest
 
 from library import settings
 from library.comics import providers
-from library.comics.models import (
-    DOWNLOADED,
-    SKIPPED,
-    WANTED,
-    ComicIssue,
-    ComicProgress,
-    ComicSeries,
-)
+from library.comics.models import ComicIssue, ComicProgress, ComicSeries
+from library.downloads.models import DOWNLOADED, SKIPPED, WANTED
 from library.models import db
 from tests.conftest import make_cbz
 
@@ -67,7 +61,6 @@ def test_every_page_renders(admin_client, saga, tmp_path, comic_dir):
         response = admin_client.get(path)
         assert response.status_code == 200, path
     assert b"Saga" in admin_client.get("/comics/").data
-    assert admin_client.get("/comics/add?q=saga").location.endswith("/get?q=saga")
     downloads = admin_client.get("/downloads").data.decode()
     # Issue 2 is out and wanted only with monitor "all"; issue 3 is coming up.
     assert "Coming up" in downloads and "Import" in downloads

@@ -3,18 +3,10 @@ up to date."""
 
 from datetime import date, datetime, timedelta
 
+from ..downloads.models import DOWNLOADED, SKIPPED, SNATCHED, WANTED
 from ..models import _utcnow, db
 from . import names
-from .models import (
-    DOWNLOADED,
-    MONITOR_ALL,
-    MONITOR_FUTURE,
-    SKIPPED,
-    SNATCHED,
-    WANTED,
-    ComicIssue,
-    ComicSeries,
-)
+from .models import MONITOR_ALL, MONITOR_FUTURE, ComicIssue, ComicSeries
 from .providers import get_provider
 
 # Series are re-read from their provider this often (ongoing ones) or a tenth

@@ -11,7 +11,7 @@ from flask import url_for
 from ..downloads import pipeline
 from ..downloads.models import DOWNLOADED, KIND_BOOK, WANTED, Download
 from ..models import db
-from .files import NotABook, add_epub
+from .files import NotABookError, add_epub
 from .models import BookRequest
 
 # Words that don't tell titles apart.
@@ -138,7 +138,7 @@ class BookKind:
             raise pipeline.ImportFilesError(f"The download has no EPUB in it{f' (only {other})' if other else ''}.")
         try:
             import_epub(path, download.book_request, keep)
-        except NotABook as e:
+        except NotABookError as e:
             raise pipeline.ImportFilesError(str(e)) from e
 
     def label(self, request: BookRequest) -> str:
@@ -175,7 +175,7 @@ def scan_import_dir(folder: str) -> dict:
         request = match_request(path)
         try:
             book = import_epub(path, request)
-        except NotABook:
+        except NotABookError:
             result["failed"].append(name)
             continue
         result["imported"].append(book.id)

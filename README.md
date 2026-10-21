@@ -75,7 +75,7 @@ Tests and lint: `uv run pytest` and `uvx ruff check .`
 | `ANTHROPIC_API_KEY` | Turns on Ask and Explain (optional) |
 | `TRASH_RETENTION_DAYS` | How long deleted books are kept (default 30) |
 | `COMIC_DIR` | Where comics live (default `instance/comics`) |
-| `IMPORT_DIR` | Folder whose comics and EPUBs get imported (default `COMIC_DIR/_import`; `COMIC_IMPORT_DIR` still works) |
+| `IMPORT_DIR` | Folder whose comics and EPUBs get imported (default `COMIC_DIR/_import`) |
 | `COMICVINE_API_KEY`, `METRON_USERNAME`, `METRON_PASSWORD` | Metadata, if not set in the app |
 
 ## Home stack

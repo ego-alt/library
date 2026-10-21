@@ -1231,28 +1231,6 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 .tag .remove-tag:hover {
     opacity: 1;
 }
-.login-button, .upload-button, .dark-mode-toggle, .layout-toggle {
-    background: none;
-    border: none;
-    font-size: var(--text-base);
-    color: var(--color-text-muted);
-    padding: var(--space-2);
-    cursor: pointer;
-    transition: color 0.2s;
-}
-.login-button:hover, .upload-button:hover, .dark-mode-toggle:hover, .layout-toggle:hover {
-    color: var(--color-accent);
-}
-.layout-toggle.active {
-    color: var(--color-accent);
-}
-.layout-toggle.active:hover {
-    color: var(--color-accent);
-    opacity: 0.8;
-}
-@media (max-width: 640px) {
-    .lib-bar { margin-bottom: var(--space-4); }
-}
 .login-overlay {
     display: none;
     position: fixed;

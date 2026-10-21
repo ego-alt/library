@@ -23,6 +23,7 @@ from flask_login import current_user, login_required
 from werkzeug.utils import secure_filename
 
 from ..downloads import jobs
+from ..downloads.models import SKIPPED, SNATCHED, WANTED
 from ..models import db
 from ..routes._helpers import json_admin_required, json_login_required
 from ..utils import make_thumbnail
@@ -33,15 +34,7 @@ from . import (
     names,
     providers,
 )
-from .models import (
-    MONITOR_CHOICES,
-    SKIPPED,
-    SNATCHED,
-    WANTED,
-    ComicIssue,
-    ComicProgress,
-    ComicSeries,
-)
+from .models import MONITOR_CHOICES, ComicIssue, ComicProgress, ComicSeries
 from .series import add_series, refresh_series, set_monitor
 
 comics_blueprint = Blueprint("comics", __name__, url_prefix="/comics", template_folder="../templates")
@@ -115,9 +108,8 @@ def issue_json(issue: ComicIssue, progress: ComicProgress | None = None) -> dict
     }
 
 
-def _page(template: str, active: str, **context):
-    admin = _is_admin()
-    return render_template(f"comics/{template}", active=active, is_admin=admin, providers_ready=bool(providers.available()), **context)
+def _page(template: str, **context):
+    return render_template(f"comics/{template}", **context)
 
 
 # Pages
@@ -173,14 +165,7 @@ def index():
     view = request.args.get("view")
     if view not in VIEWS:
         view = "reading" if any(c["state"] == "reading" for c in cards) else "all"
-    return _page("index.html", "series", cards=cards, current_view=view)
-
-
-@comics_blueprint.get("/add")
-@login_required
-def add_page():
-    """Following a series is done from Get now."""
-    return redirect(url_for("downloads.get_page", q=request.args.get("q", "")))
+    return _page("index.html", cards=cards, current_view=view)
 
 
 @comics_blueprint.get("/series/<int:series_id>")
@@ -197,7 +182,7 @@ def series_page(series_id):
     if have:
         next_issue = _up_next(have, {i.id: progress[i.id] for i in have if i.id in progress})[0]
         up_next = next(i for i in issues if i["id"] == next_issue.id)
-    return _page("series.html", "series", series=series, cover=_series_cover(series), issues=issues, up_next=up_next, monitor_choices=MONITOR_CHOICES)
+    return _page("series.html", series=series, cover=_series_cover(series), issues=issues, up_next=up_next)
 
 
 @comics_blueprint.get("/read/<int:issue_id>")

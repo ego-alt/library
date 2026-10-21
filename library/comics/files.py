@@ -15,9 +15,10 @@ from dataclasses import dataclass
 from flask import current_app
 
 from .. import settings
+from ..downloads.models import DOWNLOADED, SKIPPED
 from ..models import db
 from . import archive, names
-from .models import DOWNLOADED, SKIPPED, ComicIssue, ComicSeries
+from .models import ComicIssue, ComicSeries
 
 logger = logging.getLogger(__name__)
 
@@ -134,13 +135,6 @@ def import_file(src: str, issue: ComicIssue, *, remove_source: bool = True) -> C
         except OSError as e:
             logger.warning("Imported %s but couldn't remove it: %s", src, e)
     return issue
-
-
-def retag(issue: ComicIssue) -> None:
-    """Rewrite an issue's embedded metadata after its details change."""
-    if not issue.filename or not os.path.exists(abs_path(issue)):
-        return
-    archive.replace_metadata(abs_path(issue), archive.comicinfo_xml(issue, issue.series, issue.page_count or 0, issue.original_filename), archive.metroninfo_xml(issue, issue.series, issue.page_count or 0, issue.original_filename))
 
 
 def delete_file(issue: ComicIssue) -> None:

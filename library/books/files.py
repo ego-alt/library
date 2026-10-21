@@ -13,7 +13,7 @@ from ..models import Book, db
 from ..utils import extract_metadata, get_epub_cover_path, get_epub_structure
 
 
-class NotABook(Exception):
+class NotABookError(Exception):
     pass
 
 
@@ -47,14 +47,14 @@ def has_toc(path: str, epub_book=None) -> bool:
 
 
 def read_epub(path: str) -> dict:
-    """Title, author and cover path from an EPUB; NotABook if the reader can't
+    """Title, author and cover path from an EPUB; NotABookError if the reader can't
     open it."""
     try:
         epub_book = epub.read_epub(path, options={"ignore_ncx": True})
     except Exception as e:
-        raise NotABook("It isn't a readable EPUB.") from e
+        raise NotABookError("It isn't a readable EPUB.") from e
     if not has_toc(path, epub_book):
-        raise NotABook("It has no table of contents, so the reader can't open it.")
+        raise NotABookError("It has no table of contents, so the reader can't open it.")
     metadata = extract_metadata(epub_book) or {}
     try:
         cover_path = get_epub_cover_path(path)

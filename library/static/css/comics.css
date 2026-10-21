@@ -2,14 +2,6 @@
  * comics manager needs — a page nav, issue tables, panels for settings and
  * downloads. Words with underlines rather than boxes, like the rest of Shelves. */
 
-.comics-banner {
-    padding: var(--space-3) var(--space-4);
-    margin-bottom: 28px;
-    border-left: 2px solid var(--color-accent);
-    background: var(--pane);
-    font-size: var(--text-sm);
-    color: var(--color-text-secondary);
-}
 .comics-hint { color: var(--color-text-muted); font-size: var(--text-sm); }
 .danger-text { color: var(--color-danger) !important; }
 .text-muted { color: var(--color-text-muted); }
@@ -37,7 +29,6 @@
 }
 .link-button:hover { color: var(--color-accent-hover); text-decoration: underline; }
 .link-button:disabled { opacity: 0.5; cursor: default; }
-.link-button--strong { font-weight: 600; }
 
 /* A thin progress line (downloads). */
 .have-meter {
@@ -103,33 +94,16 @@
     border-bottom: 1px solid var(--color-border);
 }
 .issue-table td { padding: var(--space-2); border-bottom: 1px solid var(--color-border); vertical-align: middle; }
-.issue-table tr.is-have td { background: var(--color-highlight-soft); }
-.col-check { width: 2rem; }
-.col-num { width: 4rem; font-variant-numeric: tabular-nums; font-weight: 600; }
 .col-date { width: 7.5rem; white-space: nowrap; color: var(--color-text-secondary); font-variant-numeric: tabular-nums; }
-.col-status { width: 9rem; }
 .col-actions { text-align: right; white-space: nowrap; }
 .col-actions > * + * { margin-left: var(--space-3); }
-.col-title { display: flex; align-items: center; gap: var(--space-3); }
-.thumb { flex: none; width: 32px; aspect-ratio: 2 / 3; overflow: hidden; background: var(--color-border); }
-.thumb img { width: 100%; height: 100%; object-fit: cover; }
-.thumb-blank { display: block; width: 100%; height: 100%; }
 .issue-num { font-weight: 600; font-variant-numeric: tabular-nums; }
 @media (max-width: 640px) {
-    .issue-table thead { display: none; }
-    .issue-table tr { display: grid; grid-template-columns: 2rem 3rem 1fr; grid-template-areas: "check num title" "check num meta" "check num actions"; padding: var(--space-2) 0; border-bottom: 1px solid var(--color-border); }
-    .issue-table td { border: none; padding: 2px var(--space-1); }
-    .issue-table .col-check { grid-area: check; }
-    .issue-table .col-num { grid-area: num; width: auto; }
-    .issue-table .col-title { grid-area: title; }
-    .issue-table .col-date { grid-area: meta; width: auto; display: inline; }
-    .issue-table .col-status { grid-area: meta; width: auto; justify-self: end; }
-    .issue-table .col-actions { grid-area: actions; text-align: left; }
-    .issue-table--wanted tr { grid-template-columns: 1fr auto; grid-template-areas: "title title" "date actions"; }
+    .issue-table--wanted tr { display: grid; grid-template-columns: 1fr auto; grid-template-areas: "title title" "date actions"; padding: var(--space-2) 0; border-bottom: 1px solid var(--color-border); }
+    .issue-table--wanted td { border: none; padding: 2px var(--space-1); }
     .issue-table--wanted td:first-child { grid-area: title; }
-    .issue-table--wanted .col-date { grid-area: date; }
+    .issue-table--wanted .col-date { grid-area: date; width: auto; }
     .issue-table--wanted .col-actions { grid-area: actions; text-align: right; }
-    .issue-table--reader tr { grid-template-columns: 3rem 1fr; grid-template-areas: "num title" "num meta" "num actions"; }
 }
 
 .status-chip {
@@ -144,10 +118,9 @@
     white-space: nowrap;
 }
 .status-wanted { color: var(--color-accent); border-color: currentColor; }
-.status-snatched, .status-dl-downloading, .status-dl-queued, .status-dl-importing { color: #b07a1c; border-color: currentColor; }
-.status-downloaded, .status-dl-done { color: var(--color-success); border-color: currentColor; }
+.status-dl-downloading, .status-dl-queued, .status-dl-importing { color: #b07a1c; border-color: currentColor; }
+.status-dl-done { color: var(--color-success); border-color: currentColor; }
 .status-dl-failed { color: var(--color-danger); border-color: currentColor; }
-.status-upcoming { border-style: dashed; }
 
 /* The ⋯ menu on an issue row. */
 .more { display: inline-block; position: relative; }
@@ -183,7 +156,6 @@
     border-radius: var(--radius-sm);
 }
 .more__menu > button:hover, .more__menu > a:hover { background: var(--color-highlight-soft); }
-.more__note { padding: var(--space-2) var(--space-3); font-size: 0.75rem; color: var(--color-text-muted); white-space: normal; word-break: break-all; }
 
 /* Manual search. */
 .metadata-overlay .releases-panel { max-width: 760px; width: 100%; max-height: 85vh; overflow: auto; }

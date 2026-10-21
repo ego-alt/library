@@ -9,11 +9,8 @@ books (downloads/models.py).
 
 from datetime import date
 
-from ..downloads.models import DOWNLOADED, SKIPPED, SNATCHED, WANTED
+from ..downloads.models import SKIPPED
 from ..models import _utcnow, db
-
-# Issue statuses, shared with book requests.
-ISSUE_STATUSES = (WANTED, SKIPPED, SNATCHED, DOWNLOADED)
 
 # Which issues of a series are wanted: every missing one, only those released
 # from now on, or none (you mark them yourself).
