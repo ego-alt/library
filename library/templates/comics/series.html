@@ -20,11 +20,11 @@
             {% if up_next %}<a class="btn btn-primary" href="{{ url_for('comics.read_page', issue_id=up_next.id) }}">{{ 'Continue' if up_next.page and not up_next.finished else 'Read' }} #{{ up_next.number }}</a>{% endif %}
             {% if is_admin %}
             {% if series.provider != 'local' %}
-            <label class="monitor-pick">Get
+            <label class="monitor-pick" title="Which issues to download">Get
                 <select id="monitorSelect" class="input">
-                    <option value="future"{% if series.monitor == 'future' %} selected{% endif %}>new issues</option>
-                    <option value="all"{% if series.monitor == 'all' %} selected{% endif %}>every missing issue</option>
-                    <option value="none"{% if series.monitor == 'none' %} selected{% endif %}>nothing</option>
+                    <option value="future"{% if series.monitor == 'future' %} selected{% endif %}>New issues</option>
+                    <option value="all"{% if series.monitor == 'all' %} selected{% endif %}>All missing</option>
+                    <option value="none"{% if series.monitor == 'none' %} selected{% endif %}>None</option>
                 </select>
             </label>
             {% endif %}

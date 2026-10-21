@@ -282,8 +282,8 @@ function initDownloadLists() {
                h('button', {type: 'button', class: 'link-button', onclick: () => act(`/api/downloads/${d.id}`, 'DELETE', 'Removed')}, 'Remove')];
         return h('li', {class: `download is-${d.status}`},
             h('div', {class: 'download__text'},
-                h('span', {}, label, ' ', h('span', {class: `status-chip status-dl-${d.status}`}, state)),
-                h('small', {class: 'text-muted'}, [d.title, d.indexer, formatSize(d.size), timeAgo(d.updated_at || d.created_at)].filter(Boolean).join(' · ')),
+                label,
+                h('small', {class: 'text-muted'}, h('span', {class: `download__state status-dl-${d.status}`}, state), ' · ', [d.title, d.indexer, formatSize(d.size), timeAgo(d.updated_at || d.created_at)].filter(Boolean).join(' · ')),
                 d.error ? h('small', {class: 'download__error'}, d.error) : null,
                 active && d.client !== 'blackhole' ? h('span', {class: 'have-meter'}, h('span', {style: `width: ${Math.round((d.progress || 0) * 100)}%`})) : null),
             h('div', {class: 'download__actions'}, buttons));

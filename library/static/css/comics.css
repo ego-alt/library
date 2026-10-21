@@ -62,7 +62,8 @@
 .series-head__meta { color: var(--color-text-muted); font-size: var(--text-sm); }
 .series-head__desc { color: var(--color-text-secondary); max-width: 60ch; white-space: pre-line; }
 .series-head__actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
-.monitor-pick { display: inline-flex; align-items: center; gap: var(--space-2); color: var(--color-text-secondary); margin-right: var(--space-2); }
+.monitor-pick { display: inline-flex; align-items: center; gap: var(--space-2); color: var(--color-text-secondary); }
+.monitor-pick select { min-width: 0; }
 @media (max-width: 640px) {
     /* A small cover beside the title; the rest flows under it. */
     .series-head { display: block; margin-bottom: 28px; }
@@ -261,7 +262,7 @@
 .wanted-group { border-bottom: 1px solid var(--color-border); }
 .wanted-group__head {
     display: grid;
-    grid-template-columns: 1fr 7.5rem auto;
+    grid-template-columns: minmax(0, 1fr) 7.5rem 11.5rem;
     align-items: center;
     gap: var(--space-3);
     padding: var(--space-3) 0;
@@ -272,12 +273,12 @@
 .wanted-group__name { min-width: 0; }
 .wanted-group__name::before { content: "▸"; display: inline-block; width: 1.1em; color: var(--color-text-muted); transition: transform var(--dur-fast) ease; }
 .wanted-group details[open] .wanted-group__name::before { transform: rotate(90deg); }
+.wanted-group__head .col-actions { text-align: right; }
 .wanted-group__head .col-actions > * + * { margin-left: var(--space-3); }
+/* Names read as text; the underline comes on hover. */
+.wanted-group__name a, .download__text > span a, .upcoming__item a { color: inherit; text-decoration: none; }
+.wanted-group__name a:hover, .download__text > span a:hover, .upcoming__item a:hover { color: var(--color-accent); text-decoration: underline; }
 .wanted-group .issue-table { margin: 0 0 var(--space-3) 1.1em; width: calc(100% - 1.1em); }
-@media (max-width: 640px) {
-    .wanted-group__head { grid-template-columns: 1fr auto; }
-    .wanted-group__head .col-date { display: none; }
-}
 
 /* "Book" or "Comic", before a wanted thing or a download. */
 .kind-tag {
@@ -313,3 +314,18 @@
 .issue-wall.is-selecting .book-buttons { display: none; }
 .issue-wall.is-selecting [data-have="1"] .book, .issue-wall.is-selecting .status-snatched .book { opacity: 0.4; cursor: default; }
 .issue-wall .is-selected .book { outline: 3px solid var(--color-accent); outline-offset: 3px; }
+
+/* A download's state leads its detail line ("31% · the release · …"). */
+.download__state { font-weight: 600; color: var(--color-text-secondary); }
+.download__state.status-dl-failed { color: var(--color-danger); }
+.download__state.status-dl-done { color: var(--color-success); }
+
+@media (max-width: 640px) {
+    /* Wanted: the name on its own line, then the date and actions. */
+    .wanted-group__head { grid-template-columns: 1fr auto; grid-template-areas: "name name" "date actions"; row-gap: var(--space-1); }
+    .wanted-group__name { grid-area: name; }
+    .wanted-group__head .col-date { grid-area: date; display: block; font-size: var(--text-sm); }
+    .wanted-group__head .col-actions { grid-area: actions; }
+    .wanted-group .issue-table { margin-left: 0; width: 100%; }
+    .download { align-items: flex-start; }
+}

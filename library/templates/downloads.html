@@ -22,7 +22,7 @@
         <li class="wanted-group wanted-group--book" data-kind="book" data-item-id="{{ r.id }}" data-label="{{ r.label }}">
             <div class="wanted-group__head">
                 <span class="wanted-group__name"><span class="kind-tag">Book</span> {{ r.title }}{% if r.author %} <span class="text-muted">{{ r.author }}</span>{% endif %}</span>
-                <span class="col-date">{{ r.created_at|comic_date }}</span>
+                <span class="col-date" title="When you asked for it">Asked {{ r.created_at|comic_date }}</span>
                 <span class="col-actions">
                     {% if can_search %}<button type="button" class="link-button" data-action="search-item">Search</button><button type="button" class="link-button" data-action="pick">Pick</button>{% endif %}
                     <button type="button" class="link-button" data-action="remove-request">Remove</button>
