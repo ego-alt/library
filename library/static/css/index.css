@@ -1627,6 +1627,7 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 }
 .float-menu > button:hover, .float-menu > a:hover, .float-menu > :focus-visible { background: var(--color-highlight-soft); outline: none; }
 .float-menu__note { padding: var(--space-2) var(--space-3); font-size: 0.75rem; color: var(--color-text-muted); word-break: break-all; }
+.float-menu__rule { margin: var(--space-1) var(--space-2); border: none; border-top: 1px solid var(--color-border); }
 .float-menu__ask { margin: 0; padding: var(--space-2) var(--space-3) var(--space-1); max-width: 18rem; font-size: var(--text-sm); color: var(--color-text-secondary); }
 .float-menu > [role="menuitemradio"]::before { content: ""; display: inline-block; width: 1.4em; color: var(--color-accent); }
 .float-menu > [role="menuitemradio"][aria-checked="true"]::before { content: "✓"; }

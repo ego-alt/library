@@ -7,38 +7,58 @@
 .danger-text { color: var(--color-danger) !important; }
 .text-muted { color: var(--color-text-muted); }
 
-/* --- One series --- */
+/* --- One series: a compact header (a small cover beside the title and its
+   lines, the description folded to a few lines, one button), then the
+   issues, smaller and closer than books since a run's covers look alike. --- */
 .series-head {
     display: grid;
-    grid-template-columns: 200px 1fr;
-    gap: 36px;
+    grid-template-columns: 140px 1fr;
+    gap: 28px;
     align-items: start;
-    margin-bottom: 40px;
+    margin-bottom: 28px;
 }
 .series-head__cover { cursor: default; }
 .series-head__cover img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.series-head__header { margin-bottom: var(--space-3); }
-.series-head__header .meta-author { margin-top: var(--space-1); }
-.series-head__count { margin: 0 0 var(--space-3); color: var(--color-text-secondary); font-size: var(--text-sm); }
-.series-head__count .meta-label { margin-right: var(--space-2); font-size: 0.75rem; }
-.series-head__desc { color: var(--color-text-secondary); max-width: 60ch; white-space: pre-line; }
-.series-head__actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+.series-head__header { margin-bottom: var(--space-2); }
+.series-head__header .meta-author { margin-top: 2px; }
+.series-head__count, .series-head__getting { margin: 0 0 var(--space-1); color: var(--color-text-secondary); font-size: var(--text-sm); }
+.series-head__getting { color: var(--color-text-muted); }
+/* "12 of 16 here" and "Change" read as words that can be tapped. */
+.series-head__toggle, .series-head__change {
+    position: relative;
+    padding: 0;
+    border: none;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-decoration: underline;
+    text-decoration-color: var(--color-border);
+    text-underline-offset: 3px;
+    cursor: pointer;
+}
+.series-head__toggle::after, .series-head__change::after { content: ""; position: absolute; inset: -12px -6px; }
+.series-head__toggle:hover, .series-head__change:hover { color: var(--color-accent); text-decoration-color: currentColor; }
+.series-head__toggle[aria-pressed="true"] { color: var(--color-accent); text-decoration-color: currentColor; }
+.series-head__desc { margin: var(--space-2) 0 0; color: var(--color-text-secondary); max-width: 64ch; white-space: pre-line; font-size: var(--text-sm); }
+.series-head__desc.is-folded { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.series-head__more-text { padding: 0; border: none; background: none; color: var(--color-text-muted); font: inherit; font-size: var(--text-sm); text-decoration: underline; cursor: pointer; min-height: 32px; }
+.series-head__actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin-top: var(--space-3); }
 /* The same round ⋯ as on a cover, sitting on the wall. */
 .series-head__more { width: 44px; height: 44px; border: 1px solid var(--color-border); color: var(--color-text-secondary); }
 @media (max-width: 640px) {
     /* A small cover beside the title; the rest flows under it. */
-    .series-head { display: block; margin-bottom: 28px; }
+    .series-head { display: block; margin-bottom: 20px; }
     .series-head::after { content: ""; display: table; clear: both; }
-    .series-head__cover { float: left; width: 96px; margin: 4px var(--space-4) var(--space-2) 0; }
+    .series-head__cover { float: left; width: 72px; margin: 2px var(--space-3) var(--space-1) 0; }
     .series-head .meta-title { font-size: var(--text-lg); }
-    .series-head__desc { clear: both; padding-top: var(--space-2); }
-    .series-head__actions { clear: both; padding-top: var(--space-2); }
+    .series-head__desc { clear: both; padding-top: var(--space-1); }
+    .series-head__desc.is-folded { -webkit-line-clamp: 2; }
+    .series-head__actions { clear: both; }
 }
 
-/* All / Have, or what's chosen while choosing. */
-.issue-toolbar { justify-content: space-between; }
-.issue-toolbar .status-filter[hidden], .bulk[hidden] { display: none; }
-.bulk { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); font-size: var(--text-sm); color: var(--color-text-secondary); }
+/* What's chosen while choosing (from ⋯ › Choose issues). */
+.bulk { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin: 0 0 var(--space-4); font-size: var(--text-sm); color: var(--color-text-secondary); }
+.bulk[hidden] { display: none; }
 .bulk #bulkCount { margin-right: var(--space-2); }
 
 /* Choosing a release by hand: rows in the details panel's overlay, which is
@@ -73,5 +93,19 @@
 .issue-wall.is-selecting .book-buttons { display: none; }
 .issue-wall.is-selecting [data-have="1"] .book, .issue-wall.is-selecting .status-snatched .book { opacity: 0.4; cursor: default; }
 .issue-wall .is-selected .book { outline: 3px solid var(--color-accent); outline-offset: 3px; }
+/* Denser than the books: seven across on a laptop, three on a phone, with
+   a smaller label. */
+.library.row.issue-wall { grid-template-columns: repeat(7, 1fr); gap: 22px 18px; }
+@media (max-width: 991.98px) { .library.row.issue-wall { grid-template-columns: repeat(5, 1fr); } }
+@media (max-width: 767.98px) { .library.row.issue-wall { grid-template-columns: repeat(4, 1fr); gap: 18px 14px; } }
+@media (max-width: 640px)    { .library.row.issue-wall { grid-template-columns: repeat(3, 1fr); gap: 16px 12px; } }
+.issue-wall .book-caption { margin-top: 8px; }
+.issue-wall .book-caption__title { font-size: 0.8125rem; }
+.issue-wall .book-caption__author { font-size: 0.6875rem; letter-spacing: 0.1em; }
+/* Where you are in the run. */
+.issue-wall .is-next .book { outline: 2px solid var(--color-accent); outline-offset: 3px; }
+.issue-wall > .is-next { content-visibility: visible; }  /* so nothing clips the ring */
+/* No ⋯ on covers on a phone: press and hold for the menu. */
+@media (hover: none) { .issue-wall .book-buttons { display: none; } }
 /* Long runs: the browser skips laying out covers far off screen. */
-.issue-wall > * { content-visibility: auto; contain-intrinsic-size: auto 360px; }
+.issue-wall > * { content-visibility: auto; contain-intrinsic-size: auto 260px; }

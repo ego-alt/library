@@ -179,7 +179,7 @@ document.addEventListener('keydown', (e) => {
 
 /** A small menu floating by `anchor` (it can't live inside a cover, which
  * clips what overflows). Items: {label, onClick, danger, checked} |
- * {label, href} | {note} | {ask} (a question heading the menu). */
+ * {label, href} | {note} | {ask} (a question heading the menu) | {divider}. */
 let floatingMenu = null;
 let _safeBottom = null;
 function safeBottom() {
@@ -199,6 +199,7 @@ function openMenu(anchor, items) {
     closeMenu();
     const menu = h('div', {class: 'float-menu', role: 'menu'}, items.filter(Boolean).map(item => {
         if (item.ask) return h('p', {class: 'float-menu__ask'}, item.ask);
+        if (item.divider) return h('hr', {class: 'float-menu__rule'});
         if (item.note) return h('span', {class: 'float-menu__note'}, item.note);
         if (item.href) return h('a', {href: item.href, role: 'menuitem', target: item.external ? '_blank' : null, rel: item.external ? 'noopener noreferrer' : null}, item.label);
         const checkable = item.checked !== undefined;

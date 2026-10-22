@@ -16,8 +16,15 @@
             <p class="meta-author">{{ [series.publisher, series.start_year, ('Vol. ' ~ series.volume) if series.volume]|select|join(' · ') or 'From your files' }}</p>
         </header>
         {% set have = issues|selectattr('has_file')|list|length %}
-        <p class="series-head__count"><span class="meta-label">Issues</span> {{ series.issue_count or issues|length }}{% if is_admin and have %} · {{ have }} here{% endif %}</p>
-        {% if series.description %}<p class="series-head__desc">{{ series.description|truncate(600) }}</p>{% endif %}
+        {% set read = issues|selectattr('finished')|list|length %}
+        <p class="series-head__count">
+            {% if is_admin and issues|length > have %}<button type="button" class="series-head__toggle" id="haveToggle" aria-pressed="false" title="Show only the issues here">{{ have }} of {{ issues|length }} here</button>{% else %}{{ have }} issue{{ 's' if have != 1 }}{% endif %}{% if read %} · {{ read }} read{% endif %}
+        </p>
+        {% if is_admin and series.provider != 'local' %}
+        {% set getting = {'future': 'new issues', 'all': 'every missing issue', 'none': 'only the issues you choose'}[series.monitor] %}
+        <p class="series-head__getting">Getting {{ getting }} · <button type="button" class="series-head__change" data-action="monitor-menu" data-menu-anchor>Change</button></p>
+        {% endif %}
+        {% if series.description %}<p class="series-head__desc" id="seriesDesc">{{ series.description|truncate(600) }}</p><button type="button" class="series-head__more-text" id="descMore" hidden>More</button>{% endif %}
         <div class="series-head__actions">
             {% if up_next %}<a class="btn btn-primary" href="{{ url_for('comics.read_page', issue_id=up_next.id) }}">{{ 'Continue' if up_next.page and not up_next.finished else 'Read' }} #{{ up_next.number }}</a>{% endif %}
             {% if is_admin %}
@@ -28,17 +35,11 @@
 </section>
 
 {% if is_admin and issues %}
-<div class="library-toolbar issue-toolbar">
-    <div class="status-filter" role="radiogroup" aria-label="Show issues">
-        <button type="button" role="radio" data-filter="all" aria-checked="true">All</button>
-        <button type="button" role="radio" data-filter="have" aria-checked="false">Have</button>
-    </div>
-    <div class="bulk" id="bulk" hidden>
-        <span id="bulkCount">Choose issues</span>
-        <button type="button" class="btn btn-secondary" data-bulk="wanted" disabled>Want</button>
-        <button type="button" class="btn btn-secondary" data-bulk="skipped" disabled>Skip</button>
-        <button type="button" class="btn btn-ghost" id="selectDone">Done</button>
-    </div>
+<div class="bulk" id="bulk" hidden>
+    <span id="bulkCount">Choose issues</span>
+    <button type="button" class="btn btn-secondary" data-bulk="wanted" disabled>Want</button>
+    <button type="button" class="btn btn-secondary" data-bulk="skipped" disabled>Skip</button>
+    <button type="button" class="btn btn-ghost" id="selectDone">Done</button>
 </div>
 {% endif %}
 

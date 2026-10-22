@@ -63,7 +63,7 @@ function initSeries() {
 // waiting on in its caption. ---
 
 const MISSING_STATE = {wanted: 'Wanted', snatched: 'Downloading', skipped: 'Skipped'};
-const MONITOR_LABELS = [['future', 'New issues as they come out', 'new ones'], ['all', 'Every missing issue', 'all missing'], ['none', 'Only the ones I choose', 'the ones I choose']];
+const MONITOR_LABELS = [['future', 'New issues as they come out', 'new issues'], ['all', 'Every missing issue', 'every missing issue'], ['none', 'Only the ones I choose', 'only the issues you choose']];
 
 // Mark an issue read (its last page) or unread (back to the start).
 async function setRead(issue, read) {
@@ -129,7 +129,44 @@ function initSeriesDetail() {
         caption(issue);
     }
 
+    // The description folds to two lines; More shows the rest.
+    const desc = document.getElementById('seriesDesc');
+    const descMore = document.getElementById('descMore');
+    if (desc && descMore) {
+        desc.classList.add('is-folded');
+        descMore.hidden = desc.scrollHeight <= desc.clientHeight + 2;
+        descMore.addEventListener('click', () => { desc.classList.remove('is-folded'); descMore.remove(); });
+    }
+
+    // Phones have no ⋯ on the covers: press and hold one for its menu, as a
+    // book on the shelf opens its details.
+    let pressed = false;
+    if (wall) (() => {
+        let timer = null, start = null;
+        wall.addEventListener('touchstart', (e) => {
+            const book = e.target.closest('.book');
+            if (!book || e.touches.length !== 1 || selecting) return;
+            pressed = false;
+            start = {x: e.touches[0].clientX, y: e.touches[0].clientY};
+            timer = setTimeout(() => {
+                const issue = issues.get(book.closest('[data-issue-id]').dataset.issueId);
+                const items = menuItems(issue, book);
+                if (!items.filter(Boolean).length) return;
+                pressed = true;
+                navigator.vibrate?.(10);
+                openMenu(book, items);
+            }, 500);
+        }, {passive: true});
+        const cancel = () => { clearTimeout(timer); timer = null; };
+        wall.addEventListener('touchmove', (e) => {
+            if (timer && (Math.abs(e.touches[0].clientX - start.x) > 10 || Math.abs(e.touches[0].clientY - start.y) > 10)) cancel();
+        }, {passive: true});
+        wall.addEventListener('touchend', cancel, {passive: true});
+        wall.addEventListener('contextmenu', (e) => { if (e.target.closest('.book') && matchMedia('(hover: none)').matches) e.preventDefault(); });
+    })();
+
     if (wall) wall.addEventListener('click', (e) => {
+        if (pressed) { e.preventDefault(); pressed = false; return; }
         const el = e.target.closest('[data-issue-id]');
         if (!el) return;
         const issue = issues.get(el.dataset.issueId);
@@ -153,7 +190,6 @@ function initSeriesDetail() {
     function readerItems(issue) {
         if (!issue.has_file) return [];
         return [
-            {label: issue.finished ? 'Read again' : (issue.page ? `Continue from page ${issue.page + 1}` : 'Read'), href: appUrl(`/comics/read/${issue.id}`)},
             {label: issue.finished ? 'Mark as unread' : 'Mark as read', onClick: () => toggleRead(issue)},
             {label: 'Download', href: appUrl(`/comics/issue/${issue.id}/download`)},
         ];
@@ -166,17 +202,21 @@ function initSeriesDetail() {
     const upload = document.getElementById('issueUpload');
     let uploadFor = null;
 
+    // An issue you have: reading things, then a rule, then the file. One
+    // you don't: getting it.
     menuItems = (issue, anchor) => {
-        const out = issue.released;
-        const findable = !issue.has_file && out && issue.status !== 'snatched';
-        return [
+        if (issue.has_file) return [
             ...readerItems(issue),
+            {divider: true},
+            {label: 'Replace the file…', onClick: () => { uploadFor = issue; upload.click(); }},
+            {label: 'Delete the file…', danger: true, onClick: () => confirmMenu(anchor, `Delete the file for #${issue.number}? This can’t be undone.`, [{label: 'Keep it'}, {label: 'Delete the file', danger: true, onClick: () => deleteFile(issue)}])},
+        ];
+        const findable = issue.released && issue.status !== 'snatched';
+        return [
             findable ? {label: 'Find now', onClick: () => findNow(issue)} : null,
             findable && window.pickRelease ? {label: 'Choose a release…', onClick: () => pickRelease({kind: 'comic', id: issue.id, label: `${issue.series} #${issue.number}`, onGrab: () => { issue.status = 'snatched'; showStatus(issue); }})} : null,
-            !issue.has_file && issue.status !== 'snatched' ? {label: issue.status === 'wanted' ? 'Skip' : 'Want', onClick: () => setStatus(issue, issue.status === 'wanted' ? 'skipped' : 'wanted')} : null,
-            {label: issue.has_file ? 'Replace the file…' : 'Add a file…', onClick: () => { uploadFor = issue; upload.click(); }},
-            issue.has_file ? {label: 'Delete the file…', danger: true, onClick: () => confirmMenu(anchor, `Delete the file for #${issue.number}? This can’t be undone.`, [{label: 'Keep it'}, {label: 'Delete the file', danger: true, onClick: () => deleteFile(issue)}])} : null,
-            issue.original_filename ? {note: `Was ${issue.original_filename}`} : null,
+            issue.status !== 'snatched' ? {label: issue.status === 'wanted' ? 'Skip' : 'Want', onClick: () => setStatus(issue, issue.status === 'wanted' ? 'skipped' : 'wanted')} : null,
+            {label: 'Add a file…', onClick: () => { uploadFor = issue; upload.click(); }},
         ];
     };
 
@@ -225,14 +265,13 @@ function initSeriesDetail() {
         upload.value = '';
     });
 
-    // All / Have.
-    const filter = document.querySelector('[aria-label="Show issues"]');
-    if (filter) filter.addEventListener('click', (e) => {
-        const button = e.target.closest('[data-filter]');
-        if (!button) return;
-        setRadio(filter, button);
-        const show = button.dataset.filter;
-        wall.querySelectorAll('[data-issue-id]').forEach(el => { el.hidden = show === 'have' && el.dataset.have !== '1'; });
+    // "12 of 16 here": tap to show only those, again for all.
+    const haveToggle = document.getElementById('haveToggle');
+    if (haveToggle) haveToggle.addEventListener('click', () => {
+        const only = haveToggle.getAttribute('aria-pressed') !== 'true';
+        haveToggle.setAttribute('aria-pressed', String(only));
+        haveToggle.title = only ? 'Show every issue' : 'Show only the issues here';
+        wall.querySelectorAll('[data-issue-id]').forEach(el => { el.hidden = only && el.dataset.have !== '1'; });
     });
 
     // Select (from ⋯), then Want or Skip.
@@ -246,8 +285,8 @@ function initSeriesDetail() {
         selecting = true;
         wall.classList.add('is-selecting');
         bulk.hidden = false;
-        filter.hidden = true;
         updateBulk();
+        bulk.scrollIntoView({block: 'nearest', behavior: 'smooth'});
     }
     function endSelect() {
         selecting = false;
@@ -255,7 +294,6 @@ function initSeriesDetail() {
         wall.classList.remove('is-selecting');
         wall.querySelectorAll('.is-selected').forEach(el => el.classList.remove('is-selected'));
         bulk.hidden = true;
-        filter.hidden = false;
     }
     if (bulk) {
         bulk.querySelector('#selectDone').addEventListener('click', endSelect);
@@ -274,6 +312,8 @@ function initSeriesDetail() {
         try {
             const data = await comicsApi(`/series/${seriesId}`, {method: 'PATCH', body: {monitor: value}});
             head.dataset.monitor = data.monitor;
+            const getting = head.querySelector('.series-head__getting');
+            if (getting) getting.firstChild.textContent = `Getting ${MONITOR_LABELS.find(([v]) => v === data.monitor)[2]} · `;
             // Every missing issue's status may have changed; read them again.
             const page = await fetch(location.href).then(r => r.text());
             const fresh = JSON.parse(new DOMParser().parseFromString(page, 'text/html').getElementById('issuesData').textContent);
@@ -305,13 +345,13 @@ function initSeriesDetail() {
     }
 
     document.addEventListener('click', (e) => {
-        const button = e.target.closest('[data-action="series-menu"], [data-action="refresh"]');
+        const button = e.target.closest('[data-action="series-menu"], [data-action="monitor-menu"], [data-action="refresh"]');
         if (!button) return;
         if (button.dataset.action === 'refresh') return refresh();
-        const local = head.dataset.provider === 'local';
-        const monitor = MONITOR_LABELS.find(([value]) => value === head.dataset.monitor);
+        if (button.dataset.action === 'monitor-menu') {
+            return openMenu(button, MONITOR_LABELS.map(([value, label]) => ({label, checked: head.dataset.monitor === value, onClick: () => setMonitor(value)})));
+        }
         openMenu(button, [
-            local ? null : {label: `Which issues to get: ${monitor ? monitor[2] : 'new ones'}…`, onClick: () => openMenu(button, MONITOR_LABELS.map(([value, label]) => ({label, checked: head.dataset.monitor === value, onClick: () => setMonitor(value)})))},
             wall ? {label: 'Choose issues…', onClick: startSelect} : null,
             {label: 'Stop following…', danger: true, onClick: () => stopFollowing(button)},
         ]);
