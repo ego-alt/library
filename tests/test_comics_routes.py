@@ -102,11 +102,11 @@ def test_readers_see_only_what_there_is_to_read(standard_client, comic_dir, tmp_
     assert "Not here" not in series and "Stop following" not in series and "selectToggle" not in series
     # The cover opens #1, and once they're partway in, the wall opens on
     # Reading and the cover picks up where they left off.
-    assert f'href="/comics/read/{have.id}" aria-label="Read Saga #1"' in page and 'aria-checked="true">All<' in page
+    assert f'href="/comics/read/{have.id}" aria-label="Read Saga #1"' in page
     assert standard_client.get(f"/comics/read/{have.id}").status_code == 200
     assert standard_client.put(f"/comics/api/issues/{have.id}/progress", json={"page": 1}).status_code == 200
     page = standard_client.get("/comics/").data.decode()
-    assert 'aria-label="Continue Saga #1"' in page and 'aria-checked="true">Reading<' in page and "#1 · 50%" in page
+    assert 'aria-label="Continue Saga #1"' in page and "#1 · 50%" in page and 'role="radiogroup"' not in page
     assert standard_client.get(f"/comics/issue/{have.id}/download").status_code == 200
 
 

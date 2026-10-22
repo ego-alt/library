@@ -9,16 +9,11 @@
         <i class="fas fa-magnifying-glass" aria-hidden="true"></i>
         <input type="search" id="librarySearch" class="library-search__input" placeholder="Search series" aria-label="Search series" autocomplete="off" enterkeyhint="search">
     </div>
-    <div class="status-filter" role="radiogroup" aria-label="Reading status">
-        {% for view in ['all', 'unread', 'reading', 'finished'] %}
-        <button type="button" role="radio" data-view="{{ view }}" aria-checked="{{ 'true' if view == current_view else 'false' }}">{{ view|capitalize }}</button>
-        {% endfor %}
-    </div>
 </div>
 <div class="row library" id="library">
     {% for card in cards %}
     {% set s = card.series %}
-    {% set attrs = {'data-name': s.name|lower, 'data-state': card.state, 'data-last': card.last, 'hidden': True if current_view != 'all' and card.state != current_view else None} %}
+    {% set attrs = {'data-name': s.name|lower} %}
     {# Where you are leads, as a book's caption ends with how far in you are;
        the publisher only when there's room for it. #}
     {% set meta = [card.line] if card.line.startswith('#') else [s.publisher or s.start_year, card.line] %}

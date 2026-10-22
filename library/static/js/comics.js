@@ -13,50 +13,31 @@ function bindSearchKey(input) {
     });
 }
 
-// --- The wall of series: one search box and All / Unread / Reading / Finished,
-// like the books (main.js), filtered here since every series is on the page. ---
-
-const SERIES_EMPTY = {
-    unread: ['Nothing unread', 'You’ve opened every series here.'],
-    reading: ['Nothing on the go', 'Series you start reading will appear here.'],
-    finished: ['Nothing finished yet', 'Series you’ve read every issue of will appear here.'],
-};
+// --- The wall of series: one search box, filtered here since every series
+// is on the page. ---
 
 function initSeries() {
     const grid = document.getElementById('library');
     if (!grid) return;
     const search = document.getElementById('librarySearch');
     const empty = document.getElementById('emptyState');
-    const filter = document.querySelector('.status-filter[aria-label="Reading status"]');
     const cards = [...grid.children];
-    let view = filter.querySelector('[aria-checked="true"]').dataset.view;
     bindSearchKey(search);
 
     function apply() {
         const q = search.value.trim().toLowerCase();
-        // What you read last comes first under Reading; A–Z everywhere else.
-        const order = view === 'reading' ? [...cards].sort((a, b) => b.dataset.last.localeCompare(a.dataset.last)) : cards;
-        grid.append(...order);
         let shown = 0;
         for (const card of cards) {
-            card.hidden = (view !== 'all' && card.dataset.state !== view) || (q && !card.dataset.name.includes(q));
+            card.hidden = Boolean(q) && !card.dataset.name.includes(q);
             if (!card.hidden) shown += 1;
         }
         empty.hidden = shown > 0;
         if (!shown) {
-            const [title, body] = q ? [`Nothing matches "${search.value.trim()}"`, 'Try a different word, or clear the search.'] : SERIES_EMPTY[view];
-            empty.querySelector('h3').textContent = title;
-            empty.querySelector('p').textContent = body;
+            empty.querySelector('h3').textContent = `Nothing matches "${search.value.trim()}"`;
+            empty.querySelector('p').textContent = 'Try a different word, or clear the search.';
         }
     }
 
-    filter.addEventListener('click', (e) => {
-        const button = e.target.closest('[data-view]');
-        if (!button || button.dataset.view === view) return;
-        view = button.dataset.view;
-        setRadio(filter, button);
-        apply();
-    });
     search.addEventListener('input', apply);
     search.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
@@ -67,7 +48,6 @@ function initSeries() {
             apply();
         }
     });
-    apply();
 }
 
 // --- One series: its issues as covers, each with a ⋯ menu (read, mark read,
