@@ -19,14 +19,8 @@ function bindSearchKey(input) {
 function initSeries() {
     const grid = document.getElementById('library');
     const search = document.getElementById('librarySearch');
-    // ?q= (from an old Get link) opens on that search.
-    const asked = new URLSearchParams(location.search).get('q');
-    if (search && asked) search.value = asked;
     bindSearchKey(search);
-    if (!grid) {
-        if (search && asked) search.dispatchEvent(new Event('input'));
-        return;
-    }
+    if (!grid) return;
     const empty = document.getElementById('emptyState');
     const cards = [...grid.children];
 
@@ -54,7 +48,6 @@ function initSeries() {
             search.dispatchEvent(new Event('input'));
         }
     });
-    if (asked) search.dispatchEvent(new Event('input'));
 }
 
 // --- One series: its issues as covers, each with a ⋯ menu (read, mark read,

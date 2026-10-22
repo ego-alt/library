@@ -1,4 +1,4 @@
-"""Get, Downloads and Settings are for admins: no page shows them to anyone else."""
+"""Downloads (with Settings at its foot) is for admins: no page shows it to anyone else."""
 
 from library.comics.models import ComicIssue, ComicSeries
 from library.downloads.models import SKIPPED
@@ -13,9 +13,9 @@ def test_readers_never_see_admin_links(standard_client, comic_dir, tmp_path, boo
     db.session.add_all([s, i])
     db.session.commit()
     files.import_file(str(make_cbz(tmp_path / "X 001.cbz")), i)
-    for path in ["/", "/comics/", f"/comics/series/{s.id}", f"/read/{book.filename}", f"/comics/read/{i.id}", "/get", "/downloads", "/settings"]:
+    for path in ["/", "/comics/", f"/comics/series/{s.id}", f"/read/{book.filename}", f"/comics/read/{i.id}", "/downloads"]:
         r = standard_client.get(path, follow_redirects=True)
         page = r.data.decode()
         assert r.status_code == 200, path
-        for link in ('href="/get"', 'href="/downloads"', 'href="/settings"'):
+        for link in ('href="/downloads"', 'id="settingsForm"', 'id="addComics"'):
             assert link not in page, (path, link)

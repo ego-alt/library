@@ -169,14 +169,6 @@ function coverCard({href, label, title, meta = [], cover = null, attrs = {}, img
             line ? h('span', {class: 'book-caption__author'}, line) : null));
 }
 
-// The bar's menu (a <details>) closes on a click elsewhere or Escape.
-document.addEventListener('click', (e) => {
-    document.querySelectorAll('details.bar-menu[open]').forEach(menu => { if (!menu.contains(e.target) || e.target.closest('.bar-menu__panel a, .bar-menu__panel button')) menu.open = false; });
-});
-document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') document.querySelectorAll('details.bar-menu[open]').forEach(menu => { menu.open = false; });
-});
-
 /** A small menu floating by `anchor` (it can't live inside a cover, which
  * clips what overflows). Items: {label, onClick, danger, checked} |
  * {label, href} | {note} | {ask} (a question heading the menu) | {divider}. */

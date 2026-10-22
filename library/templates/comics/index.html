@@ -2,12 +2,22 @@
 {% from "_covers.html" import cover_card %}
 {% block page_title %}Comics{% endblock %}
 {% block page %}series{% endblock %}
+{% block styles %}
+    {{ super() }}
+    {% if is_admin %}<link href="{{ url_for('static', filename='css/manage.css') }}" rel="stylesheet">{% endif %}
+{% endblock %}
 {% block content %}
 {% if cards or is_admin %}
 <div class="library-toolbar">
-    <div class="library-search">
-        <i class="fas fa-magnifying-glass" aria-hidden="true"></i>
-        <input type="search" id="librarySearch" class="library-search__input" placeholder="Search series" aria-label="Search series" autocomplete="off" enterkeyhint="search">
+    <div class="library-search-row">
+        <div class="library-search">
+            <i class="fas fa-magnifying-glass" aria-hidden="true"></i>
+            <input type="search" id="librarySearch" class="library-search__input" placeholder="Search series" aria-label="Search series" autocomplete="off" enterkeyhint="search">
+        </div>
+        {% if is_admin %}
+        <button type="button" class="library-add" id="addComics" aria-label="Add comic files" title="Add comic files"><i class="fas fa-plus" aria-hidden="true"></i></button>
+        <input type="file" id="addComicsInput" accept=".cbz,.cbr,.cb7,.zip,.rar,.7z" multiple hidden>
+        {% endif %}
     </div>
 </div>
 {% endif %}
@@ -37,8 +47,7 @@
 {% elif is_admin %}
 <div class="empty-state" id="emptyState">
     <h3>No series yet</h3>
-    <p>Search above for a series to follow: its issues come as they're out, and you read them here.</p>
-    <p><a href="{{ url_for('downloads.downloads_page') }}#import">Or add comic files you already have</a></p>
+    <p>Search above for a series to follow, and its issues come as they're out; or add comic files you have with +.</p>
 </div>
 {% else %}
 <div class="empty-state">
@@ -50,7 +59,12 @@
 {% block scripts %}
     {{ super() }}
     {% if is_admin %}
+    <div class="drop-zone" id="dropZone" hidden><p>Drop comic files to add them</p></div>
     <script src="{{ url_for('static', filename='js/get.js') }}"></script>
-    <script>attachShelfGet({kind: 'comics', input: document.getElementById('librarySearch'), after: document.getElementById('emptyState')});</script>
+    <script src="{{ url_for('static', filename='js/import.js') }}"></script>
+    <script>
+        attachShelfGet({kind: 'comics', input: document.getElementById('librarySearch'), after: document.getElementById('emptyState')});
+        comicImport.attachAdd(document.getElementById('addComics'), document.getElementById('addComicsInput'));
+    </script>
     {% endif %}
 {% endblock %}

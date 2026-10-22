@@ -1,26 +1,15 @@
-"""The Settings page, for admins: where to search and download (shared by
-books and comics), and how comics are looked up and written."""
+"""Settings, for admins (the Settings card at the foot of Downloads): where
+to search and download (shared by books and comics), and how comics are
+looked up and written. This is their JSON API."""
 
-from flask import Blueprint, jsonify, redirect, render_template, request, url_for
-from flask_login import current_user, login_required
+from flask import Blueprint, jsonify, request
 
 from .. import settings
-from ..choices import UserRoleChoice
-from ..comics import files, providers
+from ..comics import providers
 from ..downloads import clients, indexers
 from ._helpers import json_admin_required
 
 settings_blueprint = Blueprint("settings", __name__)
-
-@settings_blueprint.get("/settings")
-@login_required
-def settings_page():
-    if current_user.role != UserRoleChoice.ADMIN:
-        return redirect(url_for("index_routes.index"))
-    return render_template("settings.html", shelf=None, import_dir=files.import_dir(), comic_dir=files.comic_dir())
-
-
-
 
 def _merge_secret(new, old):
     return old if settings.is_masked(new) else new

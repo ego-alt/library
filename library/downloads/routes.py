@@ -1,7 +1,6 @@
 """Get and Downloads, for admins: one place to ask for books and comics, and
 one place to follow everything on its way into the library.
 
-  /get                 (old) now under the shelves' search
   /downloads           in progress, wanted, import, coming up, history, jobs
   /api/downloads/...   the queue; /api/wanted/<kind>/<id>/... searches and
                        grabs for a comic issue or a book request alike
@@ -84,14 +83,6 @@ def _wanted_item(kind: str, item_id: int):
 # Pages
 
 
-@downloads_blueprint.get("/get")
-@login_required
-def get_page():
-    """Getting lives under the shelves' search now; old links land there."""
-    query = request.args.get("q", "")
-    return redirect(url_for("index_routes.index", q=query) if query and is_admin() else url_for("index_routes.index"))
-
-
 @downloads_blueprint.get("/downloads")
 @login_required
 def downloads_page():
@@ -111,9 +102,10 @@ def downloads_page():
         "downloads.html",
         wanted_books=books.kind.wanted(),
         wanted_comics=list(groups.values()),
-        series_options=[[s.id, s.display_name] for s in ComicSeries.query.order_by(ComicSeries.name)],
         can_search=bool(settings.get("indexers")),
         search_every=every,
+        import_dir=comic_files.import_dir(),
+        comic_dir=comic_files.comic_dir(),
     )
 
 
@@ -363,7 +355,7 @@ def import_list():
             "series": {"id": match.series.id, "name": match.series.display_name} if match.series else None,
             "reason": match.reason,
         })
-    return jsonify({"files": rows, "folder": folder})
+    return jsonify({"files": rows, "folder": folder, "series": [[i, n] for i, n in sorted(series_names.items(), key=lambda x: x[1].lower())]})
 
 
 @downloads_blueprint.post("/api/import/upload")

@@ -34,7 +34,7 @@
 </head>
 <body{% block body_attrs %}{% endblock %}>
     {# A slim paper bar: the name on the left; on the right the two shelves,
-       night mode, then for admins one menu with Downloads and Settings. #}
+       night mode, then for admins Downloads (with Settings at its foot). #}
     <header class="lib-bar">
         <div class="lib-bar__inner container">
             <h1 class="lib-bar__title"><a href="{{ url_for('index_routes.index') }}">Shelves</a></h1>
@@ -48,13 +48,7 @@
                 {% block bar_actions %}{% endblock %}
                 <button type="button" class="btn btn-ghost bar-icon" onclick="toggleDarkMode()" aria-label="Night mode" title="Night mode"><i id="dark-mode-icon" class="fas fa-moon" aria-hidden="true"></i></button>
                 {% if is_admin %}
-                <details class="bar-menu">
-                    <summary class="btn btn-ghost bar-icon" aria-label="Downloads and Settings" title="Downloads and Settings"><i class="fas fa-bars" aria-hidden="true"></i>{% if downloads_count %}<span class="bar-icon__dot" aria-hidden="true"></span>{% endif %}</summary>
-                    <div class="bar-menu__panel">
-                        <a href="{{ url_for('downloads.downloads_page') }}"{% if shelf == 'downloads' %} aria-current="page"{% endif %}><i class="fas fa-download" aria-hidden="true"></i> <span class="bar-menu__label">Downloads</span>{% if downloads_count %} <span class="count">{{ downloads_count }}</span>{% endif %}</a>
-                        <a href="{{ url_for('settings.settings_page') }}"{% if request.endpoint == 'settings.settings_page' %} aria-current="page"{% endif %}><i class="fas fa-gear" aria-hidden="true"></i> <span class="bar-menu__label">Settings</span></a>
-                    </div>
-                </details>
+                <a class="btn btn-ghost bar-icon" href="{{ url_for('downloads.downloads_page') }}"{% if shelf == 'downloads' %} aria-current="page"{% endif %} aria-label="Downloads{% if downloads_count %}, {{ downloads_count }} in progress{% endif %}" title="Downloads and Settings"><i class="fas fa-download" aria-hidden="true"></i>{% if downloads_count %}<span class="bar-icon__dot" aria-hidden="true"></span>{% endif %}</a>
                 {% endif %}
             </div>
         </div>

@@ -13,7 +13,7 @@
 // Served from the app root (see routes/pwa.py), so the scope is the whole
 // mount: "/" standalone, "/library/" behind the dashboard proxy.
 
-const SHELL_CACHE = 'shell-v28';
+const SHELL_CACHE = 'shell-v29';
 const BOOKS_CACHE = 'books-v1';
 const COVERS_CACHE = 'covers-v1';
 const COMICS_CACHE = 'comics-v1';
@@ -24,15 +24,15 @@ const ROOT = new URL(self.registration.scope).pathname;  // always ends in "/"
 
 // Never cached: auth, file downloads, the JSON APIs that change things, and the worker itself.
 const PASSTHROUGH = ['auth/', 'download/', 'comics/api/', 'api/', 'sw.js', 'healthz'];
-// Pages that need the server (searching, downloading, settings).
-const ONLINE_ONLY = ['get', 'downloads', 'settings'];
+// Pages that need the server (downloads and settings).
+const ONLINE_ONLY = ['downloads'];
 // The look of every page, cached at install so the first offline launch
 // isn't unstyled.
 const SHELL_ASSETS = [
     'static/css/base.css', 'static/css/structural.css', 'static/css/tokens.css', 'static/css/index.css',
-    'static/css/comics.css', 'static/css/manage.css', 'static/css/reader.css', 'static/css/comic_reader.css',
+    'static/css/comics.css', 'static/css/manage.css', 'static/css/settings.css', 'static/css/reader.css', 'static/css/comic_reader.css',
     'static/js/app_root.js', 'static/js/signed_out.js', 'static/js/darkmode.js', 'static/js/ui.js', 'static/js/main.js',
-    'static/js/pwa.js', 'static/js/comics.js', 'static/js/get.js', 'static/js/reader.js', 'static/js/read_aloud.js', 'static/js/comic_reader.js',
+    'static/js/pwa.js', 'static/js/comics.js', 'static/js/get.js', 'static/js/import.js', 'static/js/settings.js', 'static/js/reader.js', 'static/js/read_aloud.js', 'static/js/comic_reader.js',
     'static/vendor/jquery-3.6.0.min.js', 'static/fonts/inter/inter.css', 'static/fonts/inter/inter-latin.woff2',
     'static/vendor/fontawesome-6.0.0-subset/icons.css', 'static/vendor/fontawesome-6.0.0-subset/fa-solid-900.woff2',
 ];
@@ -78,7 +78,7 @@ self.addEventListener('fetch', (event) => {
         } else if (path.startsWith('comics/read/')) {
             event.respondWith(networkFirst(request, SHELL_CACHE).catch(() => offlinePage("This issue isn't saved on this device yet.<br>Open it once while online to read it offline.")));
         } else if (ONLINE_ONLY.includes(path.split(/[/?]/)[0])) {
-            event.respondWith(fetch(request).catch(() => offlinePage("You're offline.<br>Get, Downloads and Settings need a connection.")));
+            event.respondWith(fetch(request).catch(() => offlinePage("You're offline.<br>Downloads and Settings need a connection.")));
         } else {
             event.respondWith(networkFirst(request, SHELL_CACHE, path.startsWith('comics/') ? `${ROOT}comics/` : ROOT));
         }

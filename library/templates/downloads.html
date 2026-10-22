@@ -5,6 +5,7 @@
 {% block styles %}
     {{ super() }}
     <link href="{{ url_for('static', filename='css/manage.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/settings.css') }}" rel="stylesheet">
 {% endblock %}
 {% block content %}
 {# Only when something's wrong: the worker is down or a client isn't answering. #}
@@ -23,7 +24,7 @@
         {% if can_search and (wanted_books or wanted_comics) %}<div class="section__actions"><button type="button" class="btn btn-secondary" data-action="search-all">Find now</button></div>{% endif %}
     </div>
     {% if wanted_books or wanted_comics %}
-    <p class="section__hint">{% if can_search %}Looked for every {{ search_every }} hour{{ 's' if search_every != 1 }}.{% else %}Looked for once there's an indexer in <a href="{{ url_for('settings.settings_page') }}#indexers">Settings</a>.{% endif %}</p>
+    <p class="section__hint">{% if can_search %}Looked for every {{ search_every }} hour{{ 's' if search_every != 1 }}.{% else %}Looked for once there's an indexer in <a href="#indexers" data-open-settings>Settings</a>.{% endif %}</p>
     {% if wanted_books %}
     <h3 class="sub-head">Books <span class="count" data-count>{{ wanted_books|length }}</span></h3>
     <ol class="entries">
@@ -68,20 +69,15 @@
     {% endif %}
 </section>
 
-<section class="section" id="import">
+{# Comic files waiting for a series: from the import folder, or a finished
+   download that didn't match an issue. Shown only when there are some. #}
+<section class="section" id="import" hidden>
     <div class="section__head">
-        <h2 class="section__title">Import</h2>
-        <div class="section__actions">
-            <button type="button" class="btn btn-ghost" id="importScan" hidden>Match again</button>
-            <button type="button" class="btn btn-secondary" id="importPick">Choose files</button>
-        </div>
+        <h2 class="section__title">Needs a series</h2>
+        <div class="section__actions"><button type="button" class="btn btn-ghost" id="importScan">Match again</button></div>
     </div>
-    <p class="section__hint">Or drop EPUBs and CBZ, CBR or CB7 comics anywhere on this page. Books join the library; comics are filed with their issue.</p>
-    <input type="file" id="importInput" accept=".epub,.cbz,.cbr,.cb7,.zip,.rar,.7z" multiple hidden>
-    <div id="importWaiting" hidden>
-        <h3 class="sub-head">Needs a series</h3>
-        <ol class="entries" id="importList"></ol>
-    </div>
+    <p class="section__hint">These didn't match an issue on their own. Choose each one's series and check the number.</p>
+    <ol class="entries" id="importList"></ol>
 </section>
 
 <details class="section section--fold" id="historySection" open>
@@ -90,9 +86,14 @@
     <ol class="entries" id="historyList"></ol>
 </details>
 
-<div class="drop-zone" id="dropZone" hidden><p>Drop books or comics to add them</p></div>
-<script id="seriesData" type="application/json">{{ series_options|tojson }}</script>
+{# Settings, folded at the foot: they're set once and rarely changed. #}
+<details class="settings-fold" id="settings">
+    <summary class="section settings-fold__head"><h2 class="section__title">Settings</h2></summary>
+    {% include "_settings_form.html" %}
+</details>
 {% endblock %}
 {% block scripts %}
+    <script src="{{ url_for('static', filename='js/import.js') }}"></script>
     <script src="{{ url_for('static', filename='js/downloads.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/settings.js') }}"></script>
 {% endblock %}

@@ -75,49 +75,11 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 .lib-bar__title a { color: var(--color-text-primary); text-decoration: none; }
 .lib-bar__actions { display: flex; align-items: center; gap: var(--space-1); }
 
-/* The one menu: night mode, the view, Settings. */
-.bar-menu { position: relative; }
-.bar-menu > summary { list-style: none; cursor: pointer; }
-.bar-menu > summary::-webkit-details-marker { display: none; }
-.bar-menu__panel {
-    position: absolute;
-    right: 0;
-    top: calc(100% + var(--space-1));
-    z-index: 1100;
-    display: flex;
-    flex-direction: column;
-    min-width: 13rem;
-    padding: var(--space-1);
-    background: var(--color-bg-raised);
-    border: 1px solid var(--pane-edge);
-    border-radius: var(--radius-md);
-    box-shadow: 0 16px 40px -16px var(--color-shadow);
-}
-.bar-menu__panel > button, .bar-menu__panel > a {
-    display: flex;
-    align-items: center;
-    gap: var(--space-3);
-    min-height: 44px;
-    padding: 0 var(--space-3);
-    border: none;
-    border-radius: var(--radius-sm);
-    background: none;
-    color: var(--color-text-primary);
-    font: inherit;
-    font-size: var(--text-sm);
-    text-align: left;
-    text-decoration: none;
-    cursor: pointer;
-}
-.bar-menu__panel > button:hover, .bar-menu__panel > a:hover, .bar-menu__panel > [aria-current="page"] { background: var(--color-highlight-soft); }
-.bar-menu__panel i { width: 1.1em; text-align: center; color: var(--color-text-muted); }
-.bar-menu__panel .count { margin-left: auto; }
-/* The bar's icons: night mode and the menu, quiet until hovered. */
+/* The bar's icons: night mode and Downloads, quiet until hovered. */
 .bar-icon { position: relative; color: var(--color-text-muted); }
-.bar-icon:hover { color: var(--color-text-primary); }
+.bar-icon:hover, .bar-icon[aria-current="page"] { color: var(--color-text-primary); }
 /* Something is downloading. */
 .bar-icon__dot { position: absolute; top: 9px; right: 9px; width: 7px; height: 7px; border-radius: 50%; background: var(--color-accent); }
-/* Downloads or Settings, named after the shelves while you're there. */
 
 /* The two shelves, in the bar beside night mode and the menu. */
 .lib-bar { margin-bottom: 12px; }
@@ -1399,11 +1361,20 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     gap: var(--space-3);
     margin: 0 0 40px;
 }
-.library-search {
-    position: relative;
-    flex: 1 1 260px;
-    max-width: 420px;
+/* The search box and, at its end, + to add files to this shelf. */
+.library-search-row { display: flex; align-items: center; gap: var(--space-2); flex: 1 1 300px; max-width: 476px; }
+.library-search { position: relative; flex: 1; min-width: 0; }
+.library-add {
+    flex: 0 0 auto;
+    width: 44px;
+    height: 44px;
+    border: none;
+    border-radius: var(--radius-pill);
+    background: none;
+    color: var(--color-text-muted);
+    cursor: pointer;
 }
+.library-add:hover, .library-add:focus-visible { background: var(--color-highlight-soft); color: var(--color-text-primary); outline: none; }
 .library-search > i {
     position: absolute;
     left: 0;   /* flush left, under the name */
@@ -1469,7 +1440,7 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 .status-filter button:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }
 .meta-status { align-self: flex-start; }
 @media (max-width: 640px) {
-    .library-search { max-width: none; flex-basis: 100%; }
+    .library-search-row { max-width: none; flex-basis: 100%; }
     .library .status-filter, .library-toolbar .status-filter { width: 100%; }
     .library-toolbar .status-filter button { flex: 1; min-height: 44px; }
     .library-toolbar { margin-bottom: 28px; }
@@ -1634,7 +1605,7 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 
 
 /* At night, what floats needs a clear edge and a deeper shadow to lift off the page. */
-.dark-mode .bar-menu__panel, .dark-mode .float-menu {
+.dark-mode .float-menu {
     border-color: rgba(255, 230, 190, 0.16);
     box-shadow: 0 18px 44px -10px rgba(0, 0, 0, 0.75);
 }

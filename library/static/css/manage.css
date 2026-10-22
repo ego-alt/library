@@ -81,6 +81,14 @@ body[data-page="downloads"] .section--fold[open] > summary { margin-bottom: var(
     body[data-page="downloads"] .section, .settings .section { padding: var(--space-3) var(--space-4); }
 }
 
+/* Settings, folded at the foot of Downloads: the closed card is just its
+   title; open, its cards follow. */
+.settings-fold > summary { display: block; list-style: none; cursor: pointer; }
+.settings-fold > summary::-webkit-details-marker { display: none; }
+.settings-fold > summary .section__title { display: flex; align-items: center; gap: var(--space-2); }
+.settings-fold > summary .section__title::before { content: "▸"; font-size: var(--text-sm); color: var(--color-text-muted); transition: transform var(--dur-fast) ease; }
+.settings-fold[open] > summary .section__title::before { transform: rotate(90deg); }
+
 /* --- Rows --- */
 .entries { list-style: none; padding: 0; margin: 0; }
 .entry {

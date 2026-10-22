@@ -1,6 +1,8 @@
-// Downloads: following everything on its way into the library. Also the
-// release chooser the comics series page uses. Asking for books and
-// following series is under the shelves' search (get.js). Helpers are in ui.js.
+// Downloads: following everything on its way into the library, the files
+// that need a series, and Settings folded at the foot. Also the release
+// chooser the comics series page uses. Asking for books and following series
+// is under the shelves' search (get.js); adding files is the shelves' +.
+// Helpers are in ui.js.
 (() => {
 
 // --- Choosing a release by hand, for a book request or a comic issue ----------
@@ -83,6 +85,7 @@ function initDownloads() {
     initWanted();
     initDownloadLists();
     initImport();
+    initSettingsFold();
 }
 
 // Wanted: compact rows, each with a ⋯ menu; a comic series' row acts on all
@@ -261,84 +264,39 @@ function initDownloadLists() {
 }
 
 
-// --- Import: books and comics from your computer ----------------------------
+// --- Needs a series: comic files waiting in the import folder (import.js) ---
 
 function initImport() {
+    const section = document.getElementById('import');
     const list = document.getElementById('importList');
-    const waiting = document.getElementById('importWaiting');
-    const input = document.getElementById('importInput');
-    const series = JSON.parse(document.getElementById('seriesData').textContent);
-
-    function importRow(file) {
-        const startOn = file.guess || (file.series && file.series.id) || '';
-        const seriesSelect = h('select', {class: 'meta-input', 'aria-label': 'Series'},
-            h('option', {value: ''}, 'Choose a series…'),
-            series.map(([id, name]) => h('option', {value: id, selected: id === startOn}, name)),
-            h('option', {value: 'new'}, 'A new series (from the file)…'));
-        const number = h('input', {class: 'meta-input input--short', type: 'text', inputmode: 'decimal', value: file.parsed.number || '', 'aria-label': 'Issue number', placeholder: '#'});
-        const newName = h('input', {class: 'meta-input', type: 'text', value: file.parsed.series || '', 'aria-label': 'Series name', hidden: true});
-        const go = h('button', {type: 'button', class: 'btn btn-primary', disabled: !startOn, onclick: async (e) => {
-            const body = {path: file.path, number: number.value};
-            if (seriesSelect.value === 'new') body.new_series = newName.value;
-            else body.series_id = Number(seriesSelect.value);
-            e.currentTarget.textContent = 'Adding…';
-            await busy(e.currentTarget, async () => {
-                const issue = await run(() => apiFetch('/api/import/file', {method: 'POST', body}));
-                if (issue) {
-                    showToast(`Filed as ${issue.series} #${issue.number}`, 'success', {label: 'Open', onClick: () => { window.location = appUrl(`/comics/series/${issue.series_id}`); }});
-                    load();
-                }
-            });
-        }}, 'Add');
-        seriesSelect.addEventListener('change', () => {
-            newName.hidden = seriesSelect.value !== 'new';
-            go.disabled = !seriesSelect.value;
-        });
-        const remove = h('button', {type: 'button', class: 'btn btn-ghost danger-text', onclick: (e) => confirmMenu(e.currentTarget, `Delete ${file.path}? This can’t be undone.`, [{label: 'Keep it'}, {label: 'Delete the file', danger: true, onClick: () => run(() => apiFetch(`/api/import/file?path=${encodeURIComponent(file.path)}`, {method: 'DELETE'}), () => { showToast(`Deleted ${file.path}`); load(); })}])}, 'Delete');
-        const guess = [file.parsed.series, file.parsed.number ? `#${file.parsed.number}` : null].filter(Boolean).join(' ');
-        return h('li', {class: 'entry entry--import'},
-            h('div', {class: 'entry__main'},
-                h('span', {class: 'entry__title'}, guess ? `${guess}?` : file.path),
-                h('span', {class: 'entry__meta'}, [guess ? file.path : null, formatSize(file.size)].filter(Boolean).join(' · ')),
-                h('span', {class: 'entry__hint'}, file.issue ? `Will be filed as ${file.issue.label}` : file.reason),
-                h('div', {class: 'entry__controls'}, seriesSelect, newName, number, go, remove)));
-    }
-
-    async function load() {
-        try {
-            const data = await apiFetch('/api/import');
-            waiting.hidden = !data.files.length;
-            document.getElementById('importScan').hidden = !data.files.length;
-            list.replaceChildren(...data.files.map(importRow));
-        } catch (e) {
-            waiting.hidden = false;
-            list.replaceChildren(h('li', {class: 'empty-line'}, e.message));
-        }
-    }
-
-    function describe(data) {
-        return [`Added ${data.imported.length}.`, data.unmatched.length ? `${data.unmatched.length} need${data.unmatched.length === 1 ? 's' : ''} a series.` : null, data.failed.length ? `${data.failed.length} couldn’t be opened.` : null].filter(Boolean).join(' ');
-    }
-
-    async function send(fileList) {
-        const files = [...fileList].filter(f => /\.(epub|cbz|cbr|cb7|zip|rar|7z)$/i.test(f.name));
-        if (!files.length) return showToast('Those aren’t books or comics.', 'error');
-        const form = new FormData();
-        files.forEach(f => form.append('files', f));
-        showToast(`Adding ${files.length} file${files.length === 1 ? '' : 's'}…`);
-        await run(() => apiFetch('/api/import/upload', {method: 'POST', form}), data => showToast(describe(data), data.failed.length ? 'error' : 'success'));
-        load();
-    }
-
-    document.getElementById('importPick').addEventListener('click', () => input.click());
-    input.addEventListener('change', () => { send(input.files); input.value = ''; });
-    enableDropZone(document.getElementById('dropZone'), send);
+    const load = async () => { section.hidden = !(await comicImport.fillWaiting(list, load)); };
     document.getElementById('importScan').addEventListener('click', async (e) => {
         e.currentTarget.textContent = 'Matching…';
-        await busy(e.currentTarget, () => run(() => apiFetch('/api/import/scan', {method: 'POST'}), data => showToast(describe(data), 'success')));
+        await busy(e.currentTarget, () => run(() => apiFetch('/api/import/scan', {method: 'POST'}), data => showToast(comicImport.describe(data), 'success')));
         load();
     });
     load();
+}
+
+// --- Settings, folded at the foot: opened by a link to one of its parts ---
+
+function initSettingsFold() {
+    const fold = document.getElementById('settings');
+    const open = (hash) => {
+        fold.open = true;
+        const target = hash && document.querySelector(hash);
+        (target || fold).scrollIntoView({behavior: 'smooth', block: 'start'});
+    };
+    const fromHash = () => { if (location.hash && (location.hash === '#settings' || fold.querySelector(location.hash))) open(location.hash); };
+    document.addEventListener('click', (e) => {
+        const link = e.target.closest('[data-open-settings]');
+        if (!link) return;
+        e.preventDefault();
+        history.replaceState(null, '', link.getAttribute('href'));
+        open(link.getAttribute('href'));
+    });
+    window.addEventListener('hashchange', fromHash);
+    fromHash();
 }
 
 

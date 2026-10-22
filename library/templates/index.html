@@ -26,11 +26,16 @@
 {% block body %}
     <div class="container">
         <div class="library-toolbar">
-            <div class="library-search">
-                <i class="fas fa-magnifying-glass" aria-hidden="true"></i>
-                <input type="search" id="librarySearch" class="library-search__input"
-                       placeholder="Search titles, authors, tags" aria-label="Search the library"
-                       autocomplete="off" enterkeyhint="search">
+            <div class="library-search-row">
+                <div class="library-search">
+                    <i class="fas fa-magnifying-glass" aria-hidden="true"></i>
+                    <input type="search" id="librarySearch" class="library-search__input"
+                           placeholder="Search titles, authors, tags" aria-label="Search the library"
+                           autocomplete="off" enterkeyhint="search">
+                </div>
+                {% if current_user.is_authenticated %}
+                <button type="button" class="library-add" onclick="document.getElementById('fileUploadInput').click();" aria-label="Add books" title="Add books (U)"><i class="fas fa-plus" aria-hidden="true"></i></button>
+                {% endif %}
             </div>
             {% if current_user.is_authenticated %}
             <div class="status-filter" role="radiogroup" aria-label="Reading status">

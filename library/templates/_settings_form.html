@@ -1,20 +1,11 @@
-{% extends "_layout.html" %}
-{% block title %}Settings · Shelves{% endblock %}
-{% block head_scripts %}
-    <script>window.APP_ROOT = "{{ request.script_root }}";</script>
-{% endblock %}
-{% block styles %}
-    <link href="{{ url_for('static', filename='css/comics.css') }}" rel="stylesheet">
-    <link href="{{ url_for('static', filename='css/manage.css') }}" rel="stylesheet">
-    <link href="{{ url_for('static', filename='css/settings.css') }}" rel="stylesheet">
-{% endblock %}
-{# Sections on the page like Downloads, and fields like a book's details:
-   a small-capitals label over each box. #}
+{# Settings, at the foot of Downloads (folded shut): where to search, which
+   clients, how releases are chosen, and how comics are looked up and
+   written. Fields like a book's details: a small-capitals label over each
+   box. #}
 {% macro field(label, name, type='text', placeholder='', id=None, extra='') %}
 <label class="meta-field"{% if id %} for="{{ id }}"{% endif %}><span class="meta-label">{{ label }}</span><input class="meta-input" {% if id %}id="{{ id }}" {% endif %}name="{{ name }}" type="{{ type }}"{% if placeholder %} placeholder="{{ placeholder }}"{% endif %} {{ extra|safe }}></label>
 {% endmacro %}
-{% block body %}
-<div class="container settings-page">
+
     <form id="settingsForm" class="settings" autocomplete="off">
         <section class="section" id="indexers">
             <div class="section__head"><h2 class="section__title">Indexers</h2></div>
@@ -140,7 +131,6 @@
         </div>
     </form>
 
-</div>
 
 <template id="indexerTemplate">
     <li class="indexer">
@@ -169,7 +159,3 @@
         </details>
     </li>
 </template>
-{% endblock %}
-{% block scripts %}
-    <script src="{{ url_for('static', filename='js/settings.js') }}"></script>
-{% endblock %}

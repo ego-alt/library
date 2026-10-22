@@ -391,14 +391,6 @@ function restoreReturnState() {
 }
 
 $(function() {
-    // ?q= (from an old Get link, or a shared one) opens on that search.
-    const asked = new URLSearchParams(location.search).get('q');
-    if (asked) {
-        $('#librarySearch').val(asked);
-        applyFilters();
-        document.getElementById('librarySearch').dispatchEvent(new Event('input'));
-        return;
-    }
     if (restoreReturnState()) return;
     updateViewUI();
 
