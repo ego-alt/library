@@ -3,8 +3,7 @@
  * download clients and indexers folded to a line each, and a Save bar once
  * something has changed. */
 
-/* Full width like Downloads; the fields themselves stay a readable width. */
-.settings .field-stack { max-width: 640px; }
+/* Full width like Downloads, text and fields alike. */
 .settings .section__head + .field-stack { margin-top: var(--space-2); }
 .settings .section { scroll-margin-top: var(--space-4); }
 

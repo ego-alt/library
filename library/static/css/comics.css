@@ -39,7 +39,7 @@
 .series-head__toggle::after, .series-head__change::after { content: ""; position: absolute; inset: -12px -6px; }
 .series-head__toggle:hover, .series-head__change:hover { color: var(--color-accent); text-decoration-color: currentColor; }
 .series-head__toggle[aria-pressed="true"] { color: var(--color-accent); text-decoration-color: currentColor; }
-.series-head__desc { margin: var(--space-2) 0 0; color: var(--color-text-secondary); max-width: 64ch; white-space: pre-line; font-size: var(--text-sm); }
+.series-head__desc { margin: var(--space-2) 0 0; color: var(--color-text-secondary); white-space: pre-line; font-size: var(--text-sm); }
 .series-head__desc.is-folded { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .series-head__more-text { padding: 0; border: none; background: none; color: var(--color-text-muted); font: inherit; font-size: var(--text-sm); text-decoration: underline; cursor: pointer; min-height: 32px; }
 .series-head__actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin-top: var(--space-3); }
