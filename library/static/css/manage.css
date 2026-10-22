@@ -52,20 +52,23 @@
 .dark-mode { --card-bg: var(--pane); --card-edge: var(--pane-edge); --card-shadow: 0 10px 30px -22px var(--color-shadow); }
 body[data-page="downloads"] .section, .settings .section {
     margin-bottom: var(--space-5);
-    padding: var(--space-4) var(--space-5) var(--space-3);
+    padding: var(--space-5);
     background: var(--card-bg);
     border: 1px solid var(--card-edge);
     border-radius: var(--radius-md);
     box-shadow: var(--card-shadow);
 }
 body[data-page="downloads"] .section[hidden] { display: none; }
-/* Rows run to the card's edges; the last one needs no rule under it. */
-body[data-page="downloads"] .section .entries > .entry:last-child,
-body[data-page="downloads"] .section .entries > .entry-group:last-child > details:not([open]) > .entry { border-bottom: none; }
-body[data-page="downloads"] .section--fold:not([open]) { padding-bottom: var(--space-4); }
+/* The same space above and below what's in a card: the heading line is no
+   taller than its title, and the last row has no rule or padding under it. */
+body[data-page="downloads"] .section .section__head, .settings .section .section__head { min-height: 0; }
+body[data-page="downloads"] .section .entries:last-child > .entry:last-child,
+body[data-page="downloads"] .section .entries:last-child > .entry-group:last-child > details:not([open]) > .entry { border-bottom: none; padding-bottom: 0; min-height: 40px; }
+body[data-page="downloads"] .section > :last-child, .settings .section > :last-child { margin-bottom: 0; }
 body[data-page="downloads"] .section--fold > summary { margin-bottom: 0; }
+body[data-page="downloads"] .section--fold[open] > summary { margin-bottom: var(--space-1); }
 @media (max-width: 640px) {
-    body[data-page="downloads"] .section, .settings .section { padding: var(--space-3) var(--space-4) var(--space-2); }
+    body[data-page="downloads"] .section, .settings .section { padding: var(--space-4); }
 }
 
 /* --- Rows --- */

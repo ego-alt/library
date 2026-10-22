@@ -1,8 +1,9 @@
 // The comic reader: the book reader's frame (reader.css) around pages — one
-// page, two side by side, or one long scroll. The bar stays hidden until you
-// reach for it: tap the middle, or bring the pointer to the top edge. Tap or
-// click the left/right third to turn (swapped right to left for manga).
-// Everything else is in the Aa panel. `?` lists the keys.
+// page, two side by side, or one long scroll, picked by plain icons in the
+// bar, with Fit and right to left beside them. The bars stay hidden until
+// you reach for them: tap the middle, or bring the pointer to the top edge.
+// Tap or click the left/right third to turn (swapped right to left for
+// manga). `?` lists the keys.
 //
 // Your page is kept on this device as well as sent, so reading offline (or
 // through a failed save) never loses it; a page the server hasn't confirmed
@@ -12,8 +13,7 @@
     const root = document.getElementById('reader');
     const stage = document.getElementById('stage');
     const bar = document.getElementById('topBar');
-    const panel = document.getElementById('reader-settings');
-    const aa = document.getElementById('settings-toggle');
+    const bottom = document.getElementById('bottomBar');
     const slider = document.getElementById('pageSlider');
     const sliderCount = document.getElementById('pageSliderCount');
     const footCount = document.getElementById('pageCount');
@@ -82,7 +82,9 @@
         root.dataset.fit = fit;
         root.classList.toggle('is-rtl', rtl);
         slider.style.direction = rtl ? 'rtl' : 'ltr';
-        syncPanel();
+        document.querySelectorAll('[data-mode]').forEach(b => b.setAttribute('aria-checked', String(b.dataset.mode === mode)));
+        document.getElementById('fitButton').setAttribute('aria-pressed', String(fit === 'width'));
+        document.getElementById('rtlButton').setAttribute('aria-pressed', String(rtl));
         if (mode === 'scroll') return renderScroll();
 
         const pages = spreadAt(page);
@@ -148,7 +150,7 @@
     function showCount(pages) {
         const label = pages.length > 1 ? `${pages[0] + 1}–${pages[1] + 1}` : `${pages[0] + 1}`;
         footCount.textContent = `${label} / ${total}`;
-        sliderCount.textContent = `${label} of ${total}`;
+        sliderCount.textContent = `${label} / ${total}`;
         slider.value = pages[0] + 1;
         progressLine.style.width = `${total ? (100 * (pages[pages.length - 1] + 1) / total) : 0}%`;
     }
@@ -248,8 +250,8 @@
 
     // --- The bar: hidden until wanted, as in the book reader ---
     function showBar(show) {
-        if (!show && bar.classList.contains('pinned')) return;  // the Aa panel is open
         bar.classList.toggle('visible', show);
+        bottom.classList.toggle('visible', show);
         document.documentElement.classList.toggle('bar-visible', show);
     }
     const barShown = () => bar.classList.contains('visible');
@@ -262,14 +264,13 @@
             lastY = e.clientY;
             if (first) return;
             if (e.clientY < 28) showBar(true);
-            else if (e.clientY > bar.offsetHeight + 60 && !bar.contains(e.target)) showBar(false);
+            else if (e.clientY > bar.offsetHeight + 60 && e.clientY < window.innerHeight - bottom.offsetHeight - 60) showBar(false);
         }, {passive: true});
     }
 
     // Tap zones: the sides turn, the middle shows or hides the bar.
     stage.addEventListener('click', (e) => {
         if (e.target.closest('.cr-end')) return;
-        if (!panel.hidden) return openPanel(false);
         if (mode === 'scroll') return showBar(!barShown());
         const x = e.clientX / window.innerWidth;
         if (x > 0.35 && x < 0.65) return showBar(!barShown());
@@ -294,52 +295,10 @@
         touch = null;
     });
 
-    // --- The Aa panel ---
-    function currentTheme() {
-        const dark = document.documentElement.classList.contains('dark-mode');
-        const t = store.get('readerTheme', dark ? 'night' : 'day');
-        if (dark && (t === 'day' || t === 'sepia')) return 'night';
-        if (!dark && (t === 'night' || t === 'black')) return 'day';
-        return t;
-    }
-    function setTheme(theme) {
-        const html = document.documentElement;
-        const dark = theme === 'night' || theme === 'black';
-        html.classList.toggle('dark-mode', dark);
-        html.classList.toggle('theme-sepia', theme === 'sepia');
-        html.classList.toggle('theme-black', theme === 'black');
-        store.set('darkMode', dark ? 'enabled' : 'disabled');
-        store.set('readerTheme', theme);
-        syncPanel();
-    }
-    const toggleNight = () => setTheme(['night', 'black'].includes(currentTheme()) ? 'day' : 'night');
-
-    function syncPanel() {
-        const values = {mode, fit, direction: rtl ? 'rtl' : 'ltr', theme: currentTheme()};
-        panel.querySelectorAll('.rs-seg').forEach(seg => seg.querySelectorAll('button').forEach(b =>
-            b.setAttribute('aria-pressed', String(b.dataset.value === values[seg.dataset.setting]))));
-    }
-
-    function openPanel(open) {
-        panel.hidden = !open;
-        aa.setAttribute('aria-expanded', String(open));
-        bar.classList.toggle('pinned', open);
-        if (open) { syncPanel(); showBar(true); }
-    }
-    aa.addEventListener('click', (e) => { e.stopPropagation(); openPanel(panel.hidden); });
-    document.addEventListener('pointerdown', (e) => {
-        if (!panel.hidden && !panel.contains(e.target) && !aa.contains(e.target)) openPanel(false);
-    });
-    panel.addEventListener('click', (e) => {
-        const b = e.target.closest('.rs-seg button');
-        if (!b) return;
-        const setting = b.closest('.rs-seg').dataset.setting;
-        const v = b.dataset.value;
-        if (setting === 'mode') setMode(v);
-        else if (setting === 'fit') setFit(v);
-        else if (setting === 'direction') setRtl(v === 'rtl');
-        else if (setting === 'theme') setTheme(v);
-    });
+    // --- The icons ---
+    document.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode)));
+    document.getElementById('fitButton').addEventListener('click', () => setFit(fit === 'height' ? 'width' : 'height'));
+    document.getElementById('rtlButton').addEventListener('click', () => setRtl(!rtl));
     slider.addEventListener('input', () => go(Number(slider.value) - 1));
 
     function setMode(value) {
@@ -369,7 +328,6 @@
         ['1 2 3', 'One page, two pages, scroll'],
         ['F', 'Fit height or width'],
         ['R', 'Right to left (manga)'],
-        ['N', 'Night mode'],
         ['Esc', 'Close, or show and hide the bar'],
         ['?', 'Show these shortcuts'],
     ];
@@ -405,7 +363,6 @@
         if (key === 'Escape') {
             // Esc closes what's open, else shows or hides the bar; it never leaves.
             if (document.querySelector('.shortcut-help')) document.querySelector('.shortcut-help').remove();
-            else if (!panel.hidden) openPanel(false);
             else showBar(!barShown());
             return;
         }
@@ -418,7 +375,6 @@
         else if (key === '1' || key === '2' || key === '3') setMode({1: 'single', 2: 'double', 3: 'scroll'}[key]);
         else if (key === 'f' || key === 'F') setFit(fit === 'height' ? 'width' : 'height');
         else if (key === 'r' || key === 'R') setRtl(!rtl);
-        else if (key === 'n' || key === 'N') toggleNight();
         else if (key === '?') toggleHelp();
         else return;
     });

@@ -1,7 +1,8 @@
-/* The comic reader is the book reader (reader.css: its themes, bar, Aa
- * panel, progress hairline and running foot) with pages in place of text.
- * This file only adds what pages need: the stage, spreads and the scroll
- * column. */
+/* The comic reader wears the book reader's clothes (reader.css: its page
+ * colour by day and night, its bar, the progress hairline and the running
+ * foot) but keeps a comic's few choices as plain icons: pages are pictures,
+ * so no themes, sizes or panel. This file adds the stage, spreads, the
+ * scroll column and the bottom bar. */
 
 html, body { height: 100%; overflow: hidden; }
 
@@ -51,18 +52,42 @@ html, body { height: 100%; overflow: hidden; }
 }
 .cr-wait[hidden] { display: none; }
 
-/* The bar: ← and the title on the left, Aa on the right. */
+/* The bars: the book reader's top bar (← and the title, then the choices as
+   plain icons), and a matching one along the bottom with the page slider
+   and the next and previous issues. They come and go together. */
 .cr-bar-start { min-width: 0; }
 .cr-title { min-width: 0; color: var(--reader-heading); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cr-title__name { color: var(--color-text-muted); font-weight: 400; }
 @media (max-width: 640px) { .cr-title__name { display: none; } }
-.top-controls { padding-top: calc(var(--space-3) + env(safe-area-inset-top, 0px)); }
-.rs-page { display: flex; align-items: center; gap: var(--space-3); }
-.rs-page input { flex: 1; min-width: 0; accent-color: var(--color-accent); }
-.rs-page span { min-width: 5.5em; text-align: right; color: var(--color-text-muted); font-variant-numeric: tabular-nums; }
-.rs-links { display: flex; justify-content: space-between; gap: var(--space-3); }
-.rs-links a { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; color: var(--reader-ink); text-decoration: none; }
-.rs-links a:hover { color: var(--color-accent); }
+.top-controls { padding-top: calc(var(--space-3) + env(safe-area-inset-top, 0px)); gap: var(--space-3); }
+.cr-controls { flex: 0 0 auto; }
+.cr-controls .btn, .cr-bottom .btn { min-width: 40px; min-height: 40px; padding: 0 10px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.cr-modes { display: inline-flex; }
+.cr-modes [aria-checked="true"], .cr-controls [aria-pressed="true"] { color: var(--color-accent); background: var(--color-highlight-soft); }
+.cr-bottom {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) max(var(--space-3), env(safe-area-inset-right, 0px)) calc(var(--space-2) + env(safe-area-inset-bottom, 0px)) max(var(--space-3), env(safe-area-inset-left, 0px));
+    background: color-mix(in srgb, var(--reader-bg) 88%, transparent);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    border-top: 1px solid var(--color-border);
+    transform: translateY(calc(100% + 4px));
+    transition: transform 0.25s ease;
+}
+.cr-bottom.visible { transform: none; }
+.cr-bottom .btn-secondary { background: transparent; border-color: transparent; color: var(--color-text-muted); }
+.cr-bottom .btn-secondary:hover { background: var(--color-highlight-soft); color: var(--color-accent); }
+#pageSlider { flex: 1; min-width: 0; accent-color: var(--color-accent); }
+.cr-count { min-width: 5.5em; text-align: center; color: var(--color-text-muted); font-size: var(--text-sm); font-variant-numeric: tabular-nums; }
+.cr-issue { min-width: 48px; }
+@media (max-width: 400px) { .cr-controls .btn { min-width: 36px; padding: 0 6px; } }
 
 /* The end of an issue: the book reader's "NEXT  Chapter 2 →". */
 .cr-end {
@@ -78,3 +103,9 @@ html, body { height: 100%; overflow: hidden; }
 .cr-end .chapter-end a:hover { color: var(--color-accent); }
 .cr-end__done { margin: 0 0 var(--space-4); color: var(--color-text-muted); }
 .cr-end__back { align-self: flex-start; margin-top: var(--space-5); padding: 0; border: none; background: none; color: var(--color-text-muted); font: inherit; font-size: var(--text-sm); text-decoration: underline; cursor: pointer; }
+
+/* The page count in the margin steps aside while the bars are up (the
+   bottom bar says it too). */
+.running-foot { z-index: 150; transition: opacity 0.2s ease; }
+html.bar-visible .running-foot { opacity: 0; pointer-events: none; }
+.cr { z-index: 120; }

@@ -4,17 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <script>
-        (function() {
-          // The book reader's themes, applied before the first paint: they
-          // follow the app's day/night switch (reader.js / comic_reader.js).
-          var root = document.documentElement, get = function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } };
-          var dark = get('darkMode') === 'enabled';
-          var theme = get('readerTheme') || (dark ? 'night' : 'day');
-          if (dark && (theme === 'day' || theme === 'sepia')) theme = 'night';
-          if (!dark && (theme === 'night' || theme === 'black')) theme = 'day';
-          if (dark) root.classList.add('dark-mode');
-          if (theme === 'sepia' || theme === 'black') root.classList.add('theme-' + theme);
-        })();
+        // Night follows the app's switch; pages are pictures, so no themes.
+        try { if (localStorage.getItem('darkMode') === 'enabled') document.documentElement.classList.add('dark-mode'); } catch (e) {}
     </script>
     <script src="{{ url_for('static', filename='js/app_root.js') }}"></script>
     <script src="{{ url_for('static', filename='js/signed_out.js') }}"></script>
@@ -52,6 +43,7 @@
          data-next-url="{{ url_for('comics.read_page', issue_id=next_issue.id) if next_issue else '' }}"
          data-next-label="{{ ('#' ~ next_issue.number ~ (' · ' ~ next_issue.title if next_issue.title else '')) if next_issue else '' }}"
          data-next-first-page="{{ (url_for('comics.issue_page', issue_id=next_issue.id, page=0) ~ '?v=' ~ (next_issue.file_size or 0)) if next_issue else '' }}">
+        {# The book reader's bar, with a comic's few choices as plain icons. #}
         <div class="top-controls" id="topBar">
             <div class="d-flex align-items-center gap-3 cr-bar-start">
                 <a href="{{ url_for('comics.series_page', series_id=series.id) }}" class="btn btn-secondary" aria-label="Back to {{ series.name }}" title="Back to {{ series.name }}">
@@ -59,55 +51,22 @@
                 </a>
                 <span class="cr-title">{{ series.name }} #{{ issue.number }}{% if issue.title %}<span class="cr-title__name"> · {{ issue.title }}</span>{% endif %}</span>
             </div>
-            <div class="display-controls">
-                <button class="btn btn-secondary aa-button" id="settings-toggle" aria-label="Reading settings" title="Reading settings" aria-expanded="false" aria-controls="reader-settings">Aa</button>
+            <div class="display-controls cr-controls">
+                <div class="cr-modes" role="radiogroup" aria-label="Pages">
+                    <button type="button" class="btn btn-secondary" role="radio" data-mode="single" aria-checked="true" title="One page (1)">1</button>
+                    <button type="button" class="btn btn-secondary" role="radio" data-mode="double" aria-checked="false" title="Two pages (2)">2</button>
+                    <button type="button" class="btn btn-secondary" role="radio" data-mode="scroll" aria-checked="false" title="Scroll (3)" aria-label="Scroll">↕</button>
+                </div>
+                <button type="button" class="btn btn-secondary" id="fitButton" aria-pressed="false" title="Fit to width (F)">Fit</button>
+                <button type="button" class="btn btn-secondary" id="rtlButton" aria-pressed="false" title="Right to left, for manga (R)" aria-label="Right to left">⇄</button>
             </div>
-            {# The book reader's Aa panel, with what a comic needs. #}
-            <div class="reader-settings" id="reader-settings" role="dialog" aria-label="Reading settings" hidden>
-                <div class="rs-row">
-                    <span class="rs-label">Page</span>
-                    <div class="rs-page">
-                        <input type="range" id="pageSlider" min="1" max="{{ issue.page_count or 1 }}" value="{{ page + 1 }}" aria-label="Page">
-                        <span id="pageSliderCount"></span>
-                    </div>
-                </div>
-                <div class="rs-row">
-                    <span class="rs-label">Pages</span>
-                    <div class="rs-seg" data-setting="mode">
-                        <button type="button" data-value="single">One</button>
-                        <button type="button" data-value="double">Two</button>
-                        <button type="button" data-value="scroll">Scroll</button>
-                    </div>
-                </div>
-                <div class="rs-row">
-                    <span class="rs-label">Fit</span>
-                    <div class="rs-seg" data-setting="fit">
-                        <button type="button" data-value="height">Height</button>
-                        <button type="button" data-value="width">Width</button>
-                    </div>
-                </div>
-                <div class="rs-row">
-                    <span class="rs-label">Direction</span>
-                    <div class="rs-seg" data-setting="direction">
-                        <button type="button" data-value="ltr">Left to right</button>
-                        <button type="button" data-value="rtl" title="For manga">Right to left</button>
-                    </div>
-                </div>
-                <div class="rs-row">
-                    <span class="rs-label">Theme</span>
-                    <div class="rs-seg rs-themes" data-setting="theme">
-                        <button type="button" data-value="day"><i class="rs-swatch rs-swatch--day"></i>Day</button>
-                        <button type="button" data-value="sepia"><i class="rs-swatch rs-swatch--sepia"></i>Sepia</button>
-                        <button type="button" data-value="night"><i class="rs-swatch rs-swatch--night"></i>Night</button>
-                        <button type="button" data-value="black"><i class="rs-swatch rs-swatch--black"></i>Black</button>
-                    </div>
-                </div>
-                <div class="rs-row rs-links">
-                    {% if prev_issue %}<a href="{{ url_for('comics.read_page', issue_id=prev_issue.id) }}">← #{{ prev_issue.number }}</a>{% endif %}
-                    <a href="{{ url_for('comics.issue_download', issue_id=issue.id) }}"><i class="fas fa-download" aria-hidden="true"></i> Download</a>
-                    {% if next_issue %}<a href="{{ url_for('comics.read_page', issue_id=next_issue.id) }}">#{{ next_issue.number }} →</a>{% endif %}
-                </div>
-            </div>
+        </div>
+        <div class="cr-bottom" id="bottomBar">
+            {% if prev_issue %}<a class="btn btn-secondary cr-issue" href="{{ url_for('comics.read_page', issue_id=prev_issue.id) }}" title="Previous issue">#{{ prev_issue.number }}</a>{% else %}<span class="cr-issue"></span>{% endif %}
+            <input type="range" id="pageSlider" min="1" max="{{ issue.page_count or 1 }}" value="{{ page + 1 }}" aria-label="Page">
+            <span class="cr-count" id="pageSliderCount"></span>
+            {% if next_issue %}<a class="btn btn-secondary cr-issue" href="{{ url_for('comics.read_page', issue_id=next_issue.id) }}" title="Next issue">#{{ next_issue.number }}</a>{% else %}<span class="cr-issue"></span>{% endif %}
+            <a class="btn btn-secondary" href="{{ url_for('comics.issue_download', issue_id=issue.id) }}" aria-label="Download" title="Download"><i class="fas fa-download" aria-hidden="true"></i></a>
         </div>
 
         <main class="cr-stage" id="stage" tabindex="-1">
