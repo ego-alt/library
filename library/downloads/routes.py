@@ -24,7 +24,7 @@ from ..comics import downloads as comic_downloads
 from ..comics import files as comic_files
 from ..comics.models import ComicIssue, ComicSeries
 from ..comics.series import local_series
-from ..models import Book, db
+from ..models import Book, _utcnow, db
 from ..routes._helpers import json_admin_required
 from . import clients, indexers, jobs, pipeline
 from .models import (
@@ -218,6 +218,8 @@ def search_wanted_item(kind, item_id):
     if not settings.get("indexers"):
         return jsonify({"error": "Add an indexer in Settings first."}), 400
     releases, errors = pipeline.find_releases(kind, item)
+    item.searched_at = _utcnow()
+    db.session.commit()
     best = next((r for r in releases if r.score >= 0), None)
     if best is None:
         if errors:

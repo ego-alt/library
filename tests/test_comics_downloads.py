@@ -242,3 +242,40 @@ def test_skipped_issue_is_not_searched(app, issue, fake_client):
     issue.status = SKIPPED
     db.session.commit()
     assert pipeline.search_wanted() == 0
+
+
+def test_search_records_when_and_takes_the_longest_waiting_first(app, issue, fake_client, monkeypatch):
+    from datetime import datetime, timedelta
+
+    other = ComicIssue(series=issue.series, number="67", sort_number=67, status=WANTED, cover_date=issue.cover_date, searched_at=datetime(2026, 1, 1))
+    issue.searched_at = datetime(2026, 1, 1) + timedelta(days=1)
+    db.session.add(other)
+    db.session.commit()
+    seen = []
+    monkeypatch.setattr(pipeline, "search_item", lambda kind, item, cache=None, **kw: seen.append(item.id))
+    pipeline.search_wanted(limit=1)
+    assert seen == [other.id]
+
+
+def test_client_trouble_is_said_once_not_on_each_download(app, issue, fake_client, monkeypatch):
+    pipeline.search_wanted()
+    download = ComicDownload.query.one()
+
+    def down(ref):
+        raise clients.ClientError("SABnzbd isn't answering. Check its address in Settings.")
+
+    monkeypatch.setattr(fake_client, "state", down)
+    assert pipeline.check_downloads() == 1
+    assert download.error is None and "isn't answering" in next(iter(pipeline.client_problems.values()))
+
+
+def test_old_failure_words_are_put_plainly():
+    assert clients.plain_error("qBittorrent: missingFiles") == "Its files went missing from qBittorrent."
+    assert clients.plain_error("Out of retention") == "Out of retention"
+
+
+def test_finding_nothing_is_not_an_error(app, admin_client, issue, fake_client, monkeypatch):
+    monkeypatch.setattr(indexers, "search", lambda indexer, query, kind="comic", transport=None: [])
+    response = admin_client.post(f"/api/wanted/comic/{issue.id}/search")
+    assert response.status_code == 200 and response.get_json()["found"] is False
+    assert issue.searched_at is not None
