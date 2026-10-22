@@ -248,7 +248,10 @@ function initDownloadLists() {
         activeSection.hidden = !data.active.length && !data.attention.length;
         attentionList.replaceChildren(...data.attention.map(d => downloadRow(d, 'attention')));
         activeList.replaceChildren(...data.active.map(d => downloadRow(d, 'active')));
-        historyList.replaceChildren(...(data.history.length ? data.history.map(d => downloadRow(d, 'history')) : [h('li', {class: 'empty-line'}, 'Nothing yet.')]));
+        historyList.replaceChildren(...data.history.map(d => downloadRow(d, 'history')));
+        // Empty, the history is one line, like an empty Wanted.
+        document.getElementById('historyHint').textContent = data.history.length ? 'A release that failed isn’t downloaded again for the same book or issue; remove it from the history to allow it.' : 'Nothing downloaded yet.';
+        historyList.hidden = !data.history.length;
         historyCount.textContent = data.history.length || '';
     }
     refreshDownloads = refresh;

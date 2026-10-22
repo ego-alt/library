@@ -4,7 +4,6 @@
  * something has changed. */
 
 /* Full width like Downloads, text and fields alike. */
-.settings .section__head + .field-stack { margin-top: var(--space-2); }
 .settings .section { scroll-margin-top: var(--space-4); }
 
 /* The same small capitals as Downloads' sub-heads, and the same text size
