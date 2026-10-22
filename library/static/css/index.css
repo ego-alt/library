@@ -81,42 +81,10 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 /* Something is downloading. */
 .bar-icon__dot { position: absolute; top: 9px; right: 9px; width: 7px; height: 7px; border-radius: 50%; background: var(--color-accent); }
 
-/* The two shelves, in the bar beside night mode and the menu. */
+/* The shelf switch: a solid drawing the size and weight of the icons
+   beside it. */
+.bar-svg { width: 1.15em; height: 1.15em; fill: currentColor; vertical-align: -0.15em; }
 .lib-bar { margin-bottom: 0; }  /* the page sets its own top (--page-top) */
-.shelf-nav {
-    display: flex;
-    align-items: baseline;
-    gap: 22px;
-    margin-right: var(--space-3);
-}
-.shelf-nav a {
-    position: relative;
-    color: var(--color-text-muted);
-    text-decoration: none;
-    font-size: 1.0625rem;
-    font-weight: 500;
-    border-bottom: 1px solid transparent;
-    white-space: nowrap;
-    transition: color var(--dur-fast) ease, border-color var(--dur-fast) ease;
-}
-.shelf-nav a:hover { color: var(--color-text-primary); }
-/* 44 px to the finger, the same line to the eye. */
-.shelf-nav a::before { content: ""; position: absolute; inset: -12px -10px; }
-.shelf-nav a[aria-current="page"] { color: var(--color-text-primary); border-bottom-color: var(--color-accent); }
-@media (max-width: 420px) {
-    /* Room for the name, both shelves and the two icons on a phone. */
-    .lib-bar .lib-bar__title { font-size: 1rem; letter-spacing: 0.22em; }
-    .lib-bar .shelf-nav { gap: 14px; margin-right: var(--space-1); }
-    .lib-bar .shelf-nav a { font-size: 1rem; }
-    .lib-bar__actions .btn { min-width: 40px; }
-}
-@media (max-width: 360px) {
-    .lib-bar .lib-bar__title { font-size: 0.9375rem; letter-spacing: 0.14em; }
-    .lib-bar .shelf-nav { gap: 12px; margin-right: 0; }
-    .lib-bar .shelf-nav a { font-size: 0.9375rem; }
-    .lib-bar__actions { gap: 0; }
-    .lib-bar__actions .btn { min-width: 36px; padding-left: 6px; padding-right: 6px; }
-}
 .count {
     display: inline-block;
     min-width: 1.4em;
@@ -132,8 +100,6 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 @media (max-width: 640px) {
     .lib-bar__inner { height: 56px; }
     .lib-bar__title { letter-spacing: 0.22em; font-size: 1rem; }
-    .shelf-nav { gap: 16px; }
-    .shelf-nav a { font-size: 1rem; }
 }
 /* The hang: covers at book proportions (2:3, so nothing important is
    cropped), five across on a laptop, equally spaced, stepping down to 4, 3

@@ -33,17 +33,25 @@
     {% block styles %}{% endblock %}
 </head>
 <body{% block body_attrs %}{% endblock %}>
-    {# A slim paper bar: the name on the left; on the right the two shelves,
-       night mode, then for admins Downloads (with Settings at its foot). #}
+    {# A slim paper bar: the name on the left; on the right three quiet icons:
+       the other shelf, night mode, and for admins Downloads (with Settings at
+       its foot). #}
     <header class="lib-bar">
         <div class="lib-bar__inner container">
             <h1 class="lib-bar__title"><a href="{{ url_for('index_routes.index') }}">Shelves</a></h1>
             <div class="lib-bar__actions">
                 {% if current_user.is_authenticated %}
-                <nav class="shelf-nav" aria-label="Library">
-                    <a href="{{ url_for('index_routes.index') }}"{% if shelf == 'books' %} aria-current="page"{% endif %}>Books</a>
-                    <a href="{{ url_for('comics.index') }}"{% if shelf == 'comics' %} aria-current="page"{% endif %}>Comics</a>
-                </nav>
+                {# The other shelf, as one quiet icon (like night mode): on
+                   Books it shows comics, on Comics a book. #}
+                {% if shelf == 'comics' %}
+                <a class="btn btn-ghost bar-icon" href="{{ url_for('index_routes.index') }}" aria-label="Books" title="Books">
+                    <svg class="bar-svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5.2C3 4.5 3.6 4 4.3 4H9.5c1 0 1.8.8 1.8 1.8V20c-.4-.8-1.2-1.3-2.1-1.3H3z"/><path d="M21 5.2c0-.7-.6-1.2-1.3-1.2h-5.2c-1 0-1.8.8-1.8 1.8V20c.4-.8 1.2-1.3 2.1-1.3H21z"/></svg>
+                </a>
+                {% else %}
+                <a class="btn btn-ghost bar-icon" href="{{ url_for('comics.index') }}" aria-label="Comics" title="Comics">
+                    <svg class="bar-svg" viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="2.5" width="9.5" height="8.5" rx="1"/><rect x="14.5" y="2.5" width="7" height="11.5" rx="1"/><rect x="2.5" y="13.5" width="9.5" height="8" rx="1"/><rect x="14.5" y="16.5" width="7" height="5" rx="1"/></svg>
+                </a>
+                {% endif %}
                 {% endif %}
                 {% block bar_actions %}{% endblock %}
                 <button type="button" class="btn btn-ghost bar-icon" onclick="toggleDarkMode()" aria-label="Night mode" title="Night mode"><i id="dark-mode-icon" class="fas fa-moon" aria-hidden="true"></i></button>
