@@ -413,7 +413,7 @@ function seedLoadedBooksFromDOM() {
     document.querySelectorAll('#library .col-md-3').forEach((col) => {
         const link = col.querySelector('a[href*="/read/"]');
         const img = col.querySelector('img');
-        if (!link || !img) return;
+        if (!link) return;  // (a cover that failed to load has no img)
         const href = link.getAttribute('href') || '';
         const readMarker = '/read/';
         const readIdx = href.indexOf(readMarker);
@@ -423,7 +423,7 @@ function seedLoadedBooksFromDOM() {
             filename: decodeURIComponent(href.slice(readIdx + readMarker.length)),
             title: col.dataset.title || '',
             author: col.dataset.author || '',
-            cover: img.getAttribute('src') || '',
+            cover: img ? img.getAttribute('src') || '' : '',
             length: Number.isFinite(rawLength) ? rawLength : 0,
             progress: col.dataset.progress ? parseFloat(col.dataset.progress) : null,
             // The lock badge encodes admin-only state in the server-rendered grid.

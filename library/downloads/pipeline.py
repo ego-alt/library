@@ -118,27 +118,36 @@ def grab(kind: str, item, release: indexers.Release) -> Download:
     return download
 
 
-def search_item(kind: str, item, cache: dict | None = None) -> Download | None:
-    """Grab the best release for a wanted item, if there is one."""
+def search_item(kind: str, item, cache: dict | None = None, *, raise_client_errors: bool = False) -> Download | None:
+    """Grab the best release for a wanted item, if there is one. A download
+    client that can't take it is logged (the failed grab stays in the
+    history), or raised with raise_client_errors."""
     releases, _errors = find_releases(kind, item, cache)
+    item.searched_at = _utcnow()
+    db.session.commit()
     best = next((r for r in releases if r.score >= 0), None)
     if best is None:
         return None
     try:
         return grab(kind, item, best)
     except clients.ClientError as e:
+        if raise_client_errors:
+            raise
         logger.warning("Couldn't grab %s: %s", best.title, e)
         return None
 
 
 def search_wanted(limit: int = 50) -> int:
-    """Search for everything wanted. Returns how many were grabbed."""
+    """Search for everything wanted, the longest-waiting first (`limit` of
+    each kind per run, so a long list is worked through over several runs).
+    Returns how many were grabbed."""
     if not settings.get("indexers"):
         return 0
     grabbed = 0
     for kind_handler in handlers():
         cache = {}
-        for item in kind_handler.wanted()[:limit]:
+        waiting = sorted(kind_handler.wanted(), key=lambda i: (i.searched_at is not None, i.searched_at or 0))
+        for item in waiting[:limit]:
             if search_item(kind_handler.name, item, cache):
                 grabbed += 1
     return grabbed
@@ -189,9 +198,22 @@ def finish(download: Download, path: str | None) -> None:
     db.session.commit()
 
 
+# Download clients that didn't answer at the last check: {name: message}.
+# The Downloads page says so once, rather than under every download.
+client_problems: dict[str, str] = {}
+
+# A download whose progress hasn't moved for this long is called stalled.
+STALLED_AFTER = timedelta(hours=6)
+
+
+def is_stalled(download: Download) -> bool:
+    return download.status == DL_DOWNLOADING and download.client != "blackhole" and download.updated_at is not None and _utcnow().replace(tzinfo=None) - download.updated_at > STALLED_AFTER
+
+
 def check_downloads() -> int:
     """Ask the clients about active downloads; import finished ones. Returns
     how many are still active."""
+    client_problems.clear()
     for download in Download.query.filter(Download.status.in_(DL_ACTIVE)).all():
         if download.client == "blackhole":
             if _utcnow().replace(tzinfo=None) - download.created_at > BLACKHOLE_GIVE_UP:
@@ -202,8 +224,7 @@ def check_downloads() -> int:
         try:
             state = clients.client_for(download.protocol, download.client).state(download.client_ref)
         except clients.ClientError as e:
-            download.error = str(e)
-            db.session.commit()
+            client_problems[download.client or download.protocol or "client"] = str(e)
             continue
         if state.state == "downloading":
             download.progress = state.progress

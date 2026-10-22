@@ -7,8 +7,12 @@
     <link href="{{ url_for('static', filename='css/manage.css') }}" rel="stylesheet">
 {% endblock %}
 {% block content %}
+{# Only when something's wrong: the worker is down or a client isn't answering. #}
+<p class="section__hint status-line" id="statusLine" role="status" hidden></p>
+
 <section class="section" id="activeSection" hidden>
     <div class="section__head"><h2 class="section__title">Downloading</h2></div>
+    <ol class="entries" id="attentionList"></ol>
     <ol class="entries" id="activeList"></ol>
 </section>
 
@@ -16,17 +20,17 @@
 <section class="section" id="wanted" data-can-search="{{ '1' if can_search else '' }}">
     <div class="section__head">
         <h2 class="section__title">Wanted</h2>
-        {% if can_search and (wanted_books or wanted_comics) %}<div class="section__actions"><button type="button" class="btn btn-secondary" data-action="search-all">Search all now</button></div>{% endif %}
+        {% if can_search and (wanted_books or wanted_comics) %}<div class="section__actions"><button type="button" class="btn btn-secondary" data-action="search-all">Find now</button></div>{% endif %}
     </div>
     {% if wanted_books or wanted_comics %}
-    <p class="section__hint">{% if can_search %}Searched for every few hours.{% else %}Searched for once there's an indexer in <a href="{{ url_for('settings.settings_page') }}#indexers">Settings</a>.{% endif %}</p>
+    <p class="section__hint">{% if can_search %}Looked for every {{ search_every }} hour{{ 's' if search_every != 1 }}.{% else %}Looked for once there's an indexer in <a href="{{ url_for('settings.settings_page') }}#indexers">Settings</a>.{% endif %}</p>
     {% if wanted_books %}
     <h3 class="sub-head">Books <span class="count" data-count>{{ wanted_books|length }}</span></h3>
     <ol class="entries">
     {% for r in wanted_books %}
-        <li class="entry" data-kind="book" data-item-id="{{ r.id }}" data-label="{{ r.label }}">
+        <li class="entry" data-kind="book" data-item-id="{{ r.id }}" data-label="{{ r.title }}">
             <div class="entry__main"><span class="entry__title">{{ r.title }}{% if r.author %} <span class="muted">· {{ r.author }}</span>{% endif %}</span></div>
-            <span class="entry__side" title="When you asked for it">Asked {{ r.created_at|comic_date }}</span>
+            <span class="entry__side">Asked {{ r.created_at|comic_date }}</span>
             <button type="button" class="entry__more" data-action="menu" data-menu-anchor aria-label="More for {{ r.title }}"><i class="fas fa-ellipsis-h" aria-hidden="true"></i></button>
         </li>
     {% endfor %}
@@ -41,17 +45,18 @@
             <details>
                 <summary class="entry">
                     <div class="entry__main"><span class="entry__title"><span class="entry__fold" aria-hidden="true">▸</span>{{ group.series.display_name }} <span class="muted">· {% for i in group.issues[:3] %}#{{ i.number }}{{ ', ' if not loop.last }}{% endfor %}{% if n > 3 %} +{{ n - 3 }}{% endif %}</span></span></div>
-                    <span class="entry__side">{{ group.issues[0].date|comic_date }}</span>
+                    <span class="entry__side">Out {{ group.issues[0].date|comic_date }}</span>
                     <button type="button" class="entry__more" data-action="menu" data-menu-anchor aria-label="More for {{ group.series.display_name }}"><i class="fas fa-ellipsis-h" aria-hidden="true"></i></button>
                 </summary>
                 <ol class="entries">
                 {% for issue in group.issues %}
-                    <li class="entry" data-kind="comic" data-item-id="{{ issue.id }}" data-label="{{ group.series.display_name }} #{{ issue.number }}">
+                    <li class="entry" data-kind="comic" data-item-id="{{ issue.id }}" data-label="{{ group.series.display_name }} #{{ issue.number }}"{% if loop.index > 10 %} hidden data-more{% endif %}>
                         <div class="entry__main"><span class="entry__title">#{{ issue.number }}{% if issue.title %} <span class="muted">· {{ issue.title }}</span>{% endif %}</span></div>
-                        <span class="entry__side">{{ issue.date|comic_date }}</span>
-                        <button type="button" class="entry__more" data-action="menu" data-menu-anchor aria-label="More for #{{ issue.number }}"><i class="fas fa-ellipsis-h" aria-hidden="true"></i></button>
+                        <span class="entry__side">Out {{ issue.date|comic_date }}</span>
+                        <button type="button" class="entry__more" data-action="menu" data-menu-anchor aria-label="More for {{ group.series.display_name }} #{{ issue.number }}"><i class="fas fa-ellipsis-h" aria-hidden="true"></i></button>
                     </li>
                 {% endfor %}
+                {% if n > 10 %}<li class="entry entry--more"><button type="button" class="entry__more entry__more--text" data-action="show-more">Show {{ n - 10 }} more</button></li>{% endif %}
                 </ol>
             </details>
         </li>
@@ -71,51 +76,21 @@
             <button type="button" class="btn btn-secondary" id="importPick">Choose files</button>
         </div>
     </div>
-    <p class="section__hint">Or drop EPUBs and CBZ, CBR or CB7 comics anywhere on this page. Books join the library; comics are matched to their issue.</p>
+    <p class="section__hint">Or drop EPUBs and CBZ, CBR or CB7 comics anywhere on this page. Books join the library; comics are filed with their issue.</p>
     <input type="file" id="importInput" accept=".epub,.cbz,.cbr,.cb7,.zip,.rar,.7z" multiple hidden>
     <div id="importWaiting" hidden>
-        <h3 class="sub-head">Waiting to be matched</h3>
+        <h3 class="sub-head">Needs a series</h3>
         <ol class="entries" id="importList"></ol>
     </div>
 </section>
 
-{% if upcoming %}
-<section class="section" id="upcoming">
-    <div class="section__head"><h2 class="section__title">Coming up</h2></div>
-    <p class="section__hint">The next two months of the comics you follow, by the day they reach shops.</p>
-    <ol class="entries">
-    {% for issue in upcoming %}
-        <li class="entry">
-            <div class="entry__main"><span class="entry__title"><a href="{{ url_for('comics.series_page', series_id=issue.series_id) }}">{{ issue.series }}</a> <span class="muted">· #{{ issue.number }}</span></span></div>
-            <span class="entry__side">{{ issue.date|comic_date }}</span>
-            <span></span>
-        </li>
-    {% endfor %}
-    </ol>
-</section>
-{% endif %}
-
 <details class="section section--fold" id="historySection">
     <summary class="section__head"><h2 class="section__title">History <span class="muted" id="historyCount"></span></h2></summary>
-    <p class="section__hint">A failed release isn't grabbed again for the same book or issue; remove it to allow it.</p>
+    <p class="section__hint">A release that failed isn't downloaded again for the same book or issue; remove it from the history to allow it.</p>
     <ol class="entries" id="historyList"></ol>
 </details>
 
-<details class="section section--fold" id="jobs">
-    <summary class="section__head"><h2 class="section__title">Background jobs</h2></summary>
-    <p class="section__hint" id="workerState">These run on their own; Run starts one now.</p>
-    <ol class="entries" id="jobList">
-        {% for job, label in [('downloads', 'Check downloads'), ('import', 'Import new files'), ('refresh', 'Refresh comic series'), ('search', 'Search for everything wanted')] %}
-        <li class="entry" data-job="{{ job }}">
-            <div class="entry__main"><span class="entry__title">{{ label }}</span><span class="entry__meta job-msg">Not run yet</span></div>
-            <span></span>
-            <button type="button" class="entry__more entry__more--text" data-run="{{ job }}">Run</button>
-        </li>
-        {% endfor %}
-    </ol>
-</details>
-
-<div class="drop-zone" id="dropZone" hidden><p>Drop books or comics to import them</p></div>
+<div class="drop-zone" id="dropZone" hidden><p>Drop books or comics to add them</p></div>
 <script id="seriesData" type="application/json">{{ series_options|tojson }}</script>
 {% endblock %}
 {% block scripts %}

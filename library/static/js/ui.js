@@ -61,7 +61,7 @@ async function apiFetch(path, {method = 'GET', body, form} = {}) {
     let data = {};
     try { data = await response.json(); } catch (e) { /* empty answer */ }
     if (!response.ok) {
-        const error = new Error(data.error || `Something went wrong (${response.status}).`);
+        const error = new Error(data.error || "Couldn't reach the library. Try again.");
         error.status = response.status;
         throw error;
     }
@@ -91,13 +91,16 @@ function formatSize(bytes) {
     return mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${mb >= 10 ? Math.round(mb) : mb.toFixed(1)} MB`;
 }
 
+/** "just now", "5 minutes ago", "2 hours ago" within a day; after that the
+ * date, as everywhere else ("19 Aug"). */
 function timeAgo(iso) {
     if (!iso) return '';
     const seconds = (Date.now() - new Date(iso).getTime()) / 1000;
     if (seconds < 60) return 'just now';
-    if (seconds < 3600) return `${Math.round(seconds / 60)} min ago`;
-    if (seconds < 86400) return `${Math.round(seconds / 3600)} h ago`;
-    return `${Math.round(seconds / 86400)} d ago`;
+    const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'} ago`;
+    if (seconds < 3600) return plural(Math.round(seconds / 60), 'minute');
+    if (seconds < 86400) return plural(Math.round(seconds / 3600), 'hour');
+    return formatDate(new Date(iso).toISOString());
 }
 
 function setRadio(group, button) {
@@ -158,7 +161,8 @@ function coverCard({href, label, title, meta = [], cover = null, attrs = {}, img
     return h('div', {class: `col-6 col-sm-4 col-md-3 mb-3${classes ? ` ${classes}` : ''}`, ...attrs},
         h('div', {class: 'book'},
             h('a', {href, 'aria-label': label},
-                cover ? h('img', {src: cover, alt: label, loading: 'lazy', ...imgAttrs}) : h('span', {class: 'cover-blank'}, title)),
+                h('span', {class: 'cover-blank', 'aria-hidden': 'true'}, title),
+                cover ? h('img', {src: cover, alt: label, loading: 'lazy', onload: (e) => e.currentTarget.parentNode.classList.add('is-loaded'), onerror: (e) => e.currentTarget.remove(), ...imgAttrs}) : null),
             extras),
         h('div', {class: 'book-caption', 'aria-hidden': 'true'},
             h('span', {class: 'book-caption__title'}, title),
@@ -174,8 +178,19 @@ document.addEventListener('keydown', (e) => {
 });
 
 /** A small menu floating by `anchor` (it can't live inside a cover, which
- * clips what overflows). Items: {label, onClick, danger} | {label, href} | {note}. */
+ * clips what overflows). Items: {label, onClick, danger, checked} |
+ * {label, href} | {note} | {ask} (a question heading the menu). */
 let floatingMenu = null;
+let _safeBottom = null;
+function safeBottom() {
+    if (_safeBottom === null) {
+        const probe = h('div', {style: 'position:fixed;bottom:0;padding-bottom:env(safe-area-inset-bottom, 0px);visibility:hidden'});
+        document.body.append(probe);
+        _safeBottom = parseFloat(getComputedStyle(probe).paddingBottom) || 0;
+        probe.remove();
+    }
+    return _safeBottom;
+}
 function closeMenu() {
     if (floatingMenu) floatingMenu.remove();
     floatingMenu = null;
@@ -183,19 +198,30 @@ function closeMenu() {
 function openMenu(anchor, items) {
     closeMenu();
     const menu = h('div', {class: 'float-menu', role: 'menu'}, items.filter(Boolean).map(item => {
+        if (item.ask) return h('p', {class: 'float-menu__ask'}, item.ask);
         if (item.note) return h('span', {class: 'float-menu__note'}, item.note);
-        if (item.href) return h('a', {href: item.href, role: 'menuitem'}, item.label);
-        return h('button', {type: 'button', role: 'menuitem', class: item.danger ? 'danger-text' : null, onclick: () => { closeMenu(); item.onClick(); }}, item.label);
+        if (item.href) return h('a', {href: item.href, role: 'menuitem', target: item.external ? '_blank' : null, rel: item.external ? 'noopener noreferrer' : null}, item.label);
+        const checkable = item.checked !== undefined;
+        return h('button', {type: 'button', role: checkable ? 'menuitemradio' : 'menuitem', 'aria-checked': checkable ? String(Boolean(item.checked)) : null, class: item.danger ? 'danger-text' : null, onclick: () => { closeMenu(); item.onClick(); }}, item.label);
     }));
     document.body.append(menu);
     const rect = anchor.getBoundingClientRect();
     const width = menu.offsetWidth;
+    // Clear of the home bar on phones.
+    const room = window.innerHeight - safeBottom() - 8;
     const left = Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8));
-    const below = rect.bottom + 4 + menu.offsetHeight < window.innerHeight;
+    const below = rect.bottom + 4 + menu.offsetHeight < room;
     menu.style.left = `${left}px`;
     menu.style.top = `${below ? rect.bottom + 4 : Math.max(8, rect.top - 4 - menu.offsetHeight)}px`;
     floatingMenu = menu;
     menu.querySelector('button, a')?.focus();
+}
+
+/** Asks before something that can't be undone, in the app's own menu rather
+ * than a browser dialog. The first choice is the safe one and has focus.
+ * choices: [{label, onClick?, danger?}]; one without onClick just closes. */
+function confirmMenu(anchor, question, choices) {
+    openMenu(anchor, [{ask: question}, ...choices.map(c => ({...c, onClick: c.onClick || (() => {})}))]);
 }
 document.addEventListener('click', (e) => { if (floatingMenu && !floatingMenu.contains(e.target) && !e.target.closest('[data-menu-anchor]')) closeMenu(); }, true);
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMenu(); });

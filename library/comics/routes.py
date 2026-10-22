@@ -22,7 +22,7 @@ from flask import (
 from flask_login import current_user, login_required
 from werkzeug.utils import secure_filename
 
-from ..downloads import jobs
+from ..downloads import clients, jobs
 from ..downloads.models import SKIPPED, SNATCHED, WANTED
 from ..models import db
 from ..routes._helpers import json_admin_required, json_login_required
@@ -38,6 +38,8 @@ from .models import MONITOR_CHOICES, ComicIssue, ComicProgress, ComicSeries
 from .series import add_series, refresh_series, set_monitor
 
 comics_blueprint = Blueprint("comics", __name__, url_prefix="/comics", template_folder="../templates")
+
+MONITOR_ERROR = "Choose New issues, All missing or None."
 
 
 @comics_blueprint.app_template_filter("comic_date")
@@ -175,14 +177,15 @@ def series_page(series_id):
     admin = _is_admin()
     shown = series.issues if admin else [i for i in series.issues if i.filename]
     progress = _progress_by_issue(i.id for i in shown)
-    # Admins manage newest first; readers read from #1.
-    issues = [issue_json(i, progress.get(i.id)) for i in (reversed(shown) if admin else shown)]
+    # Reading order for everyone; admins sort out missing ones with Have / Missing.
+    issues = [issue_json(i, progress.get(i.id)) for i in shown]
     have = [i for i in series.issues if i.filename]
     up_next = None
     if have:
         next_issue = _up_next(have, {i.id: progress[i.id] for i in have if i.id in progress})[0]
         up_next = next(i for i in issues if i["id"] == next_issue.id)
-    return _page("series.html", series=series, cover=_series_cover(series), issues=issues, up_next=up_next)
+    pending = series.refreshed_at is None and series.provider in ("comicvine", "metron")
+    return _page("series.html", series=series, cover=_series_cover(series), issues=issues, up_next=up_next, pending=pending)
 
 
 @comics_blueprint.get("/read/<int:issue_id>")
@@ -280,15 +283,24 @@ def create_series():
     data = request.get_json(silent=True) or {}
     monitor = data.get("monitor", "future")
     if monitor not in MONITOR_CHOICES:
-        return jsonify({"error": "Pick all, future or none."}), 400
+        return jsonify({"error": MONITOR_ERROR}), 400
     try:
-        series = add_series(data.get("provider", ""), str(data.get("provider_id", "")), monitor)
+        # The series now; its issues come with the worker's refresh (which
+        # asks for a search if any are wanted), so following doesn't wait.
+        series = add_series(data.get("provider", ""), str(data.get("provider_id", "")), monitor, fetch_issues=False)
     except providers.ProviderError as e:
         db.session.rollback()
         return jsonify({"error": str(e)}), 502
-    if any(i.status == WANTED and i.released for i in series.issues):
-        jobs.request_run("search")
+    jobs.request_run("refresh")
     return jsonify({"id": series.id, "url": url_for("comics.series_page", series_id=series.id)}), 201
+
+
+@comics_blueprint.get("/api/series/<int:series_id>")
+@json_login_required
+def series_state(series_id):
+    """Whether a just-followed series has its issues yet."""
+    series = _series_or_404(series_id)
+    return jsonify({"pending": series.refreshed_at is None and series.provider in ("comicvine", "metron"), "issues": len(series.issues)})
 
 
 @comics_blueprint.patch("/api/series/<int:series_id>")
@@ -296,13 +308,14 @@ def create_series():
 def update_series(series_id):
     series = _series_or_404(series_id)
     data = request.get_json(silent=True) or {}
+    wanted = None
     if "monitor" in data:
         if data["monitor"] not in MONITOR_CHOICES:
-            return jsonify({"error": "Pick all, future or none."}), 400
-        set_monitor(series, data["monitor"])
+            return jsonify({"error": MONITOR_ERROR}), 400
+        wanted = set_monitor(series, data["monitor"])
         if data["monitor"] != "none":
             jobs.request_run("search")
-    return jsonify({"ok": True})
+    return jsonify({"monitor": series.monitor, "wanted": wanted})
 
 
 @comics_blueprint.post("/api/series/<int:series_id>/refresh")
@@ -345,11 +358,17 @@ def delete_series(series_id):
 @json_admin_required
 def search_series_wanted(series_id):
     series = _series_or_404(series_id)
-    cache, grabbed = {}, 0
+    cache, grabbed, error = {}, 0, None
     for issue in series.issues:
-        if issue.status == WANTED and issue.released and downloads.search_issue(issue, cache):
-            grabbed += 1
-    return jsonify({"grabbed": grabbed})
+        if issue.status != WANTED or not issue.released:
+            continue
+        try:
+            if downloads.search_issue(issue, cache, raise_client_errors=True):
+                grabbed += 1
+        except clients.ClientError as e:
+            error = str(e)
+            break
+    return jsonify({"grabbed": grabbed, "error": error})
 
 
 # API: issues

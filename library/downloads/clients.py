@@ -66,7 +66,7 @@ class SABnzbd:
         try:
             response = self.http.get(self.url, params=params)
         except httpx.HTTPError as e:
-            raise ClientError(f"SABnzbd didn't answer ({e.__class__.__name__}).") from e
+            raise ClientError("SABnzbd isn't answering. Check its address in Settings.") from e
         if response.status_code >= 400:
             raise ClientError(f"SABnzbd answered {response.status_code}.")
         data = response.json()
@@ -98,19 +98,28 @@ class SABnzbd:
             if status == "Completed":
                 return JobState("done", 1.0, map_path(slot.get("storage")))
             if status == "Failed":
-                return JobState("failed", error=slot.get("fail_message") or "SABnzbd couldn't finish it.")
+                return JobState("failed", error=f"SABnzbd couldn't finish it ({slot['fail_message']})." if slot.get("fail_message") else "SABnzbd couldn't finish it.")
             # Verifying, Repairing, Extracting, Moving…
             return JobState("downloading", 0.99)
-        return JobState("missing", error="SABnzbd no longer has it.")
+        return JobState("missing", error="It disappeared from SABnzbd.")
 
     def remove(self, ref: str) -> None:
         self._call("queue", name="delete", value=ref, del_files=1)
+
+
+def plain_error(error: str | None) -> str | None:
+    """A failure as people say it, including ones saved in older words
+    ("qBittorrent: missingFiles")."""
+    if error and error.startswith("qBittorrent: "):
+        return QBittorrent._WHY.get(error.split(": ", 1)[1], "qBittorrent couldn't finish it.")
+    return error
 
 
 class QBittorrent:
     name = "qbittorrent"
     _DONE = {"uploading", "stalledUP", "pausedUP", "stoppedUP", "queuedUP", "forcedUP", "checkingUP"}
     _FAILED = {"error", "missingFiles"}
+    _WHY = {"missingFiles": "Its files went missing from qBittorrent.", "error": "qBittorrent ran into an error with it."}
 
     def __init__(self, config: dict, transport: httpx.BaseTransport | None = None):
         if not config.get("url"):
@@ -126,7 +135,7 @@ class QBittorrent:
         try:
             response = self.http.post(f"{self.base}/api/v2/auth/login", data={"username": self.config.get("username", ""), "password": self.config.get("password", "")})
         except httpx.HTTPError as e:
-            raise ClientError(f"qBittorrent didn't answer ({e.__class__.__name__}).") from e
+            raise ClientError("qBittorrent isn't answering. Check its address in Settings.") from e
         if response.status_code != 200 or response.text.strip() == "Fails.":
             raise ClientError("qBittorrent refused the username or password.")
         self._logged_in = True
@@ -136,7 +145,7 @@ class QBittorrent:
         try:
             response = self.http.request(method, f"{self.base}/api/v2/{path}", **kwargs)
         except httpx.HTTPError as e:
-            raise ClientError(f"qBittorrent didn't answer ({e.__class__.__name__}).") from e
+            raise ClientError("qBittorrent isn't answering. Check its address in Settings.") from e
         if response.status_code >= 400:
             raise ClientError(f"qBittorrent answered {response.status_code}.")
         return response
@@ -158,9 +167,9 @@ class QBittorrent:
     def state(self, ref: str) -> JobState:
         torrent = self._torrent(ref)
         if torrent is None:
-            return JobState("missing", error="qBittorrent no longer has it.")
+            return JobState("missing", error="It disappeared from qBittorrent.")
         if torrent.get("state") in self._FAILED:
-            return JobState("failed", error=f"qBittorrent: {torrent.get('state')}")
+            return JobState("failed", error=self._WHY.get(torrent.get("state"), "qBittorrent couldn't finish it."))
         if torrent.get("progress", 0) >= 1 or torrent.get("state") in self._DONE:
             path = torrent.get("content_path") or os.path.join(torrent.get("save_path", ""), torrent.get("name", ""))
             return JobState("done", 1.0, map_path(path))

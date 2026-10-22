@@ -6,7 +6,10 @@
 <div class="col-6 col-sm-4 col-md-3 mb-3{% if classes %} {{ classes }}{% endif %}"{{ attrs|xmlattr }}>
     <div class="book">
         <a href="{{ href }}" aria-label="{{ label }}">
-            {% if cover %}<img src="{{ cover }}" alt="{{ label }}" loading="lazy"{{ img_attrs|xmlattr }}>{% else %}<span class="cover-blank">{{ title }}</span>{% endif %}
+            {# The title in type sits under the image, so a cover that's slow
+               or fails to load still reads as this book. #}
+            <span class="cover-blank" aria-hidden="true">{{ title }}</span>
+            {% if cover %}<img src="{{ cover }}" alt="{{ label }}" loading="lazy" onload="this.parentNode.classList.add('is-loaded')" onerror="this.remove()"{{ img_attrs|xmlattr }}>{% endif %}
         </a>
         {% if caller %}{{ caller() }}{% endif %}
     </div>

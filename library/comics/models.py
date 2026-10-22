@@ -71,6 +71,8 @@ class ComicIssue(db.Model):
     page_count = db.Column(db.Integer)
     original_filename = db.Column(db.String(500))
     added_at = db.Column(db.DateTime, nullable=False, default=_utcnow)
+    # When the indexers were last asked for it (wanted issues only).
+    searched_at = db.Column(db.DateTime)
 
     series = db.relationship("ComicSeries", back_populates="issues")
     downloads = db.relationship("Download", back_populates="issue", passive_deletes=True)

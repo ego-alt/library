@@ -19,29 +19,20 @@
     </div>
 </form>
 
-<p class="get-intro" id="getStatus" aria-live="polite">Books come from Open Library{% if providers_ready %} and comics from ComicVine or Metron{% else %}; add a ComicVine key or Metron account in <a href="{{ url_for('settings.settings_page') }}#metadata">Settings</a> to find comics too{% endif %}. Tap a cover to get it.</p>
+<p class="get-intro">Books come from Open Library{% if providers_ready %} and comics from ComicVine or Metron{% else %}; add a ComicVine key or Metron account in <a href="{{ url_for('settings.settings_page') }}#metadata">Settings</a> to find comics too{% endif %}. Choose a cover to ask for a book or follow a series.</p>
 
-<section class="section" id="bookResults" hidden>
-    <div class="section__head"><h2 class="section__title">Books <span class="count" data-count></span></h2></div>
-    <p class="section__hint get-note"></p>
+<section class="section" id="bookResults" data-kind="books" hidden>
+    <div class="section__head"><h2 class="section__title"><button type="button" class="section__link" data-show="books">Books</button> <span class="count" data-count></span></h2></div>
+    <p class="section__hint get-note" aria-live="polite"></p>
     <div class="row library get-results"></div>
+    <button type="button" class="btn btn-ghost get-all" data-show="books" hidden></button>
 </section>
 
-<section class="section" id="comicResults" hidden>
-    <div class="section__head">
-        <h2 class="section__title">Comics <span class="count" data-count></span></h2>
-        <div class="section__actions">
-            <label class="monitor-choice" for="monitorChoice">Get
-                <select id="monitorChoice" class="input">
-                    <option value="future" selected>New issues</option>
-                    <option value="all">All missing</option>
-                    <option value="none">None (I'll pick)</option>
-                </select>
-            </label>
-        </div>
-    </div>
-    <p class="section__hint get-note"></p>
+<section class="section" id="comicResults" data-kind="comics" hidden>
+    <div class="section__head"><h2 class="section__title"><button type="button" class="section__link" data-show="comics">Comics</button> <span class="count" data-count></span></h2></div>
+    <p class="section__hint get-note" aria-live="polite"></p>
     <div class="row library get-results"></div>
+    <button type="button" class="btn btn-ghost get-all" data-show="comics" hidden></button>
 </section>
 {% endblock %}
 {% block scripts %}

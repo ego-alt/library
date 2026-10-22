@@ -3,58 +3,43 @@
 {% block page_title %}{{ series.display_name }}{% endblock %}
 {% block page %}series-detail{% endblock %}
 {% block content %}
-<section class="series-head" data-series-id="{{ series.id }}">
+{# Read like a book's details: the cover, the title and its line, one
+   button to read; everything to do with getting issues is under ⋯. #}
+<section class="series-head" data-series-id="{{ series.id }}" data-monitor="{{ series.monitor }}" data-provider="{{ series.provider }}"
+         data-source="{% if series.provider == 'comicvine' %}https://comicvine.gamespot.com/volume/4050-{{ series.provider_id }}/{% elif series.provider == 'metron' %}https://metron.cloud/series/{{ series.provider_id }}/{% endif %}">
     <div class="series-head__cover book">
-        {% if cover %}<img src="{{ cover }}" alt="" referrerpolicy="no-referrer">{% else %}<span class="cover-blank">{{ series.name }}</span>{% endif %}
+        <span class="cover-blank" aria-hidden="true">{{ series.name }}</span>
+        {% if cover %}<img src="{{ cover }}" alt="" referrerpolicy="no-referrer" onload="this.parentNode.classList.add('is-loaded')" onerror="this.remove()">{% endif %}
     </div>
     <div class="series-head__text">
-        <h2 class="series-head__title">{{ series.name }}</h2>
-        <p class="series-head__meta">
-            {{ [series.publisher, series.start_year, ('Vol. ' ~ series.volume) if series.volume, (series.issue_count ~ ' issues') if series.issue_count]|select|join(' · ') }}
-            {% if series.provider == 'comicvine' %} · <a href="https://comicvine.gamespot.com/volume/4050-{{ series.provider_id }}/" target="_blank" rel="noopener noreferrer">ComicVine</a>
-            {% elif series.provider == 'metron' %} · <a href="https://metron.cloud/series/{{ series.provider_id }}/" target="_blank" rel="noopener noreferrer">Metron</a>
-            {% else %} · from your files{% endif %}
-        </p>
+        <header class="series-head__header">
+            <h2 class="meta-title">{{ series.name }}</h2>
+            <p class="meta-author">{{ [series.publisher, series.start_year, ('Vol. ' ~ series.volume) if series.volume]|select|join(' · ') or 'From your files' }}</p>
+        </header>
+        {% set have = issues|selectattr('has_file')|list|length %}
+        <p class="series-head__count"><span class="meta-label">Issues</span> {{ series.issue_count or issues|length }}{% if is_admin and have %} · {{ have }} here{% endif %}</p>
         {% if series.description %}<p class="series-head__desc">{{ series.description|truncate(600) }}</p>{% endif %}
         <div class="series-head__actions">
             {% if up_next %}<a class="btn btn-primary" href="{{ url_for('comics.read_page', issue_id=up_next.id) }}">{{ 'Continue' if up_next.page and not up_next.finished else 'Read' }} #{{ up_next.number }}</a>{% endif %}
             {% if is_admin %}
-            {% if series.provider != 'local' %}
-            <label class="monitor-pick" title="Which issues to download">Get
-                <select id="monitorSelect" class="input">
-                    <option value="future"{% if series.monitor == 'future' %} selected{% endif %}>New issues</option>
-                    <option value="all"{% if series.monitor == 'all' %} selected{% endif %}>All missing</option>
-                    <option value="none"{% if series.monitor == 'none' %} selected{% endif %}>None</option>
-                </select>
-            </label>
-            {% endif %}
-            <details class="more">
-                <summary class="btn btn-ghost" aria-label="More for this series">⋯</summary>
-                <div class="more__menu">
-                    {% if series.provider != 'local' %}
-                    <button type="button" data-action="search-series">Search for wanted issues</button>
-                    <button type="button" data-action="refresh">Refresh details</button>
-                    {% endif %}
-                    <button type="button" class="danger-text" data-action="delete-series">Stop following…</button>
-                </div>
-            </details>
+            <button type="button" class="book-button series-head__more" data-action="series-menu" data-menu-anchor aria-label="More for {{ series.name }}"><i class="fas fa-ellipsis-h" aria-hidden="true"></i></button>
             {% endif %}
         </div>
     </div>
 </section>
 
-{% if is_admin %}
-<div class="issue-toolbar">
+{% if is_admin and issues %}
+<div class="library-toolbar issue-toolbar">
     <div class="status-filter" role="radiogroup" aria-label="Show issues">
         <button type="button" role="radio" data-filter="all" aria-checked="true">All</button>
         <button type="button" role="radio" data-filter="have" aria-checked="false">Have</button>
         <button type="button" role="radio" data-filter="missing" aria-checked="false">Missing</button>
     </div>
-    <div class="bulk">
-        <span id="bulkCount" hidden></span>
-        <button type="button" class="btn btn-secondary" data-bulk="wanted" hidden>Want</button>
-        <button type="button" class="btn btn-secondary" data-bulk="skipped" hidden>Skip</button>
-        <button type="button" class="btn btn-ghost" id="selectToggle">Select</button>
+    <div class="bulk" id="bulk" hidden>
+        <span id="bulkCount">Choose issues</span>
+        <button type="button" class="btn btn-secondary" data-bulk="wanted" disabled>Want</button>
+        <button type="button" class="btn btn-secondary" data-bulk="skipped" disabled>Skip</button>
+        <button type="button" class="btn btn-ghost" id="selectDone">Done</button>
     </div>
 </div>
 {% endif %}
@@ -65,38 +50,41 @@
     {% set started = issue.page and not issue.finished %}
     {% set next = up_next and issue.id == up_next.id %}
     {% if issue.has_file %}
-        {% set state = 'Read' if issue.finished else ((((100 * (issue.page + 1) / issue.pages)|int) ~ '%') if issue.pages else 'Page ' ~ (issue.page + 1)) if started else ((issue.pages ~ ' pages') if issue.pages else '') %}
-        {% set flag = ('Reading' if started else 'Up next') if next else '' %}
+        {% set state = 'Read' if issue.finished else ((((100 * (issue.page + 1) / issue.pages)|int) ~ '%') if issue.pages else 'Page ' ~ (issue.page + 1)) if started else ('Up next' if next else '') %}
+        {% set meta = [issue.date|comic_date, state] %}
         {% set href = url_for('comics.read_page', issue_id=issue.id) %}
         {% set label = ('Continue' if started else 'Read') ~ ' #' ~ issue.number %}
     {% else %}
-        {% set state = '' %}
-        {% set flag = ('Out ' ~ (issue.date|comic_date)) if not issue.released else {'wanted': 'Wanted', 'snatched': 'Downloading', 'skipped': 'Skipped'}.get(issue.status, issue.status) %}
+        {% set state = {'wanted': 'Wanted', 'snatched': 'Downloading', 'skipped': 'Skipped'}.get(issue.status, issue.status) %}
+        {% set meta = ['Out ' ~ (issue.date|comic_date)] if not issue.released else [issue.date|comic_date, state] %}
         {% set href = '#' %}
-        {% set label = '#' ~ issue.number ~ ', ' ~ flag %}
+        {% set label = '#' ~ issue.number ~ ', ' ~ (meta|select|join(', ')) %}
     {% endif %}
     {% set classes = ('is-read ' if issue.finished else '') ~ ('is-next ' if next else '') ~ ('' if issue.has_file else 'is-missing status-' ~ issue.status) %}
-    {% call cover_card(href, label, '#' ~ issue.number ~ (' · ' ~ issue.title if issue.title else ''), [issue.date|comic_date, state], issue.cover, {'data-issue-id': issue.id, 'data-pages': issue.pages, 'data-have': '1' if issue.has_file else '0'}, {'referrerpolicy': 'no-referrer'}, classes) %}
-        {% if flag %}<span class="cover-flag{% if not issue.has_file %} cover-flag--status{% endif %}">{{ flag }}</span>{% endif %}
+    {% call cover_card(href, label, '#' ~ issue.number ~ (' · ' ~ issue.title if issue.title else ''), meta, issue.cover, {'data-issue-id': issue.id, 'data-have': '1' if issue.has_file else '0'}, {'referrerpolicy': 'no-referrer'}, classes) %}
+        {% if is_admin or issue.has_file %}
         <div class="book-buttons">
-            {% if issue.has_file %}<button type="button" class="book-button book-button--read" data-action="toggle-read" aria-pressed="{{ 'true' if issue.finished else 'false' }}" aria-label="Read" title="{{ 'Mark as unread' if issue.finished else 'Mark as read' }}"><i class="fas fa-check" aria-hidden="true"></i></button>{% endif %}
-            {% if is_admin %}
             <button type="button" class="book-button" data-action="menu" data-menu-anchor aria-label="More for #{{ issue.number }}" title="More"><i class="fas fa-ellipsis-h" aria-hidden="true"></i></button>
-            {% elif issue.has_file %}
-            <a class="book-button" href="{{ url_for('comics.issue_download', issue_id=issue.id) }}" aria-label="Download #{{ issue.number }}" title="Download"><i class="fas fa-download" aria-hidden="true"></i></a>
-            {% endif %}
         </div>
+        {% endif %}
     {% endcall %}
     {% endfor %}
 </div>
+{% elif pending %}
+<div class="empty-state" id="seriesPending">
+    <h3>Fetching issues…</h3>
+    <p>They'll appear here in a moment.</p>
+</div>
 {% else %}
-<div class="empty-state"><h3>{{ 'No issues yet' if is_admin else 'Nothing to read here yet' }}</h3></div>
+<div class="empty-state">
+    <h3>{{ 'No issues yet' if is_admin else 'Nothing to read here yet' }}</h3>
+    {% if is_admin and series.provider != 'local' %}<p>Refresh the details to look again.</p><button type="button" class="btn btn-secondary" data-action="refresh">Refresh details</button>{% endif %}
+</div>
 {% endif %}
 <script id="issuesData" type="application/json">{{ issues|tojson }}</script>
 
 {% if is_admin %}
 <input type="file" id="issueUpload" accept=".cbz,.cbr,.cb7,.zip,.rar,.7z" hidden>
-
 {% endif %}
 {% endblock %}
 {% block scripts %}

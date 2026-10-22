@@ -20,7 +20,7 @@ def search(query: str, limit: int = 20, transport: httpx.BaseTransport | None = 
         with httpx.Client(timeout=20, headers={"User-Agent": USER_AGENT}, transport=transport) as http:
             response = http.get(SEARCH_URL, params=params)
     except httpx.HTTPError as e:
-        raise OpenLibraryError(f"Open Library didn't answer ({e.__class__.__name__}).") from e
+        raise OpenLibraryError("Open Library isn't answering right now. Try again in a moment.") from e
     if response.status_code >= 400:
         raise OpenLibraryError(f"Open Library answered {response.status_code}.")
     results = []

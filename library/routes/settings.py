@@ -96,7 +96,7 @@ def test_settings():
         elif what == "blackhole":
             message = clients.Blackhole(values.get("blackhole_dir", "")).test()
         else:
-            return jsonify({"error": "Test what?"}), 400
+            return jsonify({"error": "Nothing to test here."}), 400
     except (providers.ProviderError, indexers.IndexerError, clients.ClientError) as e:
         return jsonify({"error": str(e)}), 502
     return jsonify({"message": message})

@@ -19,7 +19,10 @@
     {% for card in cards %}
     {% set s = card.series %}
     {% set attrs = {'data-name': s.name|lower, 'data-state': card.state, 'data-last': card.last, 'hidden': True if current_view != 'all' and card.state != current_view else None} %}
-    {% call cover_card(card.href, card.label, s.name, [s.publisher or s.start_year, card.line], card.cover, attrs, {'referrerpolicy': 'no-referrer'}) %}
+    {# Where you are leads, as a book's caption ends with how far in you are;
+       the publisher only when there's room for it. #}
+    {% set meta = [card.line] if card.line.startswith('#') else [s.publisher or s.start_year, card.line] %}
+    {% call cover_card(card.href, card.label, s.name, meta, card.cover, attrs, {'referrerpolicy': 'no-referrer'}) %}
         {% if card.href != url_for('comics.series_page', series_id=s.id) %}
         <div class="book-buttons">
             <a class="book-button" href="{{ url_for('comics.series_page', series_id=s.id) }}" aria-label="All issues of {{ s.display_name }}" title="All issues">

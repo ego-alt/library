@@ -1,6 +1,7 @@
 /* Comics: the same gallery wall as the books (index.css), plus a series'
- * header and its issues as covers, and the release picker. Get and Downloads
- * are in manage.css, Settings in settings.css. */
+ * header, read like a book's details panel, and its issues as covers. What a
+ * cover is up to goes in its caption, as for books; nothing floats over it
+ * but ⋯. Get and Downloads are in manage.css, Settings in settings.css. */
 
 .comics-hint { color: var(--color-text-muted); font-size: var(--text-sm); }
 .danger-text { color: var(--color-danger) !important; }
@@ -16,68 +17,32 @@
 }
 .series-head__cover { cursor: default; }
 .series-head__cover img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.series-head__title { font-size: var(--text-xl); font-weight: 550; letter-spacing: -0.01em; margin-bottom: var(--space-2); }
-.series-head__meta { color: var(--color-text-muted); font-size: var(--text-sm); }
+.series-head__header { margin-bottom: var(--space-3); }
+.series-head__header .meta-author { margin-top: var(--space-1); }
+.series-head__count { margin: 0 0 var(--space-3); color: var(--color-text-secondary); font-size: var(--text-sm); }
+.series-head__count .meta-label { margin-right: var(--space-2); font-size: 0.75rem; }
 .series-head__desc { color: var(--color-text-secondary); max-width: 60ch; white-space: pre-line; }
-.series-head__actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
-.monitor-pick { display: inline-flex; align-items: center; gap: var(--space-2); color: var(--color-text-secondary); }
-.monitor-pick select { min-width: 0; }
+.series-head__actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+/* The same round ⋯ as on a cover, sitting on the wall. */
+.series-head__more { width: 44px; height: 44px; border: 1px solid var(--color-border); color: var(--color-text-secondary); }
 @media (max-width: 640px) {
     /* A small cover beside the title; the rest flows under it. */
     .series-head { display: block; margin-bottom: 28px; }
     .series-head::after { content: ""; display: table; clear: both; }
     .series-head__cover { float: left; width: 96px; margin: 4px var(--space-4) var(--space-2) 0; }
-    .series-head__title { font-size: var(--text-lg); }
+    .series-head .meta-title { font-size: var(--text-lg); }
+    .series-head__desc { clear: both; padding-top: var(--space-2); }
     .series-head__actions { clear: both; padding-top: var(--space-2); }
 }
 
-.issue-toolbar {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-3);
-    margin-bottom: var(--space-3);
-}
-.bulk { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); color: var(--color-text-secondary); }
+/* All / Have / Missing, or what's chosen while choosing. */
+.issue-toolbar { justify-content: space-between; }
+.issue-toolbar .status-filter[hidden], .bulk[hidden] { display: none; }
+.bulk { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); font-size: var(--text-sm); color: var(--color-text-secondary); }
+.bulk #bulkCount { margin-right: var(--space-2); }
 
-.issue-num { font-weight: 600; font-variant-numeric: tabular-nums; }
-
-/* The ⋯ menu on an issue row. */
-.more { display: inline-block; position: relative; }
-.more summary { list-style: none; cursor: pointer; padding: 0 var(--space-2); color: var(--color-text-muted); font-weight: 700; }
-.more summary::-webkit-details-marker { display: none; }
-.more[open] summary { color: var(--color-text-primary); }
-.more__menu {
-    position: absolute;
-    right: 0;
-    top: 100%;
-    z-index: 20;
-    display: flex;
-    flex-direction: column;
-    min-width: 12rem;
-    padding: var(--space-1);
-    background: var(--color-bg-raised);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    box-shadow: 0 12px 30px -12px var(--color-shadow);
-    text-align: left;
-}
-.more__menu > button, .more__menu > a {
-    border: none;
-    background: none;
-    padding: var(--space-2) var(--space-3);
-    font: inherit;
-    font-size: var(--text-sm);
-    color: var(--color-text-primary);
-    text-align: left;
-    text-decoration: none;
-    cursor: pointer;
-    border-radius: var(--radius-sm);
-}
-.more__menu > button:hover, .more__menu > a:hover { background: var(--color-highlight-soft); }
-
-/* Manual search. */
+/* Choosing a release by hand: rows in the details panel's overlay, which is
+   a bottom sheet on phones. */
 .metadata-overlay .releases-panel { max-width: 760px; width: 100%; max-height: 85vh; overflow: auto; }
 .release-list { list-style: none; padding: 0; margin: 0; }
 .release {
@@ -87,48 +52,22 @@
     padding: var(--space-3) 0;
     border-bottom: 1px solid var(--color-border);
 }
-.release__text { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.release__text { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .release__text strong { font-weight: 500; word-break: break-word; }
-.release__text span { font-size: 0.8125rem; }
+.release__text span { font-size: var(--text-sm); color: var(--color-text-muted); }
 .release.is-rejected { opacity: 0.55; }
 
-/* --- Covers: a flag over the corner (Up next, Follow) and read issues dimmed. --- */
-.cover-flag {
-    position: absolute;
-    left: var(--space-2);
-    bottom: var(--space-2);
-    z-index: 2;
-    padding: 2px 10px;
-    border-radius: var(--radius-pill);
-    background: var(--color-accent);
-    color: #fff;
-    font-size: 0.75rem;
-    font-weight: 600;
-    letter-spacing: 0.02em;
-    pointer-events: none;
-}
-.cover-flag--action { background: var(--color-scrim); }
-.cover-flag--action.is-on { background: var(--color-success); }
+/* --- Issue covers: read ones a little dimmed, missing ones faded. --- */
 .is-busy .book { opacity: 0.6; }
 .issue-wall .is-read .book img { opacity: 0.7; }
 .issue-wall .is-read .book-caption { opacity: 0.7; }
-/* The ✓ stays on a read issue's cover, as its mark. */
-.book-button--read[aria-pressed="true"] { background: var(--color-accent); color: #fff; }
-.issue-wall .is-read .book-buttons { opacity: 1; pointer-events: auto; }
-.issue-wall .is-read .book-buttons > :not(.book-button--read) { opacity: 0; pointer-events: none; }
-.issue-wall .is-read .book:hover .book-buttons > *, .issue-wall .is-read .book:focus-within .book-buttons > * { opacity: 1; pointer-events: auto; }
 .book-buttons > .book-button { text-decoration: none; }
-.series-head .more summary.btn { padding: var(--space-1) var(--space-3); }
-.series-head .more__menu { left: 0; right: auto; }
-
-/* Missing issues (admins): faded covers with what they're waiting on. */
 .issue-wall .is-missing .book img, .issue-wall .is-missing .cover-blank { opacity: 0.35; filter: grayscale(0.6); }
 .issue-wall .is-missing .book-caption { opacity: 0.75; }
-.cover-flag--status { background: var(--color-scrim); }
-.issue-wall .status-wanted .cover-flag--status { background: var(--color-accent); }
-.issue-wall .status-snatched .cover-flag--status { background: #b07a1c; }
+.issue-wall .status-wanted .book-caption__author { color: var(--color-accent); }
 .issue-wall.is-selecting .book { cursor: pointer; }
 .issue-wall.is-selecting .book-buttons { display: none; }
 .issue-wall.is-selecting [data-have="1"] .book, .issue-wall.is-selecting .status-snatched .book { opacity: 0.4; cursor: default; }
 .issue-wall .is-selected .book { outline: 3px solid var(--color-accent); outline-offset: 3px; }
-
+/* Long runs: the browser skips laying out covers far off screen. */
+.issue-wall > * { content-visibility: auto; contain-intrinsic-size: auto 360px; }

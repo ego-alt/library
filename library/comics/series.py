@@ -77,8 +77,10 @@ def sync_issues(series: ComicSeries, rows: list[dict], first_sync: bool = False)
     return added
 
 
-def add_series(provider_name: str, provider_id: str, monitor: str = MONITOR_FUTURE) -> ComicSeries:
-    """Follow a series. If it's already followed, that series is returned."""
+def add_series(provider_name: str, provider_id: str, monitor: str = MONITOR_FUTURE, *, fetch_issues: bool = True) -> ComicSeries:
+    """Follow a series. If it's already followed, that series is returned.
+    Without fetch_issues only the series is read now; its issues come with
+    the worker's next refresh (refreshed_at stays empty until then)."""
     existing = ComicSeries.query.filter_by(provider=provider_name, provider_id=str(provider_id)).first()
     if existing:
         return existing
@@ -87,7 +89,8 @@ def add_series(provider_name: str, provider_id: str, monitor: str = MONITOR_FUTU
     series = ComicSeries(provider=provider_name, provider_id=str(provider_id), monitor=monitor, name=data["name"])
     _apply_series(series, data)
     db.session.add(series)
-    sync_issues(series, provider.get_issues(provider_id), first_sync=True)
+    if fetch_issues:
+        sync_issues(series, provider.get_issues(provider_id), first_sync=True)
     db.session.commit()
     return series
 
@@ -97,8 +100,9 @@ def refresh_series(series: ComicSeries) -> int:
     if series.provider not in ("comicvine", "metron"):
         return 0
     provider = get_provider(series.provider)
+    first_sync = series.refreshed_at is None
     _apply_series(series, provider.get_series(series.provider_id))
-    added = sync_issues(series, provider.get_issues(series.provider_id))
+    added = sync_issues(series, provider.get_issues(series.provider_id), first_sync=first_sync)
     db.session.commit()
     return added
 
@@ -117,12 +121,13 @@ def due_for_refresh(now: datetime | None = None) -> list[ComicSeries]:
     return due
 
 
-def set_monitor(series: ComicSeries, monitor: str) -> None:
+def set_monitor(series: ComicSeries, monitor: str) -> int:
     """Change what's wanted. Turning to 'all' wants every missing issue; to
-    'none' un-wants everything not already downloading."""
+    'none' un-wants everything not already downloading. Returns how many
+    issues are wanted now."""
     series.monitor = monitor
     for issue in series.issues:
-        if issue.status in (DOWNLOADED, SNATCHED):
+        if issue.status in (DOWNLOADED, SNATCHED) or issue.filename:
             continue
         if monitor == MONITOR_ALL:
             issue.status = WANTED
@@ -131,6 +136,7 @@ def set_monitor(series: ComicSeries, monitor: str) -> None:
         else:
             issue.status = SKIPPED
     db.session.commit()
+    return sum(1 for i in series.issues if i.status == WANTED)
 
 
 def local_series(name: str, year: int | None) -> ComicSeries:

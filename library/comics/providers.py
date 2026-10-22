@@ -86,7 +86,7 @@ class ComicVine:
         try:
             response = self.http.get(f"{self.base_url}/{path}", params=params)
         except httpx.HTTPError as e:
-            raise ProviderError(f"ComicVine didn't answer ({e.__class__.__name__}).") from e
+            raise ProviderError("ComicVine isn't answering right now. Try again in a moment.") from e
         if response.status_code in (401, 403):
             raise ProviderError("ComicVine refused the API key.")
         if response.status_code == 420 or response.status_code == 429:
@@ -165,7 +165,7 @@ class Metron:
             # An empty params would wipe the query of a "next page" URL.
             response = self.http.get(url, params=params or None)
         except httpx.HTTPError as e:
-            raise ProviderError(f"Metron didn't answer ({e.__class__.__name__}).") from e
+            raise ProviderError("Metron isn't answering right now. Try again in a moment.") from e
         if response.status_code in (401, 403):
             raise ProviderError("Metron refused the username or password.")
         if response.status_code == 429:

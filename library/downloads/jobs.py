@@ -54,13 +54,32 @@ def _request_path(job: str) -> str:
     return os.path.join(_state_dir(), f"downloads-run-{job}")
 
 
-def request_run(job: str) -> None:
-    """Ask the worker to run a job at its next look (within TICK seconds)."""
+def request_run(job: str, delay: float = 0) -> None:
+    """Ask the worker to run a job at its next look (within TICK seconds), or
+    no sooner than `delay` seconds from now (time to take a request back).
+    An earlier request wins over a later one."""
     if job not in JOBS:
         raise ValueError(job)
     os.makedirs(_state_dir(), exist_ok=True)
-    with open(_request_path(job), "w"):
-        pass
+    when = time.time() + delay
+    current = _requested_at(job)
+    if current is not None and current <= when:
+        return
+    with open(_request_path(job), "w") as f:
+        f.write(str(when))
+
+
+def _requested_at(job: str) -> float | None:
+    """When a requested run is due, or None if there's no request."""
+    try:
+        with open(_request_path(job)) as f:
+            text = f.read().strip()
+    except OSError:
+        return None
+    try:
+        return float(text) if text else 0.0
+    except ValueError:
+        return 0.0
 
 
 def status() -> dict:
@@ -72,7 +91,7 @@ def status() -> dict:
         state = {}
     beat = state.get("heartbeat")
     state["alive"] = bool(beat) and time.time() - beat < 5 * 60
-    state["pending"] = [job for job in JOBS if os.path.exists(_request_path(job))]
+    state["pending"] = [job for job in JOBS if _requested_at(job) is not None]
     return state
 
 
@@ -93,12 +112,12 @@ def import_all() -> dict:
 
 
 def describe_import(result: dict) -> str:
-    parts = [f"imported {len(result['imported'])}"]
+    parts = [f"Added {len(result['imported'])}."]
     if result["unmatched"]:
-        parts.append(f"{len(result['unmatched'])} to match by hand")
+        parts.append(f"{len(result['unmatched'])} need{'s' if len(result['unmatched']) == 1 else ''} a series.")
     if result["failed"]:
-        parts.append(f"{len(result['failed'])} unreadable")
-    return ", ".join(parts).capitalize() + "."
+        parts.append(f"{len(result['failed'])} couldn't be opened.")
+    return " ".join(parts)
 
 
 def run_job(job: str) -> str:
@@ -117,6 +136,9 @@ def run_job(job: str) -> str:
             except Exception as e:
                 db.session.rollback()
                 errors.append(f"{series.name}: {e}")
+        # A series just followed (or one with new issues) may want some now.
+        if new and comic_downloads.wanted_issues():
+            request_run("search")
         if errors:
             raise RuntimeError("; ".join(errors[:3]))
         return f"Refreshed {len(due)} series; {new} new issue{'s' if new != 1 else ''}."
@@ -124,7 +146,7 @@ def run_job(job: str) -> str:
         if not settings.get("indexers"):
             return "No indexers yet."
         grabbed = pipeline.search_wanted()
-        return f"Grabbed {grabbed} release{'s' if grabbed != 1 else ''}."
+        return f"Found {grabbed} to download." if grabbed else "Nothing new found."
     raise ValueError(job)
 
 
@@ -153,7 +175,8 @@ def _loop(app) -> None:
             for job in JOBS:
                 interval = EVERY.get(job, search_every)
                 last = state.get(job, {}).get("ts", 0)
-                requested = os.path.exists(_request_path(job))
+                due_at = _requested_at(job)
+                requested = due_at is not None and due_at <= now
                 if not requested and now - last < interval:
                     continue
                 if requested:
@@ -170,6 +193,8 @@ def _loop(app) -> None:
                 finally:
                     db.session.remove()
                 state[job] = {"ts": time.time(), "at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "ok": ok, "message": message}
+                if job == "downloads":
+                    state["clients"] = dict(pipeline.client_problems)
             state["heartbeat"] = time.time()
             try:
                 _save_state(state)

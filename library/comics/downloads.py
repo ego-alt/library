@@ -127,8 +127,8 @@ def grab(issue: ComicIssue, release: indexers.Release) -> Download:
     return pipeline.grab(KIND_COMIC, issue, release)
 
 
-def search_issue(issue: ComicIssue, cache: dict | None = None) -> Download | None:
-    return pipeline.search_item(KIND_COMIC, issue, cache)
+def search_issue(issue: ComicIssue, cache: dict | None = None, *, raise_client_errors: bool = False) -> Download | None:
+    return pipeline.search_item(KIND_COMIC, issue, cache, raise_client_errors=raise_client_errors)
 
 
 def mark_imported(issue_ids: list[int]) -> None:

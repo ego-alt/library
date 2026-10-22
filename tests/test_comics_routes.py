@@ -40,9 +40,16 @@ def provider(monkeypatch):
 
 @pytest.fixture
 def saga(app, comic_dir, admin_client, provider):
+    from library.comics.series import refresh_series
+
     response = admin_client.post("/comics/api/series", json={"provider": "comicvine", "provider_id": "49901", "monitor": "future"})
     assert response.status_code == 201
-    return ComicSeries.query.one()
+    series = ComicSeries.query.one()
+    # Following answers at once; the worker fetches the issues.
+    assert admin_client.get(f"/comics/api/series/{series.id}").get_json()["pending"] is True
+    refresh_series(series)
+    assert admin_client.get(f"/comics/api/series/{series.id}").get_json() == {"pending": False, "issues": 3}
+    return series
 
 
 def test_comics_need_sign_in(client, comic_dir):
@@ -62,8 +69,7 @@ def test_every_page_renders(admin_client, saga, tmp_path, comic_dir):
         assert response.status_code == 200, path
     assert b"Saga" in admin_client.get("/comics/").data
     downloads = admin_client.get("/downloads").data.decode()
-    # Issue 2 is out and wanted only with monitor "all"; issue 3 is coming up.
-    assert "Coming up" in downloads and "Import" in downloads
+    assert "Import" in downloads and "Coming up" not in downloads and "Background jobs" not in downloads
 
 
 def test_empty_comics_page_says_what_to_do(admin_client, comic_dir):
@@ -114,7 +120,8 @@ def test_admin_pages_send_readers_home(standard_client, comic_dir, path, home):
 @pytest.mark.parametrize(
     "method, path",
     [
-        ("get", "/api/get/search?q=saga"),
+        ("get", "/api/get/search/books?q=saga"),
+        ("get", "/api/get/search/comics?q=saga"),
         ("post", "/api/get/books"),
         ("post", "/comics/api/series"),
         ("patch", "/comics/api/series/1"),
@@ -143,20 +150,22 @@ def test_get_search_marks_followed_series(admin_client, saga, monkeypatch):
     from library.books import openlibrary
 
     monkeypatch.setattr(openlibrary, "search", lambda q: [])
-    data = admin_client.get("/api/get/search?q=saga").get_json()
-    assert data["comics"][0]["followed_id"] == saga.id and data["books"] == []
+    assert admin_client.get("/api/get/search/comics?q=saga").get_json()["results"][0]["followed_id"] == saga.id
+    assert admin_client.get("/api/get/search/books?q=saga").get_json()["results"] == []
 
 
 def test_get_search_without_a_comics_provider_still_finds_books(admin_client, comic_dir, monkeypatch):
     from library.books import openlibrary
 
     monkeypatch.setattr(openlibrary, "search", lambda q: [{"ol_key": "/works/OL1W", "title": "Saga", "author": "Someone", "year": 2001, "cover_url": None}])
-    data = admin_client.get("/api/get/search?q=saga").get_json()
-    assert data["books"][0]["status"] is None and "Settings" in data["errors"]["comics"]
+    books = admin_client.get("/api/get/search/books?q=saga").get_json()
+    assert books["results"][0]["status"] is None and books["error"] is None
+    monkeypatch.setattr(providers, "available", lambda: [])
+    assert "Settings" in admin_client.get("/api/get/search/comics?q=saga").get_json()["error"]
 
 
 def test_monitor_all_and_bulk(admin_client, saga):
-    admin_client.patch(f"/comics/api/series/{saga.id}", json={"monitor": "all"})
+    assert admin_client.patch(f"/comics/api/series/{saga.id}", json={"monitor": "all"}).get_json() == {"monitor": "all", "wanted": 3}
     assert all(i.status == WANTED for i in saga.issues)
     ids = [i.id for i in saga.issues]
     assert admin_client.post("/comics/api/issues/bulk", json={"ids": ids, "status": "skipped"}).get_json()["changed"] == 3
@@ -258,7 +267,8 @@ def test_readers_get_issue_covers_they_can_mark_read(standard_client, comic_dir,
     assert 'id="issueWall"' in page and "Up next" in page and ">Read #1<" in page
     assert standard_client.put(f"/comics/api/issues/{have.id}/progress", json={"page": 3, "finished": True}).get_json()["finished"]
     page = standard_client.get(f"/comics/series/{s.id}").data.decode()
-    assert "is-read" in page and 'aria-pressed="true"' in page
+    # Read shows in the caption, as a book's progress does; nothing floats over the cover but ⋯.
+    assert "is-read" in page and "author\">Read</span>" in page and "cover-flag" not in page and "toggle-read" not in page
     assert standard_client.put(f"/comics/api/issues/{have.id}/progress", json={"page": 0, "finished": False}).get_json() == {"page": 0, "finished": False}
 
 

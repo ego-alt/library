@@ -103,7 +103,7 @@ def search(indexer: dict, query: str, kind: str = "comic", transport: httpx.Base
         with httpx.Client(timeout=30, headers={"User-Agent": USER_AGENT}, follow_redirects=True, transport=transport) as http:
             response = http.get(url, params=params)
     except httpx.HTTPError as e:
-        raise IndexerError(f"{indexer.get('name', base)} didn't answer ({e.__class__.__name__}).") from e
+        raise IndexerError(f"{indexer.get('name', base)} isn't answering.") from e
     if response.status_code in (401, 403):
         raise IndexerError(f"{indexer.get('name', base)} refused the API key.")
     if response.status_code >= 400:

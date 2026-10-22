@@ -7,9 +7,9 @@ one place to follow everything on its way into the library.
                        grabs for a comic issue or a book request alike
 """
 
+import difflib
 import os
 import secrets
-from datetime import date, timedelta
 
 from flask import Blueprint, abort, jsonify, redirect, render_template, request, url_for
 from flask_login import current_user, login_required
@@ -27,7 +27,16 @@ from ..comics.series import local_series
 from ..models import Book, db
 from ..routes._helpers import json_admin_required
 from . import clients, indexers, jobs, pipeline
-from .models import DL_ACTIVE, KIND_BOOK, KIND_COMIC, KINDS, SKIPPED, WANTED, Download
+from .models import (
+    DL_ACTIVE,
+    DL_FAILED,
+    KIND_BOOK,
+    KIND_COMIC,
+    KINDS,
+    SKIPPED,
+    WANTED,
+    Download,
+)
 
 downloads_blueprint = Blueprint("downloads", __name__)
 
@@ -37,11 +46,8 @@ def is_admin() -> bool:
 
 
 def waiting_count() -> int:
-    """What's moving or needs a hand: downloads in progress and files waiting
-    in the import folder (shown on the Downloads link)."""
-    folder = comic_files.import_dir()
-    waiting = len(comic_files.comic_files(folder)) if os.path.isdir(folder) else 0
-    return pipeline.active_count() + waiting
+    """Downloads in progress (the number on the Downloads link)."""
+    return pipeline.active_count()
 
 
 def download_json(d: Download) -> dict:
@@ -57,7 +63,8 @@ def download_json(d: Download) -> dict:
         "size": d.size,
         "status": d.status,
         "progress": d.progress,
-        "error": d.error,
+        "error": clients.plain_error(d.error),
+        "stalled": pipeline.is_stalled(d),
         "created_at": d.created_at.isoformat() + "Z",
         "updated_at": d.updated_at.isoformat() + "Z" if d.updated_at else None,
         "item": {"id": item.id, "label": kind.label(item), "url": kind.link(item)} if item is not None else None,
@@ -92,59 +99,74 @@ def downloads_page():
         return redirect(url_for("index_routes.index"))
     from ..comics.routes import issue_json
 
-    today = date.today()
-    soon = ComicIssue.query.filter(ComicIssue.filename.is_(None), db.or_(ComicIssue.store_date > today, db.and_(ComicIssue.store_date.is_(None), ComicIssue.cover_date > today))).all()
-    soon = [i for i in soon if i.release_date and i.release_date <= today + timedelta(days=60) and i.series.monitor != "none"]
-    soon.sort(key=lambda i: (i.release_date, i.series.name, i.sort_number))
     # Wanted: books, a line each; comics, a group per series; newest first.
     groups: dict[int, dict] = {}
     for issue in comic_downloads.wanted_issues():
         groups.setdefault(issue.series_id, {"series": issue.series, "issues": []})["issues"].append(issue_json(issue))
-    snatched = BookRequest.query.filter_by(status="snatched").count()
+    try:
+        every = int(float(settings.get("search_interval_hours") or 6))
+    except (TypeError, ValueError):
+        every = 6
     return render_template(
         "downloads.html",
         wanted_books=books.kind.wanted(),
         wanted_comics=list(groups.values()),
-        books_on_the_way=snatched,
-        upcoming=[issue_json(i) for i in soon],
         series_options=[[s.id, s.display_name] for s in ComicSeries.query.order_by(ComicSeries.name)],
         can_search=bool(settings.get("indexers")),
+        search_every=every,
     )
 
 
 # API: Get
 
 
-@downloads_blueprint.get("/api/get/search")
+@downloads_blueprint.get("/api/get/search/books")
 @json_admin_required
-def get_search():
-    """Books from Open Library and comic series from ComicVine/Metron, each
-    marked with whether you have or follow it already."""
+def get_search_books():
+    """Books from Open Library, each marked with whether it's in the library
+    (by title and author, opening it) or asked for already."""
     query = (request.args.get("q") or "").strip()
     if not query:
-        return jsonify({"books": [], "comics": [], "errors": {}})
-    errors, found_books, found_comics = {}, [], []
+        return jsonify({"results": [], "error": None})
     try:
-        found_books = openlibrary.search(query)
+        found = openlibrary.search(query)
     except openlibrary.OpenLibraryError as e:
-        errors["books"] = str(e)
-    requested = {r.ol_key: r for r in BookRequest.query.filter(BookRequest.ol_key.in_([b["ol_key"] for b in found_books]))}
-    titles = {(b.title or "").lower() for b in Book.query.filter(Book.deleted_at.is_(None)).with_entities(Book.title)}
-    for book in found_books:
-        request_row = requested.get(book["ol_key"])
-        book["status"] = "have" if book["title"].lower() in titles or (request_row and request_row.status == "downloaded") else (request_row.status if request_row else None)
-    if providers.available():
-        try:
-            provider = providers.get_provider()
-            found_comics = provider.search_series(query)
-            followed = {(s.provider, s.provider_id): s.id for s in ComicSeries.query.filter_by(provider=provider.name)}
-            for row in found_comics:
-                row["followed_id"] = followed.get((row["provider"], row["provider_id"]))
-        except providers.ProviderError as e:
-            errors["comics"] = str(e)
-    else:
-        errors["comics"] = "Add a ComicVine key or Metron account in Settings to find comics."
-    return jsonify({"books": found_books, "comics": found_comics, "errors": errors})
+        return jsonify({"results": [], "error": str(e)})
+    requested = {r.ol_key: r for r in BookRequest.query.filter(BookRequest.ol_key.in_([b["ol_key"] for b in found]))}
+    owned = {}
+    for book in Book.query.filter(Book.deleted_at.is_(None)).with_entities(Book.title, Book.author, Book.filename):
+        owned.setdefault((book.title or "").lower(), []).append((books._surname(book.author), book.filename))
+    for row in found:
+        request_row = requested.get(row["ol_key"])
+        surname = books._surname(row.get("author"))
+        match = next((filename for owner, filename in owned.get(row["title"].lower(), []) if not surname or not owner or owner == surname), None)
+        if match is None and request_row is not None and request_row.book is not None:
+            match = request_row.book.filename
+        row["status"] = "have" if match else (request_row.status if request_row else None)
+        row["request_id"] = request_row.id if request_row else None
+        row["href"] = url_for("read_routes.read_book", filename=match) if match else None
+    return jsonify({"results": found, "error": None})
+
+
+@downloads_blueprint.get("/api/get/search/comics")
+@json_admin_required
+def get_search_comics():
+    """Comic series from ComicVine or Metron, each marked with whether you
+    follow it already."""
+    query = (request.args.get("q") or "").strip()
+    if not query:
+        return jsonify({"results": [], "error": None})
+    if not providers.available():
+        return jsonify({"results": [], "error": "Add a ComicVine key or Metron account in Settings to find comics."})
+    try:
+        provider = providers.get_provider()
+        found = provider.search_series(query)
+    except providers.ProviderError as e:
+        return jsonify({"results": [], "error": str(e)})
+    followed = {(s.provider, s.provider_id): s.id for s in ComicSeries.query.filter_by(provider=provider.name)}
+    for row in found:
+        row["followed_id"] = followed.get((row["provider"], row["provider_id"]))
+    return jsonify({"results": found, "error": None})
 
 
 @downloads_blueprint.post("/api/get/books")
@@ -156,7 +178,8 @@ def get_book():
         return jsonify({"error": "Which book?"}), 400
     book_request, created = books.request_book(data, current_user.id)
     if book_request.status == WANTED:
-        jobs.request_run("search")
+        # A few seconds' grace, so Undo on the toast really undoes.
+        jobs.request_run("search", delay=10)
     return jsonify({"id": book_request.id, "status": book_request.status, "created": created}), 201 if created else 200
 
 
@@ -197,7 +220,9 @@ def search_wanted_item(kind, item_id):
     releases, errors = pipeline.find_releases(kind, item)
     best = next((r for r in releases if r.score >= 0), None)
     if best is None:
-        return jsonify({"error": "; ".join(errors) or "Nothing on the indexers fits yet.", "releases": len(releases)}), 404
+        if errors:
+            return jsonify({"error": " ".join(errors)}), 502
+        return jsonify({"found": False, "message": "Nothing yet. It'll be looked for again.", "releases": len(releases)})
     try:
         download = pipeline.grab(kind, item, best)
     except clients.ClientError as e:
@@ -230,7 +255,7 @@ def grab_wanted(kind, item_id):
 
     saved = cache.get(f"releases:{data.get('token')}")
     if not saved or saved["kind"] != kind or saved["item_id"] != item.id:
-        return jsonify({"error": "That list is out of date; search again."}), 410
+        return jsonify({"error": "These results have expired. Search again."}), 410
     try:
         release = indexers.Release(**saved["releases"][int(data.get("index", -1))])
     except (IndexError, ValueError, TypeError):
@@ -250,7 +275,21 @@ def grab_wanted(kind, item_id):
 def activity():
     active = Download.query.filter(Download.status.in_(DL_ACTIVE)).order_by(Download.created_at.desc()).all()
     history = Download.query.filter(~Download.status.in_(DL_ACTIVE)).order_by(Download.updated_at.desc()).limit(100).all()
-    return jsonify({"active": [download_json(d) for d in active], "history": [download_json(d) for d in history], "worker": jobs.status()})
+    # Failures that still need you: the last try for something still wanted.
+    latest = {}
+    for d in Download.query.order_by(Download.created_at.desc()):
+        latest.setdefault((d.kind, d.issue_id or d.book_request_id), d.id)
+    attention = [d for d in history if d.status == DL_FAILED and d.item is not None and d.item.status == WANTED and d.error != "Cancelled." and latest.get((d.kind, d.issue_id or d.book_request_id)) == d.id]
+    history = [d for d in history if d not in attention]
+    worker = jobs.status()
+    failed_jobs = [job for job in jobs.JOBS if worker.get(job) and not worker[job].get("ok", True)]
+    return jsonify({
+        "active": [download_json(d) for d in active],
+        "attention": [download_json(d) for d in attention],
+        "history": [download_json(d) for d in history],
+        "clients": list((worker.get("clients") or {}).values()),
+        "paused": not worker.get("alive") or bool(failed_jobs),
+    })
 
 
 @downloads_blueprint.post("/api/jobs/<job>")
@@ -276,10 +315,10 @@ def retry_download(download_id):
     """Block this release and look for another."""
     download = db.session.get(Download, download_id) or abort(404)
     if download.item is None:
-        return jsonify({"error": "What it was for is gone."}), 404
+        return jsonify({"error": "That isn't wanted any more."}), 404
     grabbed = pipeline.retry(download)
     if grabbed is None:
-        return jsonify({"error": "Nothing else fits yet; it stays wanted."}), 404
+        return jsonify({"found": False, "message": "Nothing else yet. It'll be looked for again."})
     return jsonify(download_json(grabbed))
 
 
@@ -305,9 +344,16 @@ def import_list():
     folder = comic_files.import_dir()
     os.makedirs(folder, exist_ok=True)
     rows = []
+    series_names = {s.id: s.display_name for s in ComicSeries.query}
     for path in comic_files.comic_files(folder):
         match = comic_files.match_file(path)
+        # The closest followed series, to start the picker on.
+        guess = match.series.id if match.series else None
+        if guess is None and match.parsed.series:
+            close = difflib.get_close_matches(match.parsed.series.lower(), {n.lower(): i for i, n in series_names.items()}, n=1, cutoff=0.6)
+            guess = next((i for i, n in series_names.items() if close and n.lower() == close[0]), None)
         rows.append({
+            "guess": guess,
             "path": os.path.relpath(path, folder),
             "size": os.path.getsize(path),
             "parsed": {"series": match.parsed.series, "number": match.parsed.number, "year": match.parsed.year},
