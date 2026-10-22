@@ -9,6 +9,12 @@
 .settings-group__for { text-transform: none; letter-spacing: 0; font-weight: 400; }
 .settings .section { scroll-margin-top: var(--space-4); }
 
+/* The same small capitals as Downloads' sub-heads, and the same text size
+   as its rows (phones keep 16px fields so iOS doesn't zoom). */
+.settings .meta-label { font-size: 0.75rem; letter-spacing: 0.1em; }
+.settings .meta-checkbox-field .meta-label { font-size: var(--text-sm); font-weight: 400; letter-spacing: 0; color: var(--color-text-secondary); }
+@media (min-width: 641px) { .settings .meta-input { font-size: var(--text-sm); } }
+
 /* Fields, one under another; a pair side by side where there's room. */
 .field-stack { display: flex; flex-direction: column; gap: var(--space-4); }
 .field-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
@@ -37,7 +43,7 @@ select.meta-input { padding-right: var(--space-5); }
 .client summary::-webkit-details-marker, .indexer__summary::-webkit-details-marker { display: none; }
 .client summary::before, .indexer__summary::before { content: "▸"; color: var(--color-text-muted); transition: transform var(--dur-fast) ease; }
 .client[open] summary::before, .indexer details[open] .indexer__summary::before { transform: rotate(90deg); }
-.client__name, .indexer__name { font-weight: 600; }
+.client__name, .indexer__name { font-size: var(--text-base); font-weight: 500; }
 .client__state, .indexer__meta { color: var(--color-text-muted); font-size: var(--text-sm); word-break: break-all; }
 .client.is-set .client__state { color: var(--color-success); }
 .client .field-stack, .indexer .field-stack { padding: 0 0 var(--space-5) 1.1em; }

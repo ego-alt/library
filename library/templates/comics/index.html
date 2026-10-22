@@ -3,13 +3,15 @@
 {% block page_title %}Comics{% endblock %}
 {% block page %}series{% endblock %}
 {% block content %}
-{% if cards %}
+{% if cards or is_admin %}
 <div class="library-toolbar">
     <div class="library-search">
         <i class="fas fa-magnifying-glass" aria-hidden="true"></i>
         <input type="search" id="librarySearch" class="library-search__input" placeholder="Search series" aria-label="Search series" autocomplete="off" enterkeyhint="search">
     </div>
 </div>
+{% endif %}
+{% if cards %}
 <div class="row library" id="library">
     {% for card in cards %}
     {% set s = card.series %}
@@ -33,11 +35,10 @@
     <p></p>
 </div>
 {% elif is_admin %}
-<div class="empty-state">
+<div class="empty-state" id="emptyState">
     <h3>No series yet</h3>
-    <p>Follow a series to see its issues, get new ones as they come out, and read them here.</p>
-    <a class="btn btn-primary" href="{{ url_for('downloads.get_page') }}">Find a series</a>
-    <p class="mt-3"><a href="{{ url_for('downloads.downloads_page') }}#import">Or import files you already have</a></p>
+    <p>Search above for a series to follow: its issues come as they're out, and you read them here.</p>
+    <p><a href="{{ url_for('downloads.downloads_page') }}#import">Or add comic files you already have</a></p>
 </div>
 {% else %}
 <div class="empty-state">
@@ -45,4 +46,11 @@
     <p>Comics show up here as soon as there are some to read.</p>
 </div>
 {% endif %}
+{% endblock %}
+{% block scripts %}
+    {{ super() }}
+    {% if is_admin %}
+    <script src="{{ url_for('static', filename='js/get.js') }}"></script>
+    <script>attachShelfGet({kind: 'comics', input: document.getElementById('librarySearch'), after: document.getElementById('emptyState')});</script>
+    {% endif %}
 {% endblock %}

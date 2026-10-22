@@ -1,7 +1,7 @@
 """Get and Downloads, for admins: one place to ask for books and comics, and
 one place to follow everything on its way into the library.
 
-  /get                 search Open Library and ComicVine/Metron together
+  /get                 (old) now under the shelves' search
   /downloads           in progress, wanted, import, coming up, history, jobs
   /api/downloads/...   the queue; /api/wanted/<kind>/<id>/... searches and
                        grabs for a comic issue or a book request alike
@@ -87,9 +87,9 @@ def _wanted_item(kind: str, item_id: int):
 @downloads_blueprint.get("/get")
 @login_required
 def get_page():
-    if not is_admin():
-        return redirect(url_for("index_routes.index"))
-    return render_template("get.html", query=request.args.get("q", ""), providers_ready=bool(providers.available()))
+    """Getting lives under the shelves' search now; old links land there."""
+    query = request.args.get("q", "")
+    return redirect(url_for("index_routes.index", q=query) if query and is_admin() else url_for("index_routes.index"))
 
 
 @downloads_blueprint.get("/downloads")

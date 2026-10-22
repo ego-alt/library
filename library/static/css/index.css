@@ -111,6 +111,14 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 }
 .bar-menu__panel > button:hover, .bar-menu__panel > a:hover, .bar-menu__panel > [aria-current="page"] { background: var(--color-highlight-soft); }
 .bar-menu__panel i { width: 1.1em; text-align: center; color: var(--color-text-muted); }
+.bar-menu__panel .count { margin-left: auto; }
+/* The bar's icons: night mode and the menu, quiet until hovered. */
+.bar-icon { position: relative; color: var(--color-text-muted); }
+.bar-icon:hover { color: var(--color-text-primary); }
+/* Something is downloading. */
+.bar-icon__dot { position: absolute; top: 9px; right: 9px; width: 7px; height: 7px; border-radius: 50%; background: var(--color-accent); }
+/* Downloads or Settings, named after the shelves while you're there. */
+.shelf-nav__here { color: var(--color-text-primary); font-size: 1.0625rem; font-weight: 500; border-bottom: 1px solid var(--color-accent); }
 
 /* Where you are: the shelves, then Get and Downloads for admins. */
 .shelf-nav {
@@ -1453,6 +1461,27 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     .library-toolbar .status-filter button { flex: 1; min-height: 44px; }
     .library-toolbar { margin-bottom: 28px; }
 }
+
+/* Under a shelf's search (admins): a quiet offer to look further, then
+   what's out there as covers on the same wall. */
+.shelf-get { margin: 0 0 var(--space-8); }
+.shelf-get[hidden] { display: none; }
+.shelf-get__ask {
+    min-height: 44px;
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--color-text-muted);
+    font: inherit;
+    font-size: var(--text-sm);
+    cursor: pointer;
+}
+.shelf-get__ask::after { content: " →"; }
+.shelf-get__ask:hover { color: var(--color-accent); }
+.shelf-get__ask[hidden] { display: none; }
+.shelf-get__note { margin: 0 0 var(--space-4); color: var(--color-text-muted); font-size: var(--text-sm); }
+.shelf-get__note:empty { display: none; }
+.shelf-get .is-busy .book { opacity: 0.6; }
 
 .empty-state {
     text-align: center;

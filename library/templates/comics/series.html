@@ -5,8 +5,7 @@
 {% block content %}
 {# Read like a book's details: the cover, the title and its line, one
    button to read; everything to do with getting issues is under ⋯. #}
-<section class="series-head" data-series-id="{{ series.id }}" data-monitor="{{ series.monitor }}" data-provider="{{ series.provider }}"
-         data-source="{% if series.provider == 'comicvine' %}https://comicvine.gamespot.com/volume/4050-{{ series.provider_id }}/{% elif series.provider == 'metron' %}https://metron.cloud/series/{{ series.provider_id }}/{% endif %}">
+<section class="series-head" data-series-id="{{ series.id }}" data-monitor="{{ series.monitor }}" data-provider="{{ series.provider }}">
     <div class="series-head__cover book">
         <span class="cover-blank" aria-hidden="true">{{ series.name }}</span>
         {% if cover %}<img src="{{ cover }}" alt="" referrerpolicy="no-referrer" onload="this.parentNode.classList.add('is-loaded')" onerror="this.remove()">{% endif %}

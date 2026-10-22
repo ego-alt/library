@@ -18,11 +18,17 @@ function bindSearchKey(input) {
 
 function initSeries() {
     const grid = document.getElementById('library');
-    if (!grid) return;
     const search = document.getElementById('librarySearch');
+    // ?q= (from an old Get link) opens on that search.
+    const asked = new URLSearchParams(location.search).get('q');
+    if (search && asked) search.value = asked;
+    bindSearchKey(search);
+    if (!grid) {
+        if (search && asked) search.dispatchEvent(new Event('input'));
+        return;
+    }
     const empty = document.getElementById('emptyState');
     const cards = [...grid.children];
-    bindSearchKey(search);
 
     function apply() {
         const q = search.value.trim().toLowerCase();
@@ -45,9 +51,10 @@ function initSeries() {
         } else if (e.key === 'Escape' && search.value) {
             e.stopPropagation();
             search.value = '';
-            apply();
+            search.dispatchEvent(new Event('input'));
         }
     });
+    if (asked) search.dispatchEvent(new Event('input'));
 }
 
 // --- One series: its issues as covers, each with a ⋯ menu (read, mark read,
@@ -56,7 +63,7 @@ function initSeries() {
 // waiting on in its caption. ---
 
 const MISSING_STATE = {wanted: 'Wanted', snatched: 'Downloading', skipped: 'Skipped'};
-const MONITOR_LABELS = [['future', 'Get new issues'], ['all', 'Get all missing issues'], ['none', 'Get none (I’ll choose)']];
+const MONITOR_LABELS = [['future', 'New issues as they come out', 'new ones'], ['all', 'Every missing issue', 'all missing'], ['none', 'Only the ones I choose', 'the ones I choose']];
 
 // Mark an issue read (its last page) or unread (back to the start).
 async function setRead(issue, read) {
@@ -271,7 +278,7 @@ function initSeriesDetail() {
             const page = await fetch(location.href).then(r => r.text());
             const fresh = JSON.parse(new DOMParser().parseFromString(page, 'text/html').getElementById('issuesData').textContent);
             fresh.forEach(f => { const issue = issues.get(String(f.id)); if (issue) { Object.assign(issue, f); showStatus(issue); } });
-            showToast(value === 'none' ? 'Getting no issues on its own' : `Getting ${value === 'all' ? 'all missing issues' : 'new issues'}${data.wanted ? ` · ${data.wanted} wanted` : ''}`, 'success');
+            showToast(value === 'none' ? 'Only getting the issues you choose' : `Getting ${value === 'all' ? 'every missing issue' : 'new issues as they come out'}${data.wanted ? ` · ${data.wanted} wanted` : ''}`, 'success');
         } catch (e) { showToast(e.message, 'error'); }
     }
 
@@ -280,17 +287,6 @@ function initSeriesDetail() {
             const data = await comicsApi(`/series/${seriesId}/refresh`, {method: 'POST'});
             if (data.added) window.location.reload();
             else showToast('Up to date');
-        } catch (err) { showToast(err.message, 'error'); }
-    }
-
-    async function findWanted() {
-        showToast('Looking for wanted issues…');
-        try {
-            const data = await comicsApi(`/series/${seriesId}/search`, {method: 'POST'});
-            if (data.error) showToast(data.grabbed ? `Found ${data.grabbed}, but ${data.error}` : data.error, 'error');
-            else if (data.grabbed) showToast(`Downloading ${data.grabbed} issue${data.grabbed === 1 ? '' : 's'}`, 'success');
-            else showToast('Nothing new yet');
-            if (data.grabbed) setTimeout(() => window.location.reload(), 1200);
         } catch (err) { showToast(err.message, 'error'); }
     }
 
@@ -313,12 +309,10 @@ function initSeriesDetail() {
         if (!button) return;
         if (button.dataset.action === 'refresh') return refresh();
         const local = head.dataset.provider === 'local';
+        const monitor = MONITOR_LABELS.find(([value]) => value === head.dataset.monitor);
         openMenu(button, [
-            ...(local ? [] : MONITOR_LABELS.map(([value, label]) => ({label, checked: head.dataset.monitor === value, onClick: () => setMonitor(value)}))),
+            local ? null : {label: `Which issues to get: ${monitor ? monitor[2] : 'new ones'}…`, onClick: () => openMenu(button, MONITOR_LABELS.map(([value, label]) => ({label, checked: head.dataset.monitor === value, onClick: () => setMonitor(value)})))},
             wall ? {label: 'Choose issues…', onClick: startSelect} : null,
-            local ? null : {label: 'Find wanted issues now', onClick: findWanted},
-            local ? null : {label: 'Refresh details', onClick: refresh},
-            head.dataset.source ? {label: `Open on ${head.dataset.provider === 'metron' ? 'Metron' : 'ComicVine'}`, href: head.dataset.source, external: true} : null,
             {label: 'Stop following…', danger: true, onClick: () => stopFollowing(button)},
         ]);
     });

@@ -64,7 +64,7 @@ def test_every_page_renders(admin_client, saga, tmp_path, comic_dir):
     from library.comics import files
 
     files.import_file(str(make_cbz(tmp_path / "Saga 001.cbz")), issue)
-    for path in ["/comics/", "/get?q=saga", f"/comics/series/{saga.id}", "/downloads", "/settings", f"/comics/read/{issue.id}"]:
+    for path in ["/comics/", "/?q=saga", f"/comics/series/{saga.id}", "/downloads", "/settings", f"/comics/read/{issue.id}"]:
         response = admin_client.get(path)
         assert response.status_code == 200, path
     assert b"Saga" in admin_client.get("/comics/").data
@@ -74,8 +74,17 @@ def test_every_page_renders(admin_client, saga, tmp_path, comic_dir):
 
 def test_empty_comics_page_says_what_to_do(admin_client, comic_dir):
     page = admin_client.get("/comics/").data.decode()
-    assert "No series yet" in page and 'href="/get"' in page
-    assert 'href="/settings"' in page and 'href="/downloads"' in page
+    # Getting is under the shelf's search now: the box is there even with nothing on the shelf.
+    assert "No series yet" in page and 'id="librarySearch"' in page and "attachShelfGet" in page
+    assert 'href="/settings"' in page and 'href="/downloads"' in page and 'href="/get"' not in page
+
+
+def test_old_get_links_land_on_the_shelf(admin_client, comic_dir):
+    assert admin_client.get("/get?q=dune").location.endswith("/?q=dune")
+
+
+def test_old_get_links_send_readers_home(standard_client, comic_dir):
+    assert standard_client.get("/get?q=dune").location.endswith("/")
 
 
 def _series_with_one_file(comic_dir, tmp_path):

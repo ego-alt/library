@@ -1,6 +1,6 @@
-// Get and Downloads: asking for books and comics, and following everything
-// on its way into the library. Also the release chooser the comics series
-// page uses. Helpers are in ui.js.
+// Downloads: following everything on its way into the library. Also the
+// release chooser the comics series page uses. Asking for books and
+// following series is under the shelves' search (get.js). Helpers are in ui.js.
 (() => {
 
 // --- Choosing a release by hand, for a book request or a comic issue ----------
@@ -58,171 +58,6 @@ async function pickRelease({kind, id, label, onGrab}) {
 }
 
 window.pickRelease = pickRelease;
-
-// "/" puts you in the search box, as on the books shelf.
-function bindSearchKey(input) {
-    document.addEventListener('keydown', (e) => {
-        if (e.key !== '/' || e.metaKey || e.ctrlKey || e.altKey) return;
-        if (e.target.closest && e.target.closest('input, textarea, select, [contenteditable]')) return;
-        e.preventDefault();
-        input.focus();
-    });
-}
-
-// --- Get: one search for books and comics -----------------------------------
-// Results are covers like the shelves: what each is to you (in the library,
-// asked for, following) is in its caption, and the cover is the action.
-
-const BOOK_STATE = {have: 'In your library', downloaded: 'In your library', wanted: 'Asked for', snatched: 'Downloading'};
-const PHONE = window.matchMedia('(max-width: 640px)');
-const PHONE_SHOWS = 6;
-
-function initGet() {
-    const form = document.getElementById('getForm');
-    const input = document.getElementById('getQuery');
-    const sections = {books: document.getElementById('bookResults'), comics: document.getElementById('comicResults')};
-    const show = form.querySelector('[aria-label="Show"]');
-    let shown = 'all';
-    let generation = 0;
-    bindSearchKey(input);
-
-    function setShown(value) {
-        shown = value;
-        setRadio(show, show.querySelector(`[data-show="${value}"]`));
-        applyShow();
-    }
-
-    // Under All on a phone, the first few of each, so comics aren't ten
-    // screens down; the section's name (or "All 20 books") shows the rest.
-    function applyShow() {
-        for (const [kind, section] of Object.entries(sections)) {
-            const results = section.querySelector('.get-results');
-            const cards = [...results.children];
-            section.hidden = (shown !== 'all' && shown !== kind) || !(cards.length || section.querySelector('.get-note').textContent);
-            const cap = shown === 'all' && PHONE.matches && !results.dataset.loading;
-            cards.forEach((card, i) => { card.hidden = cap && i >= PHONE_SHOWS; });
-            const more = section.querySelector('.get-all');
-            more.hidden = !(cap && cards.length > PHONE_SHOWS);
-            more.textContent = `All ${cards.length} ${kind}`;
-        }
-    }
-
-    function skeletons(n) {
-        return Array.from({length: n}, () => h('div', {class: 'col-md-3 mb-3 book-skeleton-wrapper', 'aria-hidden': 'true'}, h('div', {class: 'book-skeleton'})));
-    }
-
-    function setCaption(card, parts) {
-        const line = parts.filter(Boolean).join(' · ');
-        let el = card.querySelector('.book-caption__author');
-        if (!el) card.querySelector('.book-caption').append(el = h('span', {class: 'book-caption__author'}));
-        el.textContent = line;
-    }
-
-    function bookCard(book) {
-        const owned = book.status === 'have' || book.status === 'downloaded';
-        const asked = BOOK_STATE[book.status] && !owned;
-        const card = coverCard({
-            href: owned && book.href ? book.href : '#',
-            label: owned ? `Read ${book.title}` : (asked ? `${book.title}, ${BOOK_STATE[book.status].toLowerCase()}` : `Ask for ${book.title}`),
-            title: book.title,
-            meta: [book.author, BOOK_STATE[book.status] || book.year],
-            cover: book.cover_url,
-            imgAttrs: {referrerpolicy: 'no-referrer'},
-        });
-        if (owned && book.href) return card;
-        card.querySelector('.book > a').addEventListener('click', async (e) => {
-            e.preventDefault();
-            if (BOOK_STATE[book.status] || card.classList.contains('is-busy')) return;
-            card.classList.add('is-busy');
-            try {
-                const data = await apiFetch('/api/get/books', {method: 'POST', body: book});
-                book.status = data.status;
-                book.request_id = data.id;
-                setCaption(card, [book.author, BOOK_STATE[data.status] || 'Asked for']);
-                showToast(`Asked for ${book.title}`, 'success', data.created ? {label: 'Undo', onClick: () => undoAsk(book, card)} : null);
-            } catch (err) {
-                showToast(err.message, 'error');
-            }
-            card.classList.remove('is-busy');
-        });
-        return card;
-    }
-
-    async function undoAsk(book, card) {
-        try {
-            await apiFetch(`/api/book-requests/${book.request_id}`, {method: 'DELETE'});
-            book.status = null;
-            setCaption(card, [book.author, book.year]);
-        } catch (err) { showToast(err.message, 'error'); }
-    }
-
-    function comicCard(row) {
-        const followed = Boolean(row.followed_id);
-        const card = coverCard({
-            href: followed ? appUrl(`/comics/series/${row.followed_id}`) : '#',
-            label: followed ? `${row.name}, following` : `Follow ${row.name}`,
-            title: row.name,
-            meta: [row.start_year, row.publisher, followed ? 'Following' : (row.issue_count ? `${row.issue_count} issues` : null)],
-            cover: row.cover_url,
-            imgAttrs: {referrerpolicy: 'no-referrer'},
-        });
-        if (!followed) card.querySelector('.book > a').addEventListener('click', async (e) => {
-            e.preventDefault();
-            if (card.classList.contains('is-busy')) return;
-            card.classList.add('is-busy');
-            try {
-                // New issues to start with; the series page's ⋯ changes it.
-                const data = await apiFetch('/comics/api/series', {method: 'POST', body: {provider: row.provider, provider_id: row.provider_id, monitor: 'future'}});
-                window.location = data.url;
-            } catch (err) {
-                showToast(err.message, 'error');
-                card.classList.remove('is-busy');
-            }
-        });
-        return card;
-    }
-
-    async function fill(kind, q, mine, make, emptyNote) {
-        const section = sections[kind];
-        const results = section.querySelector('.get-results');
-        results.dataset.loading = '1';
-        results.replaceChildren(...skeletons(PHONE.matches ? 4 : 6));
-        section.querySelector('.get-note').textContent = '';
-        section.querySelector('[data-count]').textContent = '';
-        section.hidden = shown !== 'all' && shown !== kind;
-        let data;
-        try {
-            data = await apiFetch(`/api/get/search/${kind}?q=${encodeURIComponent(q)}`);
-        } catch (e) {
-            data = {results: [], error: e.message};
-        }
-        if (mine !== generation) return;  // a newer search has started
-        delete results.dataset.loading;
-        results.replaceChildren(...data.results.map(make));
-        section.querySelector('.get-note').textContent = data.error || (data.results.length ? '' : emptyNote);
-        section.querySelector('[data-count]').textContent = data.results.length || '';
-        applyShow();
-    }
-
-    function search() {
-        const q = input.value.trim();
-        if (!q) return;
-        const mine = ++generation;
-        history.replaceState(null, '', `?q=${encodeURIComponent(q)}`);
-        // Each source fills its section as soon as it answers.
-        fill('books', q, mine, bookCard, 'No books by that name on Open Library.');
-        fill('comics', q, mine, comicCard, 'No comic series by that name.');
-    }
-
-    show.addEventListener('click', (e) => {
-        const button = e.target.closest('[data-show]');
-        if (button) setShown(button.dataset.show);
-    });
-    document.querySelectorAll('.section__link, .get-all').forEach(b => b.addEventListener('click', () => { setShown(b.dataset.show); window.scrollTo({top: 0, behavior: 'smooth'}); }));
-    PHONE.addEventListener?.('change', applyShow);
-    form.addEventListener('submit', (e) => { e.preventDefault(); input.blur(); search(); });
-    if (input.value.trim()) search();
-}
 
 // --- Downloads ---------------------------------------------------------------
 
@@ -507,7 +342,7 @@ function initImport() {
 }
 
 
-const DOWNLOAD_PAGES = {get: initGet, downloads: initDownloads};
+const DOWNLOAD_PAGES = {downloads: initDownloads};
 document.addEventListener('DOMContentLoaded', () => {
     const init = DOWNLOAD_PAGES[document.body.dataset.page];
     if (init) init();

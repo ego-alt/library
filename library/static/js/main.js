@@ -12,7 +12,8 @@ function normalizeView(v) { return v === 'mine' ? 'reading' : (VIEWS.includes(v)
 let currentView = normalizeView(window.initialView);
 // Layout state — 'grid' (cover cards) or 'shelf' (cover-slice spines on a wooden shelf).
 // Server always renders grid; JS swaps to shelf on load if that's the stored preference.
-let currentLayout = localStorage.getItem('libraryLayout') === 'shelf' ? 'shelf' : 'grid';
+// The bookshelf view is set aside for now: always the wall of covers.
+let currentLayout = 'grid';
 // Mirror of every book currently displayed, in insertion order. Seeded from the
 // server-rendered HTML and appended to by loadMoreImages, so toggling layouts
 // can re-render without re-fetching.
@@ -390,6 +391,14 @@ function restoreReturnState() {
 }
 
 $(function() {
+    // ?q= (from an old Get link, or a shared one) opens on that search.
+    const asked = new URLSearchParams(location.search).get('q');
+    if (asked) {
+        $('#librarySearch').val(asked);
+        applyFilters();
+        document.getElementById('librarySearch').dispatchEvent(new Event('input'));
+        return;
+    }
     if (restoreReturnState()) return;
     updateViewUI();
 

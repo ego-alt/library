@@ -64,7 +64,7 @@
     </ol>
     {% endif %}
     {% else %}
-    <p class="section__hint">Nothing wanted. <a href="{{ url_for('downloads.get_page') }}">Get</a> a book or follow a comic series, and it waits here until it's in the library.</p>
+    <p class="section__hint">Nothing wanted. Search the <a href="{{ url_for('index_routes.index') }}">books</a> or <a href="{{ url_for('comics.index') }}">comics</a> for something you don't have yet, and it waits here until it's in the library.</p>
     {% endif %}
 </section>
 
