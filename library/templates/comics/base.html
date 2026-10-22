@@ -15,7 +15,11 @@
     <div class="container">
         {% block content %}{% endblock %}
     </div>
+    <div class="offline-banner" id="offlineBanner" role="status" hidden>
+        You're offline. Saved issues still open.
+    </div>
 {% endblock %}
 {% block scripts %}
     <script src="{{ url_for('static', filename='js/comics.js') }}"></script>
 {% endblock %}
+{% block offline %}<script src="{{ url_for('static', filename='js/pwa.js') }}"></script>{% endblock %}

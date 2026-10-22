@@ -1,6 +1,7 @@
 // Registers the service worker (see sw.js) and handles being offline:
-// a banner on the library page, and books that aren't saved for offline
-// reading are dimmed and explain themselves instead of opening a dead page.
+// a banner on the shelves, and books and comic issues that aren't saved for
+// offline reading are dimmed and explain themselves instead of opening a
+// dead page.
 
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
@@ -41,14 +42,34 @@ async function checkConnection() {
     }
 }
 
+// Comic issues whose pages are all in the offline cache (comic_reader.js
+// marks an issue once it has every page).
+async function offlineIssueIds() {
+    if (!('caches' in window)) return new Set();
+    const cache = await caches.open('comics-v1');
+    const marker = new RegExp(`^${appUrl('/comics/issue/')}(\\d+)/saved$`);
+    return new Set((await cache.keys())
+        .map((req) => new URL(req.url).pathname.match(marker))
+        .filter(Boolean)
+        .map((m) => m[1]));
+}
+
+const COMIC_READ_PATH = appUrl('/comics/read/');
+function comicLinkIssue(link) {
+    const path = new URL(link.href, location.href).pathname;
+    return path.startsWith(COMIC_READ_PATH) ? path.slice(COMIC_READ_PATH.length) : null;
+}
+
 async function markOfflineAvailability() {
     const offline = isOffline;
     const saved = offline ? await offlineBookFilenames() : null;
+    const issues = offline ? await offlineIssueIds() : null;
     document.querySelectorAll('a[href*="/read/"]').forEach((link) => {
         const filename = readLinkFilename(link);
-        if (!filename) return;
+        const issue = filename ? null : comicLinkIssue(link);
+        if (!filename && !issue) return;
         const card = link.closest('.col-md-3, .shelf-slot') || link;
-        card.classList.toggle('is-unavailable', offline && !saved.has(filename));
+        card.classList.toggle('is-unavailable', offline && !(filename ? saved.has(filename) : issues.has(issue)));
     });
 }
 
@@ -81,6 +102,7 @@ document.addEventListener('click', (e) => {
     if (!card) return;
     e.preventDefault();
     if (typeof showToast === 'function') {
-        showToast("This book isn't saved on this device yet. Open it once while online to read it offline.");
+        const what = comicLinkIssue(link) ? 'issue' : 'book';
+        showToast(`This ${what} isn't saved on this device yet. Open it once while online to read it offline.`);
     }
 }, true);

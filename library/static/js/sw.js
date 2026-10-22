@@ -13,15 +13,29 @@
 // Served from the app root (see routes/pwa.py), so the scope is the whole
 // mount: "/" standalone, "/library/" behind the dashboard proxy.
 
-const SHELL_CACHE = 'shell-v26';
+const SHELL_CACHE = 'shell-v27';
 const BOOKS_CACHE = 'books-v1';
 const COVERS_CACHE = 'covers-v1';
+const COMICS_CACHE = 'comics-v1';
 const MAX_BOOKS = 12;
+const MAX_ISSUES = 12;   // comic issues kept offline, like books
 const MAX_COVERS = 400;
 const ROOT = new URL(self.registration.scope).pathname;  // always ends in "/"
 
-// Never cached: auth, file downloads, comics (pages are big and change), and the worker itself.
-const PASSTHROUGH = ['auth/', 'download/', 'comics/', 'sw.js', 'healthz'];
+// Never cached: auth, file downloads, the JSON APIs that change things, and the worker itself.
+const PASSTHROUGH = ['auth/', 'download/', 'comics/api/', 'api/', 'sw.js', 'healthz'];
+// Pages that need the server (searching, downloading, settings).
+const ONLINE_ONLY = ['get', 'downloads', 'settings'];
+// The look of every page, cached at install so the first offline launch
+// isn't unstyled.
+const SHELL_ASSETS = [
+    'static/css/base.css', 'static/css/structural.css', 'static/css/tokens.css', 'static/css/index.css',
+    'static/css/comics.css', 'static/css/manage.css', 'static/css/reader.css', 'static/css/comic_reader.css',
+    'static/js/app_root.js', 'static/js/signed_out.js', 'static/js/darkmode.js', 'static/js/ui.js', 'static/js/main.js',
+    'static/js/pwa.js', 'static/js/comics.js', 'static/js/reader.js', 'static/js/read_aloud.js', 'static/js/comic_reader.js',
+    'static/vendor/jquery-3.6.0.min.js', 'static/fonts/inter/inter.css', 'static/fonts/inter/inter-latin.woff2',
+    'static/vendor/fontawesome-6.0.0-subset/icons.css', 'static/vendor/fontawesome-6.0.0-subset/fa-solid-900.woff2',
+];
 // JSON the library and reader read; cached so the last view works offline.
 const JSON_ROUTES = ['load_more/', 'book_metadata/', 'tags', 'bookmark/'];
 
@@ -29,7 +43,7 @@ self.addEventListener('install', (event) => {
     // Warm the shell so the library opens offline even before a second visit.
     event.waitUntil(
         caches.open(SHELL_CACHE).then((cache) =>
-            Promise.all([ROOT, `${ROOT}manifest.webmanifest`].map((url) =>
+            Promise.all([ROOT, `${ROOT}manifest.webmanifest`, ...SHELL_ASSETS.map((a) => ROOT + a)].map((url) =>
                 cache.add(url).catch(() => {})
             ))
         ).then(() => self.skipWaiting())
@@ -39,7 +53,7 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
     event.waitUntil(
         caches.keys().then((keys) => Promise.all(
-            keys.filter((k) => ![SHELL_CACHE, BOOKS_CACHE, COVERS_CACHE].includes(k))
+            keys.filter((k) => ![SHELL_CACHE, BOOKS_CACHE, COVERS_CACHE, COMICS_CACHE].includes(k))
                 .map((k) => caches.delete(k))
         )).then(() => self.clients.claim())
     );
@@ -56,11 +70,24 @@ self.addEventListener('fetch', (event) => {
     if (PASSTHROUGH.some((p) => path.startsWith(p))) return;
 
     if (request.mode === 'navigate') {
-        // A book page that was never opened here can't work offline; say so
-        // rather than falling back to the library.
-        event.respondWith(path.startsWith('read/')
-            ? networkFirst(request, SHELL_CACHE).catch(() => offlineBookPage())
-            : networkFirst(request, SHELL_CACHE, ROOT));
+        // A book or issue that was never opened here can't work offline, and
+        // Get, Downloads and Settings need the server: say so rather than
+        // falling back to the library.
+        if (path.startsWith('read/')) {
+            event.respondWith(networkFirst(request, SHELL_CACHE).catch(() => offlinePage("This book isn't saved on this device yet.<br>Open it once while online to read it offline.")));
+        } else if (path.startsWith('comics/read/')) {
+            event.respondWith(networkFirst(request, SHELL_CACHE).catch(() => offlinePage("This issue isn't saved on this device yet.<br>Open it once while online to read it offline.")));
+        } else if (ONLINE_ONLY.includes(path.split(/[/?]/)[0])) {
+            event.respondWith(fetch(request).catch(() => offlinePage("You're offline.<br>Get, Downloads and Settings need a connection.")));
+        } else {
+            event.respondWith(networkFirst(request, SHELL_CACHE, path.startsWith('comics/') ? `${ROOT}comics/` : ROOT));
+        }
+    } else if (/^comics\/issue\/\d+\/page\//.test(path)) {
+        event.respondWith(comicPage(request, url, path));
+    } else if (/^comics\/issue\/\d+\/cover/.test(path)) {
+        event.respondWith(cover(request, url));
+    } else if (path.startsWith('comics/issue/')) {
+        return;  // downloads
     } else if (path.startsWith('load_book/')) {
         event.respondWith(bookData(request, url));
     } else if (path.startsWith('book_asset/')) {
@@ -90,10 +117,10 @@ async function networkFirst(request, cacheName, fallbackUrl) {
     }
 }
 
-function offlineBookPage() {
+function offlinePage(message) {
     const html = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Not saved offline</title>
+<title>Offline · Shelves</title>
 <style>
   :root { color-scheme: light dark; }
   body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px;
@@ -102,7 +129,7 @@ function offlineBookPage() {
   @media (prefers-color-scheme: dark) { body { background: #141210; color: #eadfca; } }
   a { color: inherit; }
 </style></head><body><main>
-<p>This book isn't saved on this device yet.<br>Open it once while online to read it offline.</p>
+<p>${message}</p>
 <p><a href="${ROOT}">Back to library</a></p>
 </main></body></html>`;
     return new Response(html, {status: 503, headers: {'Content-Type': 'text/html; charset=utf-8'}});
@@ -215,4 +242,40 @@ async function storeBook(cache, request, url, response) {
     await cache.put(OPENED_KEY, new Response(JSON.stringify(opened), {
         headers: {'Content-Type': 'application/json'},
     }));
+}
+
+// Comic pages: cache-first by versioned URL (?v= the file's size). The last
+// MAX_ISSUES issues opened stay; older ones go, pages and all.
+const ISSUES_KEY = `${ROOT}__issues.json`;
+
+async function comicPage(request, url, path) {
+    const cache = await caches.open(COMICS_CACHE);
+    const cached = await cache.match(request);
+    if (cached) return cached;
+    const response = await fetch(request);
+    if (response.ok && url.searchParams.has('v')) {
+        await cache.put(request, response.clone());
+        await rememberIssue(cache, path.split('/')[2]);
+    }
+    return response;
+}
+
+async function rememberIssue(cache, issue) {
+    const res = await cache.match(ISSUES_KEY);
+    let opened = {};
+    try { opened = res ? await res.json() : {}; } catch { opened = {}; }
+    const fresh = !(issue in opened);
+    opened[issue] = Date.now();
+    if (fresh) {
+        const ids = Object.keys(opened).sort((a, b) => opened[a] - opened[b]);
+        const drop = ids.slice(0, Math.max(0, ids.length - MAX_ISSUES));
+        if (drop.length) {
+            const keys = await cache.keys();
+            for (const id of drop) {
+                delete opened[id];
+                await Promise.all(keys.filter((k) => new URL(k.url).pathname.startsWith(`${ROOT}comics/issue/${id}/`)).map((k) => cache.delete(k)));
+            }
+        }
+    }
+    await cache.put(ISSUES_KEY, new Response(JSON.stringify(opened), {headers: {'Content-Type': 'application/json'}}));
 }
