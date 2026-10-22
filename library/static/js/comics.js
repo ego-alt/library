@@ -218,14 +218,14 @@ function initSeriesDetail() {
         upload.value = '';
     });
 
-    // All / Have / Missing.
+    // All / Have.
     const filter = document.querySelector('[aria-label="Show issues"]');
     if (filter) filter.addEventListener('click', (e) => {
         const button = e.target.closest('[data-filter]');
         if (!button) return;
         setRadio(filter, button);
         const show = button.dataset.filter;
-        wall.querySelectorAll('[data-issue-id]').forEach(el => { el.hidden = show !== 'all' && (el.dataset.have === '1') !== (show === 'have'); });
+        wall.querySelectorAll('[data-issue-id]').forEach(el => { el.hidden = show === 'have' && el.dataset.have !== '1'; });
     });
 
     // Select (from ⋯), then Want or Skip.
