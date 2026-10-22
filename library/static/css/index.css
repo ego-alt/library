@@ -82,7 +82,7 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 .bar-icon__dot { position: absolute; top: 9px; right: 9px; width: 7px; height: 7px; border-radius: 50%; background: var(--color-accent); }
 
 /* The two shelves, in the bar beside night mode and the menu. */
-.lib-bar { margin-bottom: 12px; }
+.lib-bar { margin-bottom: 0; }  /* the page sets its own top (--page-top) */
 .shelf-nav {
     display: flex;
     align-items: baseline;
@@ -134,7 +134,6 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     .lib-bar__title { letter-spacing: 0.22em; font-size: 1rem; }
     .shelf-nav { gap: 16px; }
     .shelf-nav a { font-size: 1rem; }
-    .lib-bar { margin-bottom: 0; }
 }
 /* The hang: covers at book proportions (2:3, so nothing important is
    cropped), five across on a laptop, equally spaced, stepping down to 4, 3
@@ -894,12 +893,17 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
    Library toolbar — one search box + reading-status control, as
    hairlines and underlines rather than boxes and pills
    ============================================================ */
+/* One rhythm for every page: the first thing you see sits --page-top under
+   the bar (where the search box's text sits), and the header (search and
+   filters, or a series' header) is --head-gap above the first covers. */
+:root { --page-top: 12px; --head-gap: 40px; }
+@media (max-width: 640px) { :root { --head-gap: 28px; } }
 .library-toolbar {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: var(--space-3);
-    margin: 0 0 40px;
+    margin: 0 0 var(--head-gap);
 }
 /* The search box and, at its end, + to add files to this shelf. */
 .library-search-row { display: flex; align-items: center; gap: var(--space-2); flex: 1 1 300px; max-width: 476px; }
@@ -983,7 +987,7 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     .library-search-row { max-width: none; flex-basis: 100%; }
     .library .status-filter, .library-toolbar .status-filter { width: 100%; }
     .library-toolbar .status-filter button { flex: 1; min-height: 44px; }
-    .library-toolbar { margin-bottom: 28px; }
+
 }
 
 /* Under a shelf's search (admins): a quiet offer to look further, then

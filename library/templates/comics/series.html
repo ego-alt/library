@@ -50,17 +50,17 @@
     {% set next = up_next and issue.id == up_next.id %}
     {% if issue.has_file %}
         {% set state = 'Read' if issue.finished else ((((100 * (issue.page + 1) / issue.pages)|int) ~ '%') if issue.pages else 'Page ' ~ (issue.page + 1)) if started else ('Up next' if next else '') %}
-        {% set meta = [issue.date|comic_date, state] %}
+        {% set meta = [state] %}
         {% set href = url_for('comics.read_page', issue_id=issue.id) %}
         {% set label = ('Continue' if started else 'Read') ~ ' #' ~ issue.number %}
     {% else %}
         {% set state = {'wanted': 'Wanted', 'snatched': 'Downloading', 'skipped': 'Skipped'}.get(issue.status, issue.status) %}
-        {% set meta = ['Out ' ~ (issue.date|comic_date)] if not issue.released else [issue.date|comic_date, state] %}
+        {% set meta = ['Out ' ~ (issue.date|comic_date)] if not issue.released else [state] %}
         {% set href = '#' %}
         {% set label = '#' ~ issue.number ~ ', ' ~ (meta|select|join(', ')) %}
     {% endif %}
     {% set classes = ('is-read ' if issue.finished else '') ~ ('is-next ' if next else '') ~ ('' if issue.has_file else 'is-missing status-' ~ issue.status) %}
-    {% call cover_card(href, label, '#' ~ issue.number ~ (' · ' ~ issue.title if issue.title else ''), meta, issue.cover, {'data-issue-id': issue.id, 'data-have': '1' if issue.has_file else '0'}, {'referrerpolicy': 'no-referrer'}, classes) %}
+    {% call cover_card(href, label, '#' ~ issue.number, meta, issue.cover, {'data-issue-id': issue.id, 'data-have': '1' if issue.has_file else '0'}, {'referrerpolicy': 'no-referrer'}, classes) %}
         {% if is_admin or issue.has_file %}
         <div class="book-buttons">
             <button type="button" class="book-button" data-action="menu" data-menu-anchor aria-label="More for #{{ issue.number }}" title="More"><i class="fas fa-ellipsis-h" aria-hidden="true"></i></button>

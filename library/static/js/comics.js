@@ -86,12 +86,13 @@ function initSeriesDetail() {
 
     function caption(issue) {
         const el = card(issue.id);
-        const meta = el && el.querySelector('.book-caption__author');
-        if (!meta) return;
+        if (!el) return;
+        let meta = el.querySelector('.book-caption__author');
+        if (!meta) el.querySelector('.book-caption').append(meta = h('span', {class: 'book-caption__author'}));
         let state = '';
         if (issue.has_file) state = issue.finished ? 'Read' : (issue.page && issue.pages ? `${Math.floor(100 * (issue.page + 1) / issue.pages)}%` : '');
         else state = issue.released ? (MISSING_STATE[issue.status] || issue.status) : '';
-        meta.textContent = (issue.released || issue.has_file ? [formatDate(issue.date), state] : [`Out ${formatDate(issue.date)}`]).filter(Boolean).join(' · ');
+        meta.textContent = issue.released || issue.has_file ? state : `Out ${formatDate(issue.date)}`;
     }
 
     function showRead(issue) {

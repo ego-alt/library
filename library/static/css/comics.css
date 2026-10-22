@@ -15,7 +15,7 @@
     grid-template-columns: 140px 1fr;
     gap: 28px;
     align-items: start;
-    margin-bottom: 28px;
+    margin: var(--page-top) 0 var(--head-gap);
 }
 .series-head__cover { cursor: default; }
 .series-head__cover img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
@@ -47,9 +47,9 @@
 .series-head__more { width: 44px; height: 44px; border: 1px solid var(--color-border); color: var(--color-text-secondary); }
 @media (max-width: 640px) {
     /* A small cover beside the title; the rest flows under it. */
-    .series-head { display: block; margin-bottom: 20px; }
+    .series-head { display: block; }
     .series-head::after { content: ""; display: table; clear: both; }
-    .series-head__cover { float: left; width: 72px; margin: 2px var(--space-3) var(--space-1) 0; }
+    .series-head__cover { float: left; width: 72px; margin: 0 var(--space-3) var(--space-1) 0; }
     .series-head .meta-title { font-size: var(--text-lg); }
     .series-head__desc { clear: both; padding-top: var(--space-1); }
     .series-head__desc.is-folded { -webkit-line-clamp: 2; }
@@ -99,9 +99,11 @@
 @media (max-width: 991.98px) { .library.row.issue-wall { grid-template-columns: repeat(5, 1fr); } }
 @media (max-width: 767.98px) { .library.row.issue-wall { grid-template-columns: repeat(4, 1fr); gap: 12px 14px; } }
 @media (max-width: 640px)    { .library.row.issue-wall { grid-template-columns: repeat(3, 1fr); gap: 10px 12px; } }
-.issue-wall .book-caption { margin-top: 6px; gap: 0; }
-.issue-wall .book-caption__title { font-size: 0.8125rem; line-height: 1.25; }
-.issue-wall .book-caption__author { font-size: 0.6875rem; letter-spacing: 0.1em; line-height: 1.3; }
+/* The number, then what it's up to (Up next, 50%, Read, Wanted, Out 1 Nov)
+   on the same line. */
+.issue-wall .book-caption { flex-direction: row; align-items: baseline; gap: var(--space-2); margin-top: 6px; }
+.issue-wall .book-caption__title { flex: 0 0 auto; font-size: 0.8125rem; line-height: 1.3; }
+.issue-wall .book-caption__author { min-width: 0; font-size: 0.6875rem; letter-spacing: 0.1em; line-height: 1.3; }
 /* Where you are in the run. */
 .issue-wall .is-next .book { outline: 2px solid var(--color-accent); outline-offset: 3px; }
 .issue-wall > .is-next { content-visibility: visible; }  /* so nothing clips the ring */
