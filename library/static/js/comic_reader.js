@@ -1,44 +1,33 @@
-// The comic reader: the book reader's frame (reader.css) around pages — one
-// page, two side by side, or one long scroll, picked by plain icons in the
-// bar, with Fit and right to left beside them. The bars stay hidden until
-// you reach for them: tap the middle, or bring the pointer to the top edge.
-// Tap or click the left/right third to turn (swapped right to left for
-// manga). `?` lists the keys.
+// The comic reader: one page, two pages side by side, or one long scroll.
+// Tap or click the left/right third to turn (swapped right-to-left for
+// manga), the middle to show or hide the bars. Keys: ←/→, space, Home/End,
+// 1/2/3 for the layout, F for fit, R for right-to-left.
 //
 // Your page is kept on this device as well as sent, so reading offline (or
-// through a failed save) never loses it; a page the server hasn't confirmed
-// is sent again when the connection comes back.
+// through a failed save) never loses it, and once an issue is open its pages
+// are fetched quietly so it reads offline too (sw.js keeps the last few).
 
 (function () {
     const root = document.getElementById('reader');
     const stage = document.getElementById('stage');
-    const bar = document.getElementById('topBar');
-    const bottom = document.getElementById('bottomBar');
     const slider = document.getElementById('pageSlider');
-    const sliderCount = document.getElementById('pageSliderCount');
-    const footCount = document.getElementById('pageCount');
-    const progressLine = document.getElementById('chapter-progress');
+    const countEl = document.getElementById('pageCount');
     const total = Number(root.dataset.pages) || 0;
-    const issueId = root.dataset.issueId;
     const pageUrl = (n) => `${root.dataset.pageUrl}${n}?v=${root.dataset.version}`;
-    const REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const store = {
-        get(key, fallback) { try { return localStorage.getItem(key) ?? fallback; } catch (e) { return fallback; } },
-        set(key, value) { try { localStorage.setItem(key, value); } catch (e) { /* private mode */ } },
+        get(key, fallback) { try { return localStorage.getItem(`comics.${key}`) ?? fallback; } catch (e) { return fallback; } },
+        set(key, value) { try { localStorage.setItem(`comics.${key}`, value); } catch (e) { /* private mode */ } },
     };
 
-    // --- Where you are: the server's word, unless this device has a newer
-    // page it couldn't send yet. ---
-    const POSITION_KEY = `comicPosition:${issueId}`;
-    const readLocal = () => { try { return JSON.parse(store.get(POSITION_KEY, 'null')); } catch (e) { return null; } };
+    const POSITION_KEY = `comicPosition:${root.dataset.issueId}`;
+    const readLocal = () => { try { return JSON.parse(localStorage.getItem(POSITION_KEY)); } catch (e) { return null; } };
+    const writeLocal = (value) => { try { localStorage.setItem(POSITION_KEY, JSON.stringify(value)); } catch (e) { /* private mode */ } };
     const local = readLocal();
-    let page = Number(root.dataset.page) || 0;
-    if (local && local.pending && !local.finished) page = local.page;
-    page = Math.min(page, Math.max(total - 1, 0));
-
-    let mode = store.get('comics.mode', window.innerWidth > window.innerHeight * 1.2 ? 'double' : 'single');
-    let fit = store.get('comics.fit', 'height'); // height | width
-    let rtl = store.get(`comics.rtl.${issueId}`, store.get('comics.rtl', '0')) === '1';
+    // A page this device couldn't send yet wins over the server's.
+    let page = Math.min((local && local.pending && !local.finished ? local.page : Number(root.dataset.page)) || 0, Math.max(total - 1, 0));
+    let mode = store.get('mode', window.innerWidth > window.innerHeight * 1.2 ? 'double' : 'single');
+    let fit = store.get('fit', 'height'); // height | width
+    let rtl = store.get(`rtl.${root.dataset.issueId}`, store.get('rtl', '0')) === '1';
     const sizes = {}; // page -> {w, h}, learned as pages load
     const cache = new Map();
 
@@ -73,18 +62,14 @@
         return pair.length === 2 ? pair : [n];
     }
 
-    // --- Drawing ---
-    let turning = 0;  // +1 onwards, -1 back, 0 a jump
-    let waitTimer = null;
-
     function render() {
         root.dataset.mode = mode;
         root.dataset.fit = fit;
         root.classList.toggle('is-rtl', rtl);
-        slider.style.direction = rtl ? 'rtl' : 'ltr';
         document.querySelectorAll('[data-mode]').forEach(b => b.setAttribute('aria-checked', String(b.dataset.mode === mode)));
-        document.getElementById('fitButton').setAttribute('aria-pressed', String(fit === 'width'));
         document.getElementById('rtlButton').setAttribute('aria-pressed', String(rtl));
+        document.getElementById('fitButton').textContent = fit === 'height' ? 'Fit height' : 'Fit width';
+        slider.style.direction = rtl ? 'rtl' : 'ltr';
         if (mode === 'scroll') return renderScroll();
 
         const pages = spreadAt(page);
@@ -92,31 +77,18 @@
         const order = rtl ? [...imgs].reverse() : imgs;
         const spread = document.createElement('div');
         spread.className = `cr-spread cr-spread--${imgs.length}`;
-        if (turning && !REDUCED) spread.classList.add('is-turning', ((turning > 0) !== rtl) ? 'is-turning-fwd' : 'is-turning-back');
-        turning = 0;
         order.forEach(img => spread.append(img));
-        // A page still on its way says which it is, after a moment.
-        const wait = document.createElement('p');
-        wait.className = 'cr-wait';
-        wait.hidden = true;
-        wait.textContent = `Page ${pages[0] + 1}`;
-        stage.replaceChildren(spread, wait);
+        stage.replaceChildren(spread);
         stage.scrollTop = 0;
         stage.scrollLeft = 0;
-        clearTimeout(waitTimer);
-        if (imgs.some(img => !img.complete)) {
-            waitTimer = setTimeout(() => { if (imgs.some(img => !img.complete)) wait.hidden = false; }, 300);
-            imgs.forEach(img => img.addEventListener('load', () => { if (imgs.every(i => i.complete)) wait.remove(); }, {once: true}));
-        }
         showCount(pages);
         // Once sizes are known a spread may change shape (a wide page).
         imgs.forEach(img => {
             if (!img.complete) img.addEventListener('load', () => { if (spreadAt(page).join() !== pages.join()) render(); }, {once: true});
         });
-        // Load ahead; near the end, the next issue's first page too.
+        // Load ahead.
         for (let i = 1; i <= 3; i++) load(pages[pages.length - 1] + i);
         load(pages[0] - 1);
-        if (root.dataset.nextFirstPage && pages[pages.length - 1] >= total - 3) new Image().src = root.dataset.nextFirstPage;
         saveProgress();
     }
 
@@ -149,44 +121,36 @@
 
     function showCount(pages) {
         const label = pages.length > 1 ? `${pages[0] + 1}–${pages[1] + 1}` : `${pages[0] + 1}`;
-        footCount.textContent = `${label} / ${total}`;
-        sliderCount.textContent = `${label} / ${total}`;
+        countEl.textContent = `${label} / ${total}`;
         slider.value = pages[0] + 1;
-        progressLine.style.width = `${total ? (100 * (pages[pages.length - 1] + 1) / total) : 0}%`;
     }
 
-    // --- Saving your page: here first, then the server. ---
     let saveTimer = null;
-    function writeLocal(value) { store.set(POSITION_KEY, JSON.stringify(value)); }
-
     function send(body) {
         return fetch(root.dataset.progressUrl, {method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body), keepalive: true})
-            .then(r => {
+            .then((r) => {
                 if (!r.ok) throw new Error(r.status);
                 const now = readLocal();
                 if (now && now.page === body.page && Boolean(now.finished) === Boolean(body.finished)) writeLocal({...now, pending: false});
             });
     }
-
-    function saveProgress(finished = false) {
+    function saveProgress() {
         clearTimeout(saveTimer);
-        const last = finished ? total - 1 : (mode === 'scroll' ? page : spreadAt(page).slice(-1)[0]);
-        const body = finished ? {page: last, finished: true} : {page: last};
-        writeLocal({page: last, finished, pending: true});
-        saveTimer = setTimeout(() => send(body).catch(() => { /* kept here; sent again when online */ }), finished ? 0 : 600);
+        const last = mode === 'scroll' ? page : spreadAt(page).slice(-1)[0];
+        writeLocal({page: last, finished: false, pending: true});
+        saveTimer = setTimeout(() => send({page: last}).catch(() => { /* kept here; sent when back online */ }), 600);
     }
-
-    window.addEventListener('online', () => {
+    const resend = () => {
         const now = readLocal();
         if (now && now.pending) send(now.finished ? {page: now.page, finished: true} : {page: now.page}).catch(() => {});
-    });
-    if (local && local.pending) send(local.finished ? {page: local.page, finished: true} : {page: local.page}).catch(() => {});
+    };
+    window.addEventListener('online', resend);
+    resend();
 
-    // --- Turning ---
     function go(n) {
         if (mode === 'scroll') {
             const target = stage.querySelector(`[data-page="${n}"]`);
-            if (target) target.scrollIntoView({behavior: REDUCED ? 'auto' : 'smooth'});
+            if (target) target.scrollIntoView({behavior: 'smooth'});
             return;
         }
         if (n >= total) return finished();
@@ -196,84 +160,44 @@
 
     const next = () => {
         if (mode === 'scroll') return stage.scrollBy({top: stage.clientHeight * 0.9, behavior: 'smooth'});
-        turning = 1;
         go(spreadAt(page).slice(-1)[0] + 1);
     };
     const prev = () => {
         if (mode === 'scroll') return stage.scrollBy({top: -stage.clientHeight * 0.9, behavior: 'smooth'});
         const first = spreadAt(page)[0];
-        turning = -1;
         if (first > 0) go(spreadAt(first - 1)[0]);
     };
 
-    // The end: marked read, and on to the next issue as the book reader goes
-    // on to the next chapter.
     function finished() {
-        saveProgress(true);
+        clearTimeout(saveTimer);
+        writeLocal({page: total - 1, finished: true, pending: true});
+        send({page: total - 1, finished: true}).catch(() => {});
         const end = document.createElement('div');
         end.className = 'cr-end';
         const nextUrl = root.dataset.nextUrl;
+        end.innerHTML = `<p>The end.</p>`;
         if (nextUrl) {
-            const nav = document.createElement('nav');
-            nav.className = 'chapter-end';
-            nav.setAttribute('aria-label', 'Next issue');
             const a = document.createElement('a');
+            a.className = 'cr-end__next';
             a.href = nextUrl;
-            a.innerHTML = '<span class="chapter-end__label">Next</span><span class="chapter-end__title"></span><span aria-hidden="true">→</span>';
-            a.querySelector('.chapter-end__title').textContent = root.dataset.nextLabel;
-            nav.append(a);
-            end.append(nav);
-        } else {
-            const done = document.createElement('p');
-            done.className = 'cr-end__done';
-            done.textContent = `That’s the last issue here. Marked as read.`;
-            const nav = document.createElement('nav');
-            nav.className = 'chapter-end';
-            const a = document.createElement('a');
-            a.href = root.dataset.seriesUrl;
-            a.innerHTML = '<span class="chapter-end__label">Back to</span><span class="chapter-end__title"></span><span aria-hidden="true">→</span>';
-            a.querySelector('.chapter-end__title').textContent = root.dataset.seriesName;
-            nav.append(a);
-            end.append(done, nav);
+            a.textContent = 'Next issue';
+            end.append(a);
         }
         const back = document.createElement('button');
         back.type = 'button';
-        back.className = 'cr-end__back';
         back.textContent = 'Back to the last page';
         back.addEventListener('click', () => render());
         end.append(back);
         stage.replaceChildren(end);
-        progressLine.style.width = '100%';
-        footCount.textContent = '';
-        showBar(true);
+        root.classList.remove('bars-hidden');
     }
 
-    // --- The bar: hidden until wanted, as in the book reader ---
-    function showBar(show) {
-        bar.classList.toggle('visible', show);
-        bottom.classList.toggle('visible', show);
-        document.documentElement.classList.toggle('bar-visible', show);
-    }
-    const barShown = () => bar.classList.contains('visible');
-
-    if (window.matchMedia('(hover: hover)').matches) {
-        let lastY = null;
-        document.addEventListener('mousemove', (e) => {
-            if (e.clientY === lastY) return;
-            const first = lastY === null;
-            lastY = e.clientY;
-            if (first) return;
-            if (e.clientY < 28) showBar(true);
-            else if (e.clientY > bar.offsetHeight + 60 && e.clientY < window.innerHeight - bottom.offsetHeight - 60) showBar(false);
-        }, {passive: true});
-    }
-
-    // Tap zones: the sides turn, the middle shows or hides the bar.
+    // Tap zones.
     stage.addEventListener('click', (e) => {
         if (e.target.closest('.cr-end')) return;
-        if (mode === 'scroll') return showBar(!barShown());
+        if (mode === 'scroll') { root.classList.toggle('bars-hidden'); return; }
         const x = e.clientX / window.innerWidth;
-        if (x > 0.35 && x < 0.65) return showBar(!barShown());
+        if (x > 0.35 && x < 0.65) { root.classList.toggle('bars-hidden'); return; }
         const forward = (x >= 0.65) !== rtl;
         forward ? next() : prev();
     });
@@ -295,77 +219,9 @@
         touch = null;
     });
 
-    // --- The icons ---
-    document.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode)));
-    document.getElementById('fitButton').addEventListener('click', () => setFit(fit === 'height' ? 'width' : 'height'));
-    document.getElementById('rtlButton').addEventListener('click', () => setRtl(!rtl));
-    slider.addEventListener('input', () => go(Number(slider.value) - 1));
-
-    function setMode(value) {
-        if (value === mode) return;
-        mode = value;
-        store.set('comics.mode', mode);
-        stage.replaceChildren();
-        render();
-    }
-    function setFit(value) {
-        fit = value;
-        store.set('comics.fit', fit);
-        render();
-    }
-    function setRtl(value) {
-        rtl = value;
-        store.set(`comics.rtl.${issueId}`, rtl ? '1' : '0');
-        store.set('comics.rtl', rtl ? '1' : '0');
-        render();
-    }
-
-    // --- Keys, and the ? sheet (the book reader's) ---
-    const SHORTCUTS = [
-        ['← →', 'Previous / next page'],
-        ['Space', 'Next page'],
-        ['Home End', 'First / last page'],
-        ['1 2 3', 'One page, two pages, scroll'],
-        ['F', 'Fit height or width'],
-        ['R', 'Right to left (manga)'],
-        ['Esc', 'Close, or show and hide the bar'],
-        ['?', 'Show these shortcuts'],
-    ];
-    function toggleHelp() {
-        const open = document.querySelector('.shortcut-help');
-        if (open) return open.remove();
-        const sheet = document.createElement('div');
-        sheet.className = 'shortcut-help';
-        sheet.setAttribute('role', 'dialog');
-        sheet.setAttribute('aria-label', 'Keyboard shortcuts');
-        const list = document.createElement('dl');
-        for (const [keys, what] of SHORTCUTS) {
-            const dt = document.createElement('dt');
-            keys.split(' ').forEach((k, i) => {
-                if (i) dt.append(' ');
-                const kbd = document.createElement('kbd');
-                kbd.textContent = k;
-                dt.append(kbd);
-            });
-            const dd = document.createElement('dd');
-            dd.textContent = what;
-            list.append(dt, dd);
-        }
-        sheet.append(list);
-        sheet.addEventListener('click', () => sheet.remove());
-        document.body.append(sheet);
-    }
-
     document.addEventListener('keydown', (e) => {
         if (e.target.matches('input, select, textarea') && e.target !== slider) return;
-        if (e.metaKey || e.ctrlKey || e.altKey) return;
         const key = e.key;
-        if (key === 'Escape') {
-            // Esc closes what's open, else shows or hides the bar; it never leaves.
-            if (document.querySelector('.shortcut-help')) document.querySelector('.shortcut-help').remove();
-            else showBar(!barShown());
-            return;
-        }
         if (key === 'ArrowRight') { rtl ? prev() : next(); }
         else if (key === 'ArrowLeft') { rtl ? next() : prev(); }
         else if (key === ' ' || key === 'PageDown') { if (mode !== 'scroll' || key === 'PageDown') { e.preventDefault(); e.shiftKey ? prev() : next(); } }
@@ -373,31 +229,49 @@
         else if (key === 'Home') go(0);
         else if (key === 'End') go(total - 1);
         else if (key === '1' || key === '2' || key === '3') setMode({1: 'single', 2: 'double', 3: 'scroll'}[key]);
-        else if (key === 'f' || key === 'F') setFit(fit === 'height' ? 'width' : 'height');
-        else if (key === 'r' || key === 'R') setRtl(!rtl);
-        else if (key === '?') toggleHelp();
+        else if (key === 'f' || key === 'F') toggleFit();
+        else if (key === 'r' || key === 'R') toggleRtl();
+        else if (key === 'Escape') window.location = document.querySelector('.cr-bar a').href;
         else return;
     });
 
-    // --- Offline: the whole issue, quietly, once it's open (sw.js keeps the
-    // last few issues opened, as it does books). ---
-    async function keepForOffline() {
-        if (!('caches' in window) || !navigator.serviceWorker?.controller) return;
-        for (let n = 0; n < total; n++) {
-            try { await fetch(pageUrl(n), {credentials: 'same-origin'}); } catch (e) { return; }
-        }
-        try {
-            const cache = await caches.open('comics-v1');
-            await cache.put(appUrl(`/comics/issue/${issueId}/saved`), new Response('1'));
-        } catch (e) { /* storage full */ }
+    function setMode(value) {
+        mode = value;
+        store.set('mode', mode);
+        stage.replaceChildren();
+        render();
+    }
+    function toggleFit() {
+        fit = fit === 'height' ? 'width' : 'height';
+        store.set('fit', fit);
+        render();
+    }
+    function toggleRtl() {
+        rtl = !rtl;
+        store.set(`rtl.${root.dataset.issueId}`, rtl ? '1' : '0');
+        store.set('rtl', rtl ? '1' : '0');
+        render();
     }
 
+    document.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode)));
+    document.getElementById('fitButton').addEventListener('click', toggleFit);
+    document.getElementById('rtlButton').addEventListener('click', toggleRtl);
+    slider.addEventListener('input', () => go(Number(slider.value) - 1));
+
     if (!total) {
-        stage.innerHTML = '<p class="cr-opening">This file is empty or damaged.</p>';
+        stage.textContent = 'This file has no pages.';
         return;
     }
     render();
     stage.focus({preventScroll: true});
-    const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 2000));
-    idle(() => keepForOffline());
+    // The whole issue, quietly, for reading offline.
+    (window.requestIdleCallback || ((fn) => setTimeout(fn, 2000)))(async () => {
+        if (!('caches' in window) || !navigator.serviceWorker || !navigator.serviceWorker.controller) return;
+        for (let n = 0; n < total; n++) {
+            try { await fetch(pageUrl(n)); } catch (e) { return; }
+        }
+        try { await (await caches.open('comics-v1')).put(appUrl(`/comics/issue/${root.dataset.issueId}/saved`), new Response('1')); } catch (e) { /* storage full */ }
+    });
+    // Bars fade out once you start reading.
+    setTimeout(() => root.classList.add('bars-hidden'), 2500);
 })();

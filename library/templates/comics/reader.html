@@ -3,75 +3,46 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <script>
-        // Night follows the app's switch; pages are pictures, so no themes.
-        try { if (localStorage.getItem('darkMode') === 'enabled') document.documentElement.classList.add('dark-mode'); } catch (e) {}
-    </script>
+    <meta name="theme-color" content="#0b0a09">
     <script src="{{ url_for('static', filename='js/app_root.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/signed_out.js') }}"></script>
     <script>window.APP_ROOT = "{{ request.script_root }}";</script>
-    <title>{{ series.name }} #{{ issue.number }}</title>
+    <title>{{ series.name }} #{{ issue.number }} · Shelves</title>
     <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
-    <link rel="manifest" href="{{ url_for('pwa.manifest') }}">
-    <meta name="theme-color" content="#f6f1e7" media="(prefers-color-scheme: light)">
-    <meta name="theme-color" content="#1e1c19" media="(prefers-color-scheme: dark)">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-title" content="Shelves">
     <link href="{{ url_for('static', filename='vendor/fontawesome-6.0.0-subset/icons.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='fonts/inter/inter.css') }}" rel="stylesheet">
-    <link href="{{ url_for('static', filename='css/base.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/structural.css') }}" rel="stylesheet">
-    <link href="{{ url_for('static', filename='css/tokens.css') }}" rel="stylesheet">
-    <link href="{{ url_for('static', filename='css/reader.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/comic_reader.css') }}" rel="stylesheet">
 </head>
 <body>
-    {# The book reader's frame: a hairline of progress along the top, where
-       you are in the bottom margin, and the bar hidden until you reach for it. #}
-    <div class="reading-progress" aria-hidden="true"><div id="chapter-progress"></div></div>
-    <div class="running-foot" id="pageCount" aria-live="polite"></div>
     <div class="cr" id="reader"
          data-issue-id="{{ issue.id }}"
          data-pages="{{ issue.page_count }}"
          data-page="{{ page }}"
          data-version="{{ issue.file_size or 0 }}"
-         data-label="{{ series.name }} #{{ issue.number }}"
          data-page-url="{{ url_for('comics.issue_page', issue_id=issue.id, page=0)[:-1] }}"
          data-progress-url="{{ url_for('comics.save_progress', issue_id=issue.id) }}"
-         data-series-url="{{ url_for('comics.series_page', series_id=series.id) }}"
-         data-series-name="{{ series.name }}"
-         data-next-url="{{ url_for('comics.read_page', issue_id=next_issue.id) if next_issue else '' }}"
-         data-next-label="{{ ('#' ~ next_issue.number ~ (' · ' ~ next_issue.title if next_issue.title else '')) if next_issue else '' }}"
-         data-next-first-page="{{ (url_for('comics.issue_page', issue_id=next_issue.id, page=0) ~ '?v=' ~ (next_issue.file_size or 0)) if next_issue else '' }}">
-        {# The book reader's bar, with a comic's few choices as plain icons. #}
-        <div class="top-controls" id="topBar">
-            <div class="d-flex align-items-center gap-3 cr-bar-start">
-                <a href="{{ url_for('comics.series_page', series_id=series.id) }}" class="btn btn-secondary" aria-label="Back to {{ series.name }}" title="Back to {{ series.name }}">
-                    <i class="fas fa-arrow-left" aria-hidden="true"></i>
-                </a>
-                <span class="cr-title">{{ series.name }} #{{ issue.number }}{% if issue.title %}<span class="cr-title__name"> · {{ issue.title }}</span>{% endif %}</span>
+         data-next-url="{{ url_for('comics.read_page', issue_id=next_issue.id) if next_issue else '' }}">
+        <header class="cr-bar" id="topBar">
+            <a class="cr-btn" href="{{ url_for('comics.series_page', series_id=series.id) }}" aria-label="Back to {{ series.name }}"><i class="fas fa-arrow-left" aria-hidden="true"></i></a>
+            <div class="cr-title"><strong>{{ series.name }}</strong> <span>#{{ issue.number }}{% if issue.title %} · {{ issue.title }}{% endif %}</span></div>
+            <div class="cr-modes" role="radiogroup" aria-label="Layout">
+                <button type="button" role="radio" data-mode="single" aria-checked="true" title="One page (1)">1</button>
+                <button type="button" role="radio" data-mode="double" aria-checked="false" title="Two pages (2)">2</button>
+                <button type="button" role="radio" data-mode="scroll" aria-checked="false" title="Scroll (3)">↕</button>
             </div>
-            <div class="display-controls cr-controls">
-                <div class="cr-modes" role="radiogroup" aria-label="Pages">
-                    <button type="button" class="btn btn-secondary" role="radio" data-mode="single" aria-checked="true" title="One page (1)">1</button>
-                    <button type="button" class="btn btn-secondary" role="radio" data-mode="double" aria-checked="false" title="Two pages (2)">2</button>
-                    <button type="button" class="btn btn-secondary" role="radio" data-mode="scroll" aria-checked="false" title="Scroll (3)" aria-label="Scroll">↕</button>
-                </div>
-                <button type="button" class="btn btn-secondary" id="fitButton" aria-pressed="false" title="Fit to width (F)">Fit</button>
-                <button type="button" class="btn btn-secondary" id="rtlButton" aria-pressed="false" title="Right to left, for manga (R)" aria-label="Right to left">⇄</button>
-            </div>
-        </div>
-        <div class="cr-bottom" id="bottomBar">
-            {% if prev_issue %}<a class="btn btn-secondary cr-issue" href="{{ url_for('comics.read_page', issue_id=prev_issue.id) }}" title="Previous issue">#{{ prev_issue.number }}</a>{% else %}<span class="cr-issue"></span>{% endif %}
-            <input type="range" id="pageSlider" min="1" max="{{ issue.page_count or 1 }}" value="{{ page + 1 }}" aria-label="Page">
-            <span class="cr-count" id="pageSliderCount"></span>
-            {% if next_issue %}<a class="btn btn-secondary cr-issue" href="{{ url_for('comics.read_page', issue_id=next_issue.id) }}" title="Next issue">#{{ next_issue.number }}</a>{% else %}<span class="cr-issue"></span>{% endif %}
-            <a class="btn btn-secondary" href="{{ url_for('comics.issue_download', issue_id=issue.id) }}" aria-label="Download" title="Download"><i class="fas fa-download" aria-hidden="true"></i></a>
-        </div>
+            <button type="button" class="cr-btn" id="fitButton" title="Fit width or height (F)">Fit</button>
+            <button type="button" class="cr-btn" id="rtlButton" aria-pressed="false" title="Right to left, for manga (R)">⇄</button>
+            <a class="cr-btn" href="{{ url_for('comics.issue_download', issue_id=issue.id) }}" aria-label="Download" title="Download"><i class="fas fa-download" aria-hidden="true"></i></a>
+        </header>
 
-        <main class="cr-stage" id="stage" tabindex="-1">
-            <p class="cr-opening">Opening {{ series.name }} #{{ issue.number }}…</p>
-        </main>
+        <main class="cr-stage" id="stage" tabindex="-1" aria-live="polite"></main>
+
+        <footer class="cr-bar cr-bar--bottom" id="bottomBar">
+            {% if prev_issue %}<a class="cr-btn cr-issue" href="{{ url_for('comics.read_page', issue_id=prev_issue.id) }}" title="Previous issue">#{{ prev_issue.number }}</a>{% else %}<span class="cr-issue"></span>{% endif %}
+            <input type="range" id="pageSlider" min="1" max="{{ issue.page_count }}" value="{{ page + 1 }}" aria-label="Page">
+            <span class="cr-count" id="pageCount"></span>
+            {% if next_issue %}<a class="cr-btn cr-issue" href="{{ url_for('comics.read_page', issue_id=next_issue.id) }}" title="Next issue">#{{ next_issue.number }}</a>{% else %}<span class="cr-issue"></span>{% endif %}
+        </footer>
     </div>
     <script src="{{ url_for('static', filename='js/comic_reader.js') }}"></script>
     <script src="{{ url_for('static', filename='js/pwa.js') }}"></script>
