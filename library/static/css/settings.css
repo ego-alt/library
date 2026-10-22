@@ -5,10 +5,7 @@
 
 /* Full width like Downloads; the fields themselves stay a readable width. */
 .settings .field-stack { max-width: 640px; }
-.settings .section__head + .field-stack { margin-top: var(--space-3); }
-.settings-group { margin: 0 0 var(--space-5); scroll-margin-top: var(--space-4); }
-#comics.settings-group { margin-top: var(--space-6); }
-.settings-group__for { text-transform: none; letter-spacing: 0; font-weight: 400; }
+.settings .section__head + .field-stack { margin-top: var(--space-2); }
 .settings .section { scroll-margin-top: var(--space-4); }
 
 /* The same small capitals as Downloads' sub-heads, and the same text size

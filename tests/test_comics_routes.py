@@ -266,7 +266,7 @@ def test_settings_tests_use_the_form_without_saving(admin_client, comic_dir, tmp
 
 def test_settings_page_is_shared_and_admin_only(admin_client, comic_dir):
     page = admin_client.get("/settings").data.decode()
-    assert "for books and comics" in page and 'id="comics"' in page
+    assert 'id="indexers"' in page and 'id="metadata"' in page
     assert 'href="/settings"' in admin_client.get("/").data.decode()
 
 
