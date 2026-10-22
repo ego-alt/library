@@ -1,6 +1,5 @@
 """Getting books and comics: indexers, download clients, one queue and one
-background worker for both kinds (see pipeline.py), and the Get and Downloads
-pages."""
+background worker for both kinds (see pipeline.py), and the Downloads page."""
 
 
 def init_downloads(app) -> None:

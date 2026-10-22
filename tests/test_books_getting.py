@@ -1,4 +1,3 @@
-import io
 
 import pytest
 
@@ -120,9 +119,11 @@ def test_get_api_requests_a_book_once(admin_client, comic_dir):
     assert BookRequest.query.count() == 0
 
 
-def test_epub_upload_on_downloads_joins_the_library(admin_client, comic_dir, book_dir):
-    data = {"files": [(io.BytesIO(build_epub3(title="Dropped In", author="A Writer")), "dropped.epub")]}
-    result = admin_client.post("/api/import/upload", data=data, content_type="multipart/form-data").get_json()
+def test_epub_in_the_import_folder_joins_the_library(admin_client, comic_dir, book_dir):
+    inbox = comic_dir / "_import"
+    inbox.mkdir()
+    (inbox / "dropped.epub").write_bytes(build_epub3(title="Dropped In", author="A Writer"))
+    result = admin_client.post("/api/import/scan").get_json()
     assert len(result["imported"]) == 1 and Book.query.one().title == "Dropped In"
 
 

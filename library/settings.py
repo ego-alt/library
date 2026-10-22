@@ -1,5 +1,5 @@
-"""Shelves settings, kept in the database so they can be changed from the
-Settings page: where to search and download (shared by books and comics),
+"""Shelves settings, kept in the database so they can be changed from
+Downloads › Settings: where to search and download (shared by books and comics),
 and how comics are looked up and written.
 
 Metadata keys can also come from the environment (COMICVINE_API_KEY,
@@ -81,7 +81,7 @@ def set_many(values: dict) -> None:
 
 
 def masked(secret: str) -> str:
-    """What the settings page shows for a saved secret."""
+    """What Settings shows for a saved secret."""
     return "•" * 8 + secret[-4:] if len(secret) > 8 else ("•" * 8 if secret else "")
 
 

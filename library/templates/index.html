@@ -34,7 +34,7 @@
                            autocomplete="off" enterkeyhint="search">
                 </div>
                 {% if current_user.is_authenticated %}
-                <button type="button" class="library-add" onclick="document.getElementById('fileUploadInput').click();" aria-label="Add books" title="Add books (U)"><i class="fas fa-plus" aria-hidden="true"></i></button>
+                <button type="button" class="library-add" onclick="document.getElementById('fileUploadInput').click();" aria-label="Add a book" title="Add a book (U)"><i class="fas fa-plus" aria-hidden="true"></i></button>
                 {% endif %}
             </div>
             {% if current_user.is_authenticated %}
@@ -50,7 +50,7 @@
             {% for book in images %}
                 {% set label = book.title ~ (' by ' ~ book.author if book.author else '') %}
                 {% set pct = ((book.progress or 0) * 100)|round(0, 'floor')|int %}
-                {% set attrs = {'data-length': book.length, 'data-title': book.title, 'data-author': book.author, 'data-progress': book.progress} %}
+                {% set attrs = {'data-title': book.title, 'data-author': book.author, 'data-progress': book.progress} %}
                 {% call cover_card(url_for('read_routes.read_book', filename=book.filename), 'Read ' ~ label, book.title, [book.author, (pct|string ~ '%') if pct > 0], book.cover, attrs) %}
                     {% if book.access_level and book.access_level != 'standard' %}
                     <span class="book-lock" title="Private — only admins can see this" aria-label="Private"><i class="fas fa-lock" aria-hidden="true"></i></span>
@@ -110,11 +110,11 @@
     </div>
 
     <!-- Hidden file input for file uploads -->
-    <input type="file" id="fileUploadInput" style="display: none;" multiple
+    <input type="file" id="fileUploadInput" style="display: none;"
            accept=".epub,application/epub+zip" onchange="handleFileUpload(this.files)">
 
     <div class="drop-zone" id="dropZone" hidden>
-        <p>Drop EPUBs to add them to the library</p>
+        <p>Drop an EPUB to add it to the library</p>
     </div>
 
     <!-- Hidden input for cover image uploads -->

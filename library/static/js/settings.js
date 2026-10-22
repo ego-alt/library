@@ -1,4 +1,4 @@
-// The Settings page: one form saved as a whole, a Save bar that shows only
+// Settings (folded at the foot of Downloads): one form saved as a whole, a Save bar that shows only
 // when something has changed, and Test buttons that try a section with what's
 // on the form (saved or not). Helpers are in ui.js.
 

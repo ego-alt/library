@@ -48,7 +48,7 @@
                 {% block bar_actions %}{% endblock %}
                 <button type="button" class="btn btn-ghost bar-icon" onclick="toggleDarkMode()" aria-label="Night mode" title="Night mode"><i id="dark-mode-icon" class="fas fa-moon" aria-hidden="true"></i></button>
                 {% if is_admin %}
-                <a class="btn btn-ghost bar-icon" href="{{ url_for('downloads.downloads_page') }}"{% if shelf == 'downloads' %} aria-current="page"{% endif %} aria-label="Downloads{% if downloads_count %}, {{ downloads_count }} in progress{% endif %}" title="Downloads and Settings"><i class="fas fa-download" aria-hidden="true"></i>{% if downloads_count %}<span class="bar-icon__dot" aria-hidden="true"></span>{% endif %}</a>
+                <a class="btn btn-ghost bar-icon" href="{{ url_for('downloads.downloads_page') }}"{% if shelf == 'downloads' %} aria-current="page"{% endif %} aria-label="Downloads and Settings{% if downloads_count %}, {{ downloads_count }} downloading{% endif %}" title="Downloads and Settings"><i class="fas fa-gear" aria-hidden="true"></i>{% if downloads_count %}<span class="bar-icon__dot" aria-hidden="true"></span>{% endif %}</a>
                 {% endif %}
             </div>
         </div>

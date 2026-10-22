@@ -175,9 +175,12 @@ def test_monitor_all_and_bulk(admin_client, saga):
     assert admin_client.post("/comics/api/issues/bulk", json={"ids": ids, "status": "skipped"}).get_json()["changed"] == 3
 
 
-def test_upload_to_import_folder_matches_and_files(admin_client, saga, comic_dir):
-    data = {"files": [(io.BytesIO(make_cbz(comic_dir / "tmp.cbz").read_bytes()), "Saga 002 (2024) (Digital).cbz"), (io.BytesIO(b"x"), "notes.txt")]}
-    result = admin_client.post("/api/import/upload", data=data, content_type="multipart/form-data").get_json()
+def test_import_folder_matches_and_files(admin_client, saga, comic_dir):
+    inbox = comic_dir / "_import"
+    inbox.mkdir()
+    make_cbz(inbox / "Saga 002 (2024) (Digital).cbz")
+    (inbox / "notes.txt").write_text("x")
+    result = admin_client.post("/api/import/scan").get_json()
     assert len(result["imported"]) == 1
     assert saga.issues[1].status == DOWNLOADED
 
@@ -289,3 +292,22 @@ def test_comic_date():
     assert comic_date(date(this_year, 8, 19)) == "19 Aug"
     assert comic_date("2019-03-05") == "5 Mar 2019"
     assert comic_date(None) == ""
+
+
+def test_one_comic_is_checked_before_it_is_filed(admin_client, saga, comic_dir):
+    data = {"file": (io.BytesIO(make_cbz(comic_dir / "tmp.cbz").read_bytes()), "Saga 002 (2024) (Digital).cbz")}
+    staged = admin_client.post("/api/import/stage", data=data, content_type="multipart/form-data").get_json()
+    row = staged["file"]
+    # Matched, but not filed until you say so.
+    assert row["issue"]["number"] == "2" and row["name"] == "Saga 002 (2024) (Digital).cbz"
+    assert saga.issues[1].status != DOWNLOADED
+    filed = admin_client.post(f"/api/import/stage/{row['path']}", json={"series_id": saga.id, "number": "2"}).get_json()
+    assert filed["has_file"] and saga.issues[1].status == DOWNLOADED
+
+
+def test_closing_the_check_lets_the_file_go(admin_client, comic_dir):
+    data = {"file": (io.BytesIO(make_cbz(comic_dir / "tmp.cbz").read_bytes()), "Zine 004 (2021).cbz")}
+    row = admin_client.post("/api/import/stage", data=data, content_type="multipart/form-data").get_json()["file"]
+    assert row["issue"] is None and row["reason"]
+    assert admin_client.delete(f"/api/import/stage/{row['path']}").status_code == 200
+    assert admin_client.post(f"/api/import/stage/{row['path']}", json={"new_series": "Zine"}).status_code == 404

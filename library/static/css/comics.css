@@ -1,7 +1,7 @@
 /* Comics: the same gallery wall as the books (index.css), plus a series'
  * header, read like a book's details panel, and its issues as covers. What a
  * cover is up to goes in its caption, as for books; nothing floats over it
- * but ⋯. Get and Downloads are in manage.css, Settings in settings.css. */
+ * but ⋯. Downloads is in manage.css, its Settings in settings.css. */
 
 .comics-hint { color: var(--color-text-muted); font-size: var(--text-sm); }
 .danger-text { color: var(--color-danger) !important; }
@@ -95,13 +95,13 @@
 .issue-wall .is-selected .book { outline: 3px solid var(--color-accent); outline-offset: 3px; }
 /* Denser than the books: seven across on a laptop, three on a phone, with
    a smaller label. */
-.library.row.issue-wall { grid-template-columns: repeat(7, 1fr); gap: 22px 18px; }
+.library.row.issue-wall { grid-template-columns: repeat(7, 1fr); gap: 14px 18px; }
 @media (max-width: 991.98px) { .library.row.issue-wall { grid-template-columns: repeat(5, 1fr); } }
-@media (max-width: 767.98px) { .library.row.issue-wall { grid-template-columns: repeat(4, 1fr); gap: 18px 14px; } }
-@media (max-width: 640px)    { .library.row.issue-wall { grid-template-columns: repeat(3, 1fr); gap: 16px 12px; } }
-.issue-wall .book-caption { margin-top: 8px; }
-.issue-wall .book-caption__title { font-size: 0.8125rem; }
-.issue-wall .book-caption__author { font-size: 0.6875rem; letter-spacing: 0.1em; }
+@media (max-width: 767.98px) { .library.row.issue-wall { grid-template-columns: repeat(4, 1fr); gap: 12px 14px; } }
+@media (max-width: 640px)    { .library.row.issue-wall { grid-template-columns: repeat(3, 1fr); gap: 10px 12px; } }
+.issue-wall .book-caption { margin-top: 6px; gap: 0; }
+.issue-wall .book-caption__title { font-size: 0.8125rem; line-height: 1.25; }
+.issue-wall .book-caption__author { font-size: 0.6875rem; letter-spacing: 0.1em; line-height: 1.3; }
 /* Where you are in the run. */
 .issue-wall .is-next .book { outline: 2px solid var(--color-accent); outline-offset: 3px; }
 .issue-wall > .is-next { content-visibility: visible; }  /* so nothing clips the ring */

@@ -15,8 +15,8 @@
             <input type="search" id="librarySearch" class="library-search__input" placeholder="Search series" aria-label="Search series" autocomplete="off" enterkeyhint="search">
         </div>
         {% if is_admin %}
-        <button type="button" class="library-add" id="addComics" aria-label="Add comic files" title="Add comic files"><i class="fas fa-plus" aria-hidden="true"></i></button>
-        <input type="file" id="addComicsInput" accept=".cbz,.cbr,.cb7,.zip,.rar,.7z" multiple hidden>
+        <button type="button" class="library-add" id="addComics" aria-label="Add a comic" title="Add a comic"><i class="fas fa-plus" aria-hidden="true"></i></button>
+        <input type="file" id="addComicsInput" accept=".cbz,.cbr,.cb7,.zip,.rar,.7z" hidden>
         {% endif %}
     </div>
 </div>
@@ -59,7 +59,7 @@
 {% block scripts %}
     {{ super() }}
     {% if is_admin %}
-    <div class="drop-zone" id="dropZone" hidden><p>Drop comic files to add them</p></div>
+    <div class="drop-zone" id="dropZone" hidden><p>Drop a comic file to add it</p></div>
     <script src="{{ url_for('static', filename='js/get.js') }}"></script>
     <script src="{{ url_for('static', filename='js/import.js') }}"></script>
     <script>

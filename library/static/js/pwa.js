@@ -68,7 +68,7 @@ async function markOfflineAvailability() {
         const filename = readLinkFilename(link);
         const issue = filename ? null : comicLinkIssue(link);
         if (!filename && !issue) return;
-        const card = link.closest('.col-md-3, .shelf-slot') || link;
+        const card = link.closest('.col-md-3') || link;
         card.classList.toggle('is-unavailable', offline && !(filename ? saved.has(filename) : issues.has(issue)));
     });
 }

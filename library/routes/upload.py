@@ -13,7 +13,6 @@ from ..models import Book, Tag, book_tags, db
 from ..utils import (
     cover_mimetype,
     display_author,
-    epub_text_size,
     extract_metadata,
     fallback_cover_svg,
     get_epub_cover_path,
@@ -193,7 +192,6 @@ def upload_book_metadata():
             "title": book.title,
             "author": display_author(book.author),
             "cover": cover_url(book, width=400),
-            "length": epub_text_size(os.path.join(book_dir, filename)),
             "access_level": book.access_level,
         },
     })

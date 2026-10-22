@@ -112,7 +112,7 @@ def search(indexer: dict, query: str, kind: str = "comic", transport: httpx.Base
 
 
 def test(indexer: dict, transport: httpx.BaseTransport | None = None) -> str:
-    """Check an indexer answers; returns a sentence for the settings page."""
+    """Check an indexer answers; returns a sentence for Settings."""
     kind = indexer.get("kind", "newznab")
     base = indexer["url"].rstrip("/")
     url = base if base.endswith("/api") else f"{base}/api"

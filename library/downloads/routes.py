@@ -1,16 +1,31 @@
-"""Get and Downloads, for admins: one place to ask for books and comics, and
-one place to follow everything on its way into the library.
+"""Downloads, for admins: following everything on its way into the library,
+and the APIs behind asking for books and series from the shelves' search
+and adding files with the shelves' +.
 
-  /downloads           in progress, wanted, import, coming up, history, jobs
+  /downloads           in progress, wanted, files that need a series,
+                       history, and Settings folded at the foot
+  /api/get/...         searching Open Library and ComicVine/Metron
   /api/downloads/...   the queue; /api/wanted/<kind>/<id>/... searches and
                        grabs for a comic issue or a book request alike
+  /api/import/...      the import folder, and one comic staged to check
 """
 
 import difflib
+import io
 import os
 import secrets
+import shutil
 
-from flask import Blueprint, abort, jsonify, redirect, render_template, request, url_for
+from flask import (
+    Blueprint,
+    abort,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    send_file,
+    url_for,
+)
 from flask_login import current_user, login_required
 
 from .. import settings
@@ -25,6 +40,7 @@ from ..comics.models import ComicIssue, ComicSeries
 from ..comics.series import local_series
 from ..models import Book, _utcnow, db
 from ..routes._helpers import json_admin_required
+from ..utils import make_thumbnail
 from . import clients, indexers, jobs, pipeline
 from .models import (
     DL_ACTIVE,
@@ -331,51 +347,148 @@ def forget_download(download_id):
 # API: the import folder
 
 
+def _series_names() -> dict:
+    return {s.id: s.display_name for s in ComicSeries.query}
+
+
+def _file_row(path: str, folder: str, series_names: dict) -> dict:
+    """What a comic file looks like it is: its match (if any), the closest
+    followed series to start the picker on, and why it didn't match."""
+    match = comic_files.match_file(path)
+    guess = match.series.id if match.series else None
+    if guess is None and match.parsed.series:
+        close = difflib.get_close_matches(match.parsed.series.lower(), {n.lower(): i for i, n in series_names.items()}, n=1, cutoff=0.6)
+        guess = next((i for i, n in series_names.items() if close and n.lower() == close[0]), None)
+    return {
+        "guess": guess,
+        "path": os.path.relpath(path, folder),
+        "size": os.path.getsize(path),
+        "parsed": {"series": match.parsed.series, "number": match.parsed.number, "year": match.parsed.year},
+        "issue": {"id": match.issue.id, "label": f"{match.series.display_name} #{match.issue.number}", "number": match.issue.number} if match.issue else None,
+        "series": {"id": match.series.id, "name": match.series.display_name} if match.series else None,
+        "reason": match.reason,
+    }
+
+
+def _series_options(series_names: dict) -> list:
+    return [[i, n] for i, n in sorted(series_names.items(), key=lambda x: x[1].lower())]
+
+
+def _issue_for(data: dict, path: str):
+    """The issue a file is being filed as: one picked, or by number in a
+    series picked (or a new local one named for it). Returns (issue, error)."""
+    if data.get("issue_id"):
+        return _wanted_item(KIND_COMIC, int(data["issue_id"])), None
+    if not (data.get("series_id") or data.get("new_series")):
+        return None, "Choose a series."
+    number = names.normalize_number(str(data.get("number") or "")) or names.parse(os.path.basename(path)).number
+    if not number:
+        return None, "Which issue number is it?"
+    if data.get("series_id"):
+        series = db.session.get(ComicSeries, int(data["series_id"])) or abort(404)
+    else:
+        parsed = names.parse(os.path.basename(path))
+        series = local_series((data.get("new_series") or "").strip() or parsed.series or "Unknown", parsed.year)
+    issue = next((i for i in series.issues if names.normalize_number(i.number) == number), None)
+    if issue is None:
+        issue = ComicIssue(series=series, number=number, sort_number=names.sort_number(number), status=SKIPPED)
+        db.session.add(issue)
+        db.session.flush()
+    return issue, None
+
+
+def _file_issue(path: str, issue):
+    from ..comics.routes import issue_json
+
+    try:
+        comic_files.import_file(path, issue)
+    except archive.ArchiveError as e:
+        db.session.rollback()
+        return jsonify({"error": str(e)}), 400
+    comic_downloads.mark_imported([issue.id])
+    return jsonify(issue_json(issue))
+
+
 @downloads_blueprint.get("/api/import")
 @json_admin_required
 def import_list():
     """Comics in the import folder that didn't match an issue on their own."""
     folder = comic_files.import_dir()
     os.makedirs(folder, exist_ok=True)
-    rows = []
-    series_names = {s.id: s.display_name for s in ComicSeries.query}
-    for path in comic_files.comic_files(folder):
-        match = comic_files.match_file(path)
-        # The closest followed series, to start the picker on.
-        guess = match.series.id if match.series else None
-        if guess is None and match.parsed.series:
-            close = difflib.get_close_matches(match.parsed.series.lower(), {n.lower(): i for i, n in series_names.items()}, n=1, cutoff=0.6)
-            guess = next((i for i, n in series_names.items() if close and n.lower() == close[0]), None)
-        rows.append({
-            "guess": guess,
-            "path": os.path.relpath(path, folder),
-            "size": os.path.getsize(path),
-            "parsed": {"series": match.parsed.series, "number": match.parsed.number, "year": match.parsed.year},
-            "issue": {"id": match.issue.id, "label": f"{match.series.display_name} #{match.issue.number}"} if match.issue else None,
-            "series": {"id": match.series.id, "name": match.series.display_name} if match.series else None,
-            "reason": match.reason,
-        })
-    return jsonify({"files": rows, "folder": folder, "series": [[i, n] for i, n in sorted(series_names.items(), key=lambda x: x[1].lower())]})
+    series_names = _series_names()
+    rows = [_file_row(path, folder, series_names) for path in comic_files.comic_files(folder)]
+    return jsonify({"files": rows, "folder": folder, "series": _series_options(series_names)})
 
 
-@downloads_blueprint.post("/api/import/upload")
+# Adding one comic from a shelf's +: it waits, unfiled, while you check what
+# it matched (or choose its series), as a book waits in its review panel.
+
+def _staged_dir() -> str:
+    return os.path.join(comic_files.comic_dir(), "_staged")
+
+
+def _staged_path(name: str) -> str:
+    """A staged file by its "<token>/<name>"; refuses anything else."""
+    folder = os.path.realpath(_staged_dir())
+    path = os.path.realpath(os.path.join(folder, name or ""))
+    if not path.startswith(folder + os.sep) or os.path.dirname(path) == folder or not os.path.isfile(path):
+        abort(404, description="That file has gone; choose it again.")
+    return path
+
+
+def _unstage(path: str) -> None:
+    shutil.rmtree(os.path.dirname(path), ignore_errors=True)
+
+
+@downloads_blueprint.post("/api/import/stage")
 @json_admin_required
-def import_upload():
-    """Comics and EPUBs from your computer into the import folder, then
-    imported: comics matched to their issues, EPUBs added to the books."""
-    folder = comic_files.import_dir()
-    os.makedirs(folder, exist_ok=True)
-    saved = 0
-    for upload in request.files.getlist("files"):
-        filename = upload.filename or ""
-        if not (names.is_comic_file(filename) or filename.lower().endswith(".epub")):
-            continue
-        # Keep the name as it was (it's what matching reads), just safely.
-        upload.save(os.path.join(folder, names.safe_filename(os.path.basename(filename))))
-        saved += 1
-    if not saved:
-        return jsonify({"error": "Choose CBZ, CBR, CB7 or EPUB files."}), 400
-    return jsonify({"saved": saved, **jobs.import_all()})
+def import_stage():
+    upload = request.files.get("file")
+    if upload is None or not names.is_comic_file(upload.filename or ""):
+        return jsonify({"error": "Choose a CBZ, CBR or CB7 file."}), 400
+    # Its own folder, so the file keeps the name matching reads.
+    folder = _staged_dir()
+    token_dir = os.path.join(folder, secrets.token_hex(6))
+    os.makedirs(token_dir, exist_ok=True)
+    path = os.path.join(token_dir, names.safe_filename(os.path.basename(upload.filename)))
+    upload.save(path)
+    series_names = _series_names()
+    row = _file_row(path, folder, series_names)
+    row["name"] = os.path.basename(upload.filename)
+    return jsonify({"file": row, "series": _series_options(series_names)})
+
+
+@downloads_blueprint.get("/api/import/stage/<path:name>/cover")
+@json_admin_required
+def import_staged_cover(name):
+    """Its first page, small, for the check."""
+    try:
+        data = make_thumbnail(archive.first_page(_staged_path(name)), 300)
+    except Exception:
+        abort(404)
+    return send_file(io.BytesIO(data), mimetype="image/webp")
+
+
+@downloads_blueprint.post("/api/import/stage/<path:name>")
+@json_admin_required
+def import_staged(name):
+    path = _staged_path(name)
+    issue, error = _issue_for(request.get_json(silent=True) or {}, path)
+    if error:
+        return jsonify({"error": error}), 400
+    response = _file_issue(path, issue)
+    _unstage(path)
+    return response
+
+
+@downloads_blueprint.delete("/api/import/stage/<path:name>")
+@json_admin_required
+def import_unstage(name):
+    try:
+        _unstage(_staged_path(name))
+    except Exception:
+        pass
+    return jsonify({"ok": True})
 
 
 @downloads_blueprint.post("/api/import/scan")
@@ -387,40 +500,17 @@ def import_scan():
 @downloads_blueprint.post("/api/import/file")
 @json_admin_required
 def import_one():
-    """Import one comic as an issue you pick, or as a new local series when
-    no provider knows it."""
-    from ..comics.routes import issue_json
-
+    """File one comic from the import folder as an issue you pick, or as a
+    new local series when no provider knows it."""
     data = request.get_json(silent=True) or {}
     try:
         path = comic_files.import_folder_path(data.get("path", ""))
     except FileNotFoundError:
         return jsonify({"error": "That file isn't in the import folder any more."}), 404
-    if data.get("issue_id"):
-        issue = _wanted_item(KIND_COMIC, int(data["issue_id"]))
-    elif data.get("series_id") or data.get("new_series"):
-        number = names.normalize_number(str(data.get("number") or "")) or names.parse(os.path.basename(path)).number
-        if not number:
-            return jsonify({"error": "Which issue number is it?"}), 400
-        if data.get("series_id"):
-            series = db.session.get(ComicSeries, int(data["series_id"])) or abort(404)
-        else:
-            parsed = names.parse(os.path.basename(path))
-            series = local_series((data.get("new_series") or "").strip() or parsed.series or "Unknown", parsed.year)
-        issue = next((i for i in series.issues if names.normalize_number(i.number) == number), None)
-        if issue is None:
-            issue = ComicIssue(series=series, number=number, sort_number=names.sort_number(number), status=SKIPPED)
-            db.session.add(issue)
-            db.session.flush()
-    else:
-        return jsonify({"error": "Pick an issue or a series."}), 400
-    try:
-        comic_files.import_file(path, issue)
-    except archive.ArchiveError as e:
-        db.session.rollback()
-        return jsonify({"error": str(e)}), 400
-    comic_downloads.mark_imported([issue.id])
-    return jsonify(issue_json(issue))
+    issue, error = _issue_for(data, path)
+    if error:
+        return jsonify({"error": error}), 400
+    return _file_issue(path, issue)
 
 
 @downloads_blueprint.delete("/api/import/file")

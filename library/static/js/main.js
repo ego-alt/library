@@ -10,57 +10,14 @@ let currentFilters = {};
 const VIEWS = ['all', 'unread', 'reading', 'finished'];
 function normalizeView(v) { return v === 'mine' ? 'reading' : (VIEWS.includes(v) ? v : 'all'); }
 let currentView = normalizeView(window.initialView);
-// Layout state — 'grid' (cover cards) or 'shelf' (cover-slice spines on a wooden shelf).
-// Server always renders grid; JS swaps to shelf on load if that's the stored preference.
-// The bookshelf view is set aside for now: always the wall of covers.
-let currentLayout = 'grid';
 // Mirror of every book currently displayed, in insertion order. Seeded from the
-// server-rendered HTML and appended to by loadMoreImages, so toggling layouts
-// can re-render without re-fetching.
+// server-rendered HTML and appended to by loadMoreImages, so the wall can be
+// re-rendered (after a delete, or coming back from a book) without re-fetching.
 const loadedBooks = [];
 // Total books available for the current view+filter. Server seeds it on
 // initial render; each /load_more response refreshes it via X-Total-Count.
 // Used to cap the number of loading skeletons we render.
 let totalBooks = (typeof window.totalBooks === 'number') ? window.totalBooks : null;
-
-// Spine thickness is a log-scaled mapping of book length (uncompressed HTML
-// bytes — a cheap proxy for word count, computed server-side). When length
-// is missing (older payloads, empty/broken EPUBs), fall back to a stable
-// per-filename hash so we still get visual variety.
-const SPINE_MIN_W = 22;
-const SPINE_MAX_W = 80;
-const SPINE_MIN_BYTES = 30_000;     // ~novella
-const SPINE_MAX_BYTES = 3_000_000;  // ~doorstopper
-function spineWidth(book) {
-    const len = book.length;
-    if (typeof len === 'number' && len > 0) {
-        const clamped = Math.max(SPINE_MIN_BYTES, Math.min(SPINE_MAX_BYTES, len));
-        const t = Math.log(clamped / SPINE_MIN_BYTES) / Math.log(SPINE_MAX_BYTES / SPINE_MIN_BYTES);
-        return Math.round(SPINE_MIN_W + t * (SPINE_MAX_W - SPINE_MIN_W));
-    }
-    let h = 0;
-    for (let i = 0; i < book.filename.length; i++) {
-        h = ((h << 5) - h + book.filename.charCodeAt(i)) | 0;
-    }
-    return 32 + (Math.abs(h) % 28); // 32–59 px fallback
-}
-
-// Spine height is purely cosmetic — derived from the filename so re-renders
-// stay stable and adjacent books vary in height like a real shelf.
-function spineHeight(filename) {
-    let h = 0;
-    for (let i = 0; i < filename.length; i++) {
-        h = ((h << 5) - h + filename.charCodeAt(i) * 7) | 0;
-    }
-    return 230 + (Math.abs(h) % 71); // 230–300 px
-}
-
-// Lock badge for admin-only books. Only admins ever receive such books in
-// their cover feed, so its presence doubles as the "restricted" marker.
-function lockBadge(book) {
-    if (!book.access_level || book.access_level === 'standard') return '';
-    return `<span class="book-lock" title="Private — only admins can see this" aria-label="Private"><i class="fas fa-lock" aria-hidden="true"></i></span>`;
-}
 
 // "Title by Author", for alt text and labels. Falls back to the filename for
 // payloads that predate title/author.
@@ -69,70 +26,9 @@ function bookLabel(book) {
     return book.author ? `${book.title} by ${book.author}` : book.title;
 }
 
-function getSpineTemplate(book) {
-    const urlSafe = encodeURIComponent(book.filename);
-    const attrSafe = escapeHtml(book.filename);
-    const label = escapeHtml(bookLabel(book));
-    const coverSafe = escapeHtml(book.cover);
-    const width = spineWidth(book);
-    const height = spineHeight(book.filename);
-    return `
-        <div class="shelf-slot" style="width: ${width}px">
-            <div class="book-spine"
-                 style="height: ${height}px; background-image: url(${coverSafe})"
-                 title="${label}">
-                <a class="book-spine__link" href="${appUrl(`/read/${urlSafe}`)}" aria-label="Read ${label}"></a>
-                ${lockBadge(book)}
-                <div class="book-buttons">
-                    <button class="book-button book-button--spine"
-                            data-action="show-metadata" data-filename="${attrSafe}"
-                            aria-label="Details" title="Details">
-                        <i class="fas fa-ellipsis-h" aria-hidden="true"></i>
-                    </button>
-                </div>
-            </div>
-        </div>
-    `;
-}
-
 function appendBookToLibrary(book) {
-    const html = currentLayout === 'shelf' ? getSpineTemplate(book) : getBookTemplate(book);
-    $('#library').append(html);
+    $('#library').append(getBookTemplate(book));
 }
-
-// Plank height — keep in sync with --plank-h in index.css. Used to position
-// the per-row planks rendered by repaintShelfPlanks.
-const SHELF_PLANK_H = 14;
-
-// Draw a full-page-width plank under each row of spines. Detect rows by their
-// shared bottom edge: with align-items:flex-end + uniform plank padding, every
-// slot in a wrapped flex row resolves to the same offsetTop+offsetHeight.
-function repaintShelfPlanks() {
-    const lib = document.getElementById('library');
-    if (!lib) return;
-    lib.querySelectorAll('.shelf-plank').forEach(p => p.remove());
-    if (currentLayout !== 'shelf') return;
-
-    const rowBottoms = new Set();
-    lib.querySelectorAll('.shelf-slot').forEach(slot => {
-        rowBottoms.add(slot.offsetTop + slot.offsetHeight);
-    });
-
-    rowBottoms.forEach(bottom => {
-        const plank = document.createElement('div');
-        plank.className = 'shelf-plank';
-        plank.style.top = (bottom - SHELF_PLANK_H) + 'px';
-        lib.appendChild(plank);
-    });
-}
-
-// Rows rewrap when the window resizes — repaint to keep planks aligned.
-let _shelfPlankResizeTimer;
-window.addEventListener('resize', () => {
-    if (currentLayout !== 'shelf') return;
-    clearTimeout(_shelfPlankResizeTimer);
-    _shelfPlankResizeTimer = setTimeout(repaintShelfPlanks, 120);
-});
 
 function getBookTemplate(book) {
     const n = Math.floor((book.progress || 0) * 100);
@@ -155,9 +51,9 @@ function nearPageBottom(thresholdPx = 100) {
     return $(window).scrollTop() + $(window).height() >= $(document).height() - thresholdPx;
 }
 
-/** Shelf view packs many spines per row, so the first batch often fits entirely in
- *  the viewport — no scroll event fires and /load_more never runs. Keep fetching
- *  until the document is tall enough to scroll (or everything is loaded). */
+/** On a tall screen the first batch can fit without scrolling — no scroll
+ *  event fires and /load_more never runs. Keep fetching until the document is
+ *  tall enough to scroll (or everything is loaded). */
 function tryLoadMoreIfPageStillShort() {
     if (isLoading || allImagesLoaded) return;
     if ($(document).height() <= $(window).height() + 100) {
@@ -193,7 +89,6 @@ function loadMoreImages() {
     const replacing = replaceOnLoad;
     const skeletons = replacing ? [] : appendSkeletons(computeSkeletonCount());
     if (replacing) $('#library').addClass('is-refreshing');
-    repaintShelfPlanks();
 
     const queryParams = new URLSearchParams(currentFilters);
     queryParams.set('view', currentView);
@@ -222,7 +117,6 @@ function loadMoreImages() {
                 loadedBooks.push(book);
                 appendBookToLibrary(book);
             });
-            repaintShelfPlanks();
         }
         offset += data.length;
         isLoading = false;
@@ -243,10 +137,7 @@ function computeSkeletonCount() {
     // If we don't know the total yet (e.g. anonymous browse before first
     // /load_more response), assume a full page worth of cards.
     if (totalBooks == null) return SKELETON_COUNT;
-    const selector = currentLayout === 'shelf'
-        ? '#library .shelf-slot:not(.shelf-slot--skeleton)'
-        : '#library .col-md-3:not(.book-skeleton-wrapper)';
-    const displayed = document.querySelectorAll(selector).length;
+    const displayed = document.querySelectorAll('#library .col-md-3:not(.book-skeleton-wrapper)').length;
     return Math.min(SKELETON_COUNT, Math.max(0, totalBooks - displayed));
 }
 
@@ -257,18 +148,8 @@ function appendSkeletons(count) {
     const created = [];
     for (let i = 0; i < count; i++) {
         const el = document.createElement('div');
-        if (currentLayout === 'shelf') {
-            el.className = 'shelf-slot shelf-slot--skeleton';
-            el.style.width = (SPINE_MIN_W + Math.floor(Math.random() * (SPINE_MAX_W - SPINE_MIN_W))) + 'px';
-            const inner = document.createElement('div');
-            inner.className = 'book-spine book-spine--skeleton';
-            inner.style.height = (230 + Math.floor(Math.random() * 71)) + 'px';
-            el.appendChild(inner);
-            el.setAttribute('aria-hidden', 'true');
-        } else {
-            el.className = 'col-md-3 mb-3 book-skeleton-wrapper';
-            el.innerHTML = '<div class="book-skeleton" aria-hidden="true"></div>';
-        }
+        el.className = 'col-md-3 mb-3 book-skeleton-wrapper';
+        el.innerHTML = '<div class="book-skeleton" aria-hidden="true"></div>';
         grid.appendChild(el);
         created.push(el);
     }
@@ -382,10 +263,8 @@ function restoreReturnState() {
     offset = state.offset;
     allImagesLoaded = state.allImagesLoaded;
     totalBooks = state.totalBooks;
-    applyLayoutClasses();
     rerenderLibrary();
     updateViewUI();
-    updateLayoutToggleUI();
     requestAnimationFrame(() => window.scrollTo(0, state.scrollY || 0));
     return true;
 }
@@ -394,12 +273,8 @@ $(function() {
     if (restoreReturnState()) return;
     updateViewUI();
 
-    // Mirror the initial grid HTML into loadedBooks so flipping to shelf doesn't
-    // require a refetch. Then, if 'shelf' is the stored preference, swap layout.
+    // Mirror the server-rendered covers into loadedBooks (see above).
     seedLoadedBooksFromDOM();
-    applyLayoutClasses();
-    if (currentLayout === 'shelf') rerenderLibrary();
-    updateLayoutToggleUI();
     if (totalBooks === 0) {
         renderEmptyState();
         // Nothing to search or sort yet.
@@ -409,7 +284,7 @@ $(function() {
 });
 
 
-// <== LAYOUT TOGGLE (Grid vs Bookshelf) ==>
+// <== THE WALL'S MIRROR ==>
 function seedLoadedBooksFromDOM() {
     document.querySelectorAll('#library .col-md-3').forEach((col) => {
         const link = col.querySelector('a[href*="/read/"]');
@@ -419,13 +294,11 @@ function seedLoadedBooksFromDOM() {
         const readMarker = '/read/';
         const readIdx = href.indexOf(readMarker);
         if (readIdx === -1) return;
-        const rawLength = parseInt(col.dataset.length || '', 10);
         loadedBooks.push({
             filename: decodeURIComponent(href.slice(readIdx + readMarker.length)),
             title: col.dataset.title || '',
             author: col.dataset.author || '',
             cover: img ? img.getAttribute('src') || '' : '',
-            length: Number.isFinite(rawLength) ? rawLength : 0,
             progress: col.dataset.progress ? parseFloat(col.dataset.progress) : null,
             // The lock badge encodes admin-only state in the server-rendered grid.
             access_level: col.querySelector('.book-lock') ? 'restricted' : 'standard',
@@ -433,43 +306,11 @@ function seedLoadedBooksFromDOM() {
     });
 }
 
-function toggleLayout() {
-    currentLayout = currentLayout === 'shelf' ? 'grid' : 'shelf';
-    localStorage.setItem('libraryLayout', currentLayout);
-    applyLayoutClasses();
-    rerenderLibrary();
-    updateLayoutToggleUI();
-    requestAnimationFrame(tryLoadMoreIfPageStillShort);
-}
-
-function applyLayoutClasses() {
-    const lib = $('#library');
-    if (currentLayout === 'shelf') {
-        lib.removeClass('row').addClass('library-shelf');
-    } else {
-        lib.removeClass('library-shelf').addClass('row');
-    }
-}
-
 function rerenderLibrary() {
     $('#library').empty().show();
     $('#emptyState').hide();
     loadedBooks.forEach(appendBookToLibrary);
-    repaintShelfPlanks();
 }
-
-function updateLayoutToggleUI() {
-    const btn = document.getElementById('layoutToggle');
-    if (!btn) return;
-    const icon = btn.querySelector('i');
-    const isShelf = currentLayout === 'shelf';
-    btn.classList.toggle('active', isShelf);
-    btn.setAttribute('aria-pressed', isShelf ? 'true' : 'false');
-    const label = btn.querySelector('.bar-menu__label');
-    if (label) label.textContent = isShelf ? 'Grid view' : 'Bookshelf view';
-    if (icon) icon.className = isShelf ? 'fas fa-th-large' : 'fas fa-grip-vertical';
-}
-
 
 // <== SEARCH ==>
 // One box: every word must match the title, author, genre or one of your tags.
@@ -930,21 +771,18 @@ $('.close-metadata, .metadata-overlay').on('click', function(e) {
     }
 });
 
-// After a cover change, swap the new (versioned) thumbnail URLs into every
-// place the book's cover shows: grid card, shelf spine, and the mirror used to
-// re-render layouts.
+// After a cover change, swap the new (versioned) thumbnail URL into the
+// book's card and into the mirror used to re-render the wall.
 function updateCoverEverywhere(filename, urls) {
     const coverUrl = urls.thumb || urls.cover;
     const book = loadedBooks.find(b => b.filename === filename);
     if (book) book.cover = coverUrl;
     const readHref = appUrl(`/read/${encodeURIComponent(filename)}`);
     document.querySelectorAll(`a[href="${CSS.escape(readHref)}"]`).forEach(link => {
-        const card = link.closest('.col-md-3, .shelf-slot');
+        const card = link.closest('.col-md-3');
         if (!card) return;
         const img = card.querySelector('img');
         if (img) img.src = coverUrl;
-        const spine = card.querySelector('.book-spine');
-        if (spine) spine.style.backgroundImage = `url("${coverUrl}")`;
     });
 }
 
@@ -969,8 +807,8 @@ async function deleteBook(filename) {
         return;
     }
 
-    // Drop the card/spine from the library, and from the in-memory mirror so a
-    // later layout switch doesn't resurrect it. Keep both for Undo.
+    // Drop the card from the wall, and from the in-memory mirror so a later
+    // re-render doesn't bring it back. Keep both for Undo.
     const index = loadedBooks.findIndex(b => b.filename === filename);
     const removed = index !== -1 ? loadedBooks.splice(index, 1)[0] : null;
     rerenderLibrary();
@@ -1009,10 +847,9 @@ document.addEventListener('click', (e) => {
 });
 
 // <== LONG-PRESS (touch) ==>
-// Covers have no hover on phones, and shelf spines are too narrow for a
-// button: press and hold any book to open its details.
+// Covers have no hover on phones: press and hold any book to open its details.
 (function enableLongPress() {
-    const SELECTOR = '#library .book, #library .book-spine';
+    const SELECTOR = '#library .book';
     const HOLD_MS = 500;
     let timer = null, start = null, fired = false;
     document.addEventListener('touchstart', (e) => {
@@ -1234,8 +1071,7 @@ function addTag(text, container) {
 
 // <== FUNCTIONS FOR UPLOADING BOOKS AND COVERS ==>
 // <== ADDING BOOKS ==>
-// One file: stage it, then review it in the panel. Several files: add each
-// with the metadata from the EPUB, with a running progress toast.
+// Stage the file, then review it in the panel before it's added.
 async function stageUpload(file) {
     const formData = new FormData();
     formData.append('file', file);
@@ -1266,7 +1102,7 @@ function insertNewBook(book) {
     offset += 1;  // keep infinite scroll from re-fetching it
     rerenderLibrary();
     const link = document.querySelector(`#library a[href="${CSS.escape(appUrl(`/read/${encodeURIComponent(book.filename)}`))}"]`);
-    const card = link?.closest('.col-md-3, .shelf-slot');
+    const card = link?.closest('.col-md-3');
     if (card) {
         card.classList.add('is-new');
         card.scrollIntoView({block: 'nearest', behavior: 'smooth'});
@@ -1279,40 +1115,21 @@ async function handleFileUpload(files) {
     input.value = '';  // so choosing the same file again still triggers
     if (!list.length) return;
 
-    if (list.length === 1) {
-        const toast = showToast(`Reading ${list[0].name}…`, 'info', null, {sticky: true});
-        try {
-            const data = await stageUpload(list[0]);
-            dismissToast(toast);
-            showUploadMetadata(data);
-        } catch (err) {
-            dismissToast(toast);
-            showToast(navigator.onLine ? err.message
-                : "Upload didn't finish. Check your connection and try again.", 'error');
-        }
+    // One at a time, so each book's details can be checked before it's added.
+    if (list.length > 1) {
+        showToast('Add books one at a time, so each can be checked.', 'error');
         return;
     }
-
-    const toast = showToast(`Adding ${list.length} books…`, 'info', null, {sticky: true});
-    const failed = [];
-    let added = 0;
-    for (const [i, file] of list.entries()) {
-        toast.firstChild.textContent = `Adding ${list.length} books… (${i + 1} of ${list.length})`;
-        try {
-            const staged = await stageUpload(file);
-            const book = await confirmUpload({
-                upload_id: staged.upload_id, title: staged.title,
-                author: staged.author, cover_path: staged.cover_path,
-            });
-            insertNewBook(book);
-            added += 1;
-        } catch (err) {
-            failed.push(`${file.name}: ${err.message}`);
-        }
+    const toast = showToast(`Reading ${list[0].name}…`, 'info', null, {sticky: true});
+    try {
+        const data = await stageUpload(list[0]);
+        dismissToast(toast);
+        showUploadMetadata(data);
+    } catch (err) {
+        dismissToast(toast);
+        showToast(navigator.onLine ? err.message
+            : "Upload didn't finish. Check your connection and try again.", 'error');
     }
-    dismissToast(toast);
-    if (added) showToast(`Added ${added} book${added === 1 ? '' : 's'}.`, 'success');
-    if (failed.length) showToast(`Couldn't add ${failed.length}: ${failed.join(' · ')}`, 'error');
 }
 
 async function saveNewBook() {

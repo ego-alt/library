@@ -20,7 +20,6 @@ from ..utils import (
     book_progress,
     cover_mimetype,
     display_author,
-    epub_text_size,
     fallback_cover_svg,
     guess_cover_mimetype_from_bytes,
     make_thumbnail,
@@ -150,7 +149,6 @@ def get_covers(offset=0, limit=BOOKS_PER_LOAD, filters=None, view=VIEW_ALL):
             "title": book.title,
             "author": display_author(book.author),
             "cover": cover_url(book, width=400),
-            "length": _book_text_size(book),
             "access_level": book.access_level,
             "progress": _progress(book, status, chapter, position),
         }
@@ -163,27 +161,6 @@ def _progress(book, status, chapter, position):
     if status != BookProgressChoice.IN_PROGRESS:
         return None
     return round(book_progress(chapter_sizes(book), chapter or 0, position or 0.0), 4)
-
-
-def _book_text_size(book) -> int:
-    """Cached EPUB text size for `book`, in bytes. Used to size spine thickness
-    in the bookshelf view. Cached per (book_id, file mtime) since text size
-    only changes if the EPUB is rewritten on disk."""
-    epub_path = os.path.join(current_app.config["BOOK_DIR"], book.filename)
-    try:
-        mtime = int(os.path.getmtime(epub_path))
-    except OSError:
-        return 0
-
-    # Local import to avoid circular import via library/__init__.py.
-    from .. import cache
-
-    cache_key = f"length:{book.id}:{mtime}"
-    size = cache.get(cache_key)
-    if size is None:
-        size = epub_text_size(epub_path)
-        cache.set(cache_key, size, timeout=86400)
-    return size
 
 
 def count_books(filters=None, view=VIEW_ALL):
