@@ -40,8 +40,13 @@
             <div class="lib-bar__actions">
                 {% if current_user.is_authenticated %}
                 {# The other shelf, as one quiet icon (like night mode): on
-                   Books it shows comics, on Comics a book. #}
-                {% if shelf == 'comics' %}
+                   Books it shows comics, on Comics a book. Inside a comic
+                   series it's the way back to the comics instead. #}
+                {% if shelf == 'series' %}
+                <a class="btn btn-ghost bar-icon" href="{{ url_for('comics.index') }}" aria-label="Back to Comics" title="Back to Comics">
+                    {{ icon('arrow-left') }}
+                </a>
+                {% elif shelf == 'comics' %}
                 <a class="btn btn-ghost bar-icon" href="{{ url_for('index_routes.index') }}" aria-label="Books" title="Books">
                     {{ icon('book-open') }}
                 </a>

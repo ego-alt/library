@@ -1,5 +1,6 @@
 {% extends "comics/base.html" %}
 {% from "_covers.html" import cover_card %}
+{% set shelf = 'series' %}
 {% block page_title %}{{ series.display_name }}{% endblock %}
 {% block page %}series-detail{% endblock %}
 {% block content %}
