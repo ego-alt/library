@@ -53,6 +53,7 @@ function initSeries() {
         if (!button || button.dataset.view === view) return;
         view = button.dataset.view;
         setRadio(filter, button);
+        rememberShelfView('comics', view);
         apply();
     });
     search.addEventListener('input', apply);

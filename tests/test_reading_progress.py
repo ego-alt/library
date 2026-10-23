@@ -96,3 +96,13 @@ def test_reading_hides_trashed_and_restricted_books(
     assert _view(html) == "all"   # nothing visible is in progress
     assert "Trashed Book" not in html
     assert "Secret Book" not in html
+
+
+def test_the_shelf_opens_on_the_tab_you_were_last_on(standard_client, standard_user, book_dir):
+    book = _add_book(book_dir, "r.epub", "Reading Book")
+    _bookmark(standard_user, book, BookProgressChoice.IN_PROGRESS)
+    assert _view(standard_client.get("/").data.decode()) == "reading"
+    standard_client.set_cookie("shelf_view_books", "finished")
+    assert _view(standard_client.get("/").data.decode()) == "finished"
+    standard_client.set_cookie("shelf_view_books", "nonsense")
+    assert _view(standard_client.get("/").data.decode()) == "reading"

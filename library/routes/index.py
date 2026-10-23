@@ -172,7 +172,9 @@ def count_books(filters=None, view=VIEW_ALL):
 
 
 def _requested_view(default=VIEW_ALL):
-    view = request.args.get("view", default)
+    """?view=, else the tab you were last on (remembered in a cookie by
+    main.js), else `default`."""
+    view = request.args.get("view") or request.cookies.get("shelf_view_books")
     return view if view in VIEWS else default
 
 
@@ -185,8 +187,8 @@ def _has_books_in_progress() -> bool:
 @index_blueprint.route("/")
 def index():
     """Render the initial page with the first batch of book covers. It opens
-    on what you're reading when there's something in progress, else on
-    everything; ?view= picks explicitly."""
+    on the tab you were last on; the first time, on what you're reading when
+    there's something in progress, else on everything. ?view= picks."""
     view = _requested_view(VIEW_READING if _has_books_in_progress() else VIEW_ALL)
     images = get_covers(0, BOOKS_PER_LOAD, view=view)
     total = count_books(view=view)

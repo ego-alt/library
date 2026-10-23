@@ -103,6 +103,12 @@ function timeAgo(iso) {
     return formatDate(new Date(iso).toISOString());
 }
 
+/** Remembers a shelf's tab (All, Unread, Reading, Finished) so it opens on
+ * it next time; the server reads the cookie. */
+function rememberShelfView(shelf, view) {
+    document.cookie = `shelf_view_${shelf}=${view}; path=${window.APP_ROOT || ''}/; max-age=31536000; samesite=lax`;
+}
+
 function setRadio(group, button) {
     group.querySelectorAll('[role="radio"]').forEach(b => b.setAttribute('aria-checked', String(b === button)));
 }

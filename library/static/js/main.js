@@ -4,9 +4,9 @@ let isLoading = false;
 let allImagesLoaded = false;
 let currentFilters = {};
 // View state — reading status: 'all' (newest first), 'unread', 'reading' or
-// 'finished' (the last two by when you last read). The server picks the
-// opening view (Reading when something's in progress, else All); it isn't
-// remembered between visits, so the page always opens on what you're reading.
+// 'finished' (the last two by when you last read). The tab you pick is
+// remembered (a cookie the server reads), so the page opens on it next time;
+// the first time, on Reading when something's in progress, else All.
 const VIEWS = ['all', 'unread', 'reading', 'finished'];
 function normalizeView(v) { return v === 'mine' ? 'reading' : (VIEWS.includes(v) ? v : 'all'); }
 let currentView = normalizeView(window.initialView);
@@ -201,6 +201,7 @@ function renderEmptyState() {
 // <== READING-STATUS VIEW (All / Unread / Reading / Finished) ==>
 function setView(view) {
     currentView = normalizeView(view);
+    rememberShelfView('books', currentView);
     updateViewUI();
     reloadLibrary();
 }

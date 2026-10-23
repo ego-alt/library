@@ -159,15 +159,16 @@ VIEWS = ("all", "unread", "reading", "finished")
 @comics_blueprint.get("/")
 @login_required
 def index():
-    """The wall of series, filtered like the books: it opens on what you're
-    reading when there's something, else on everything (?view= picks).
+    """The wall of series, filtered like the books: it opens on the tab you
+    were last on; the first time, on what you're reading when there's
+    something, else on everything (?view= picks).
     Under All, what you're partway through comes first, then A–Z."""
     admin = _is_admin()
     progress = {p.issue_id: p for p in ComicProgress.query.filter_by(user_id=current_user.id)}
     cards = [_series_card(s, progress) for s in ComicSeries.query.order_by(ComicSeries.name) if admin or any(i.filename for i in s.issues)]
     reading = sorted((c for c in cards if c["line"].startswith("#")), key=lambda c: c["last"], reverse=True)
     cards = reading + [c for c in cards if c not in reading]
-    view = request.args.get("view")
+    view = request.args.get("view") or request.cookies.get("shelf_view_comics")
     if view not in VIEWS:
         view = "reading" if any(c["state"] == "reading" for c in cards) else "all"
     return _page("index.html", cards=cards, current_view=view)
