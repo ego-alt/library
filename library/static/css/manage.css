@@ -40,41 +40,6 @@
 }
 .section__title .muted { color: var(--color-text-muted); font-size: var(--text-sm); font-weight: 400; }
 
-/* Downloads and Settings: each section a card on the wall, as Settings
-   always was. By day the card is thin paper the light comes through; at
-   night the frosted pane. */
-:root { --card-bg: rgba(251, 248, 242, 0.5); --card-edge: rgba(255, 255, 255, 0.7); --card-shadow: 0 10px 30px -26px rgba(60, 40, 20, 0.5); }
-.dark-mode { --card-bg: var(--pane); --card-edge: var(--pane-edge); --card-shadow: 0 10px 30px -22px var(--color-shadow); }
-body[data-page="downloads"] .section, body[data-page="settings"] .section {
-    margin-bottom: var(--space-4);
-    padding: var(--space-4) var(--space-5);
-    background: var(--card-bg);
-    border: 1px solid var(--card-edge);
-    border-radius: var(--radius-md);
-    box-shadow: var(--card-shadow);
-}
-body[data-page="downloads"] .section[hidden] { display: none; }
-/* The same space above and below what's in a card: the heading line is no
-   taller than its title (a button beside it hangs into the padding rather
-   than pushing it down), spacing comes from one gap so hidden parts leave
-   nothing behind, and the last row has no rule or padding under it. */
-body[data-page="downloads"] section.section, .settings section.section { display: flex; flex-direction: column; gap: var(--space-2); }
-body[data-page="downloads"] section.section > *, .settings section.section > * { margin-top: 0; margin-bottom: 0; }
-body[data-page="downloads"] section.section > [hidden], .settings section.section > [hidden] { display: none; }
-body[data-page="downloads"] section.section > .sub-head { margin-top: var(--space-3); }
-body[data-page="downloads"] section.section > .sub-head + .entries { margin-top: calc(-1 * var(--space-2)); }
-body[data-page="downloads"] .section .section__head, .settings .section .section__head { min-height: 0; }
-body[data-page="downloads"] section.section > .btn, .settings section.section > .btn { align-self: flex-start; }
-/* The first card sits where every page's first thing does (index.css). */
-
-body[data-page="downloads"] .section__actions .btn, .settings .section__actions .btn { min-height: 36px; margin-block: -6px; padding-block: 0; }
-body[data-page="downloads"] .section .entries:last-child > .entry:last-child,
-body[data-page="downloads"] .section .entries:last-child > .entry-group:last-child > details:not([open]) > .entry { border-bottom: none; padding-bottom: 0; min-height: 40px; }
-body[data-page="downloads"] .section > :last-child, .settings .section > :last-child { margin-bottom: 0; }
-@media (max-width: 640px) {
-    body[data-page="downloads"] .section, body[data-page="settings"] .section { padding: var(--space-3) var(--space-4); }
-}
-
 /* Downloads | Settings: the shelves' tabs, as links. */
 .admin-tabs { margin: var(--page-top) 0 var(--space-5); }
 .admin-tabs a { color: var(--color-text-muted); text-decoration: none; font-size: 1rem; font-weight: 500; min-height: 44px; display: inline-flex; align-items: center; border-bottom: 1px solid transparent; }
@@ -116,7 +81,10 @@ body[data-page="downloads"] .section > :last-child, .settings .section > :last-c
 }
 .entry__more:hover, .entry__more:focus-visible { background: var(--color-highlight-soft); color: var(--color-text-primary); outline: none; }
 .entry__more--text { width: auto; padding: 0 var(--space-3); font-size: var(--text-sm); color: var(--color-accent); }
-.entry__bar { display: block; height: 2px; margin-top: var(--space-1); background: var(--color-border); overflow: hidden; }
+/* A download's progress is drawn along its row's bottom rule, so the row
+   stays two lines: what it is, then its state. */
+.entry { position: relative; }
+.entry__bar { position: absolute; left: 0; bottom: -1px; height: 2px; width: 100%; overflow: hidden; pointer-events: none; }
 .entry__bar > span { display: block; height: 100%; background: var(--color-accent); transition: width var(--dur-slow) ease; }
 
 /* A group that folds open (a comic series and its wanted issues). */
@@ -161,3 +129,53 @@ body.is-stale .section { opacity: 0.55; transition: opacity var(--dur-base) ease
 
 .entry__controls .input--short { width: 5rem; }
 .entry__controls .btn { min-height: 44px; padding: 0 var(--space-4); font-size: var(--text-sm); }
+
+/* Downloads and Settings, set like the shelves: everything on the lit
+   wall, section names in spaced small capitals (as SHELVES and the cover
+   captions), a hairline under each and space between them, and fields as a
+   single line like the search box. */
+body[data-page="downloads"] .section, body[data-page="settings"] .section { margin: 0 0 56px; }
+body[data-page="downloads"] .section[hidden] { display: none; }
+/* One spacing rule for every section: its parts sit one gap apart (hidden
+   parts leave nothing behind), the heading line is no taller than its name
+   (a link beside it hangs in rather than pushing it down), and the last row
+   has no rule under it. */
+body[data-page] section.section { display: flex; flex-direction: column; gap: var(--space-2); }
+body[data-page] section.section > * { margin-top: 0; margin-bottom: 0; }
+body[data-page] section.section > [hidden] { display: none; }
+body[data-page] section.section > .sub-head { margin-top: var(--space-3); }
+body[data-page] section.section > .btn { align-self: flex-start; }
+body[data-page] .section .section__head { min-height: 0; }
+body[data-page] .section .entries:last-child > .entry:last-child,
+body[data-page] .section .entries:last-child > .entry-group:last-child > details:not([open]) > .entry { border-bottom: none; }
+body[data-page] .section .section__head { padding-bottom: var(--space-2); border-bottom: 1px solid var(--color-border); }
+body[data-page] .section__title {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--color-text-secondary);
+}
+body[data-page] .section__title .muted, body[data-page] .section__title .count { letter-spacing: 0; }
+body[data-page] .section__hint { margin-top: var(--space-1); }
+/* Sub-heads drop to the rows' own small capitals without a rule of their
+   own, so a section has one line: under its name. */
+body[data-page] .sub-head { border-bottom: none; padding-bottom: 0; font-size: 0.6875rem; letter-spacing: 0.16em; }
+body[data-page] .entry { border-bottom-color: color-mix(in srgb, var(--color-border) 60%, transparent); }
+body[data-page] .section__actions .btn { border: none; background: none; padding: 0; min-height: 0; color: var(--color-text-muted); font-size: var(--text-sm); text-transform: none; letter-spacing: 0; }
+body[data-page] .section__actions .btn:hover { color: var(--color-accent); }
+body[data-page] .status-line { margin-bottom: var(--space-5); }
+/* Fields as one line, like the search box. */
+body[data-page] .meta-input {
+    background-color: transparent;
+    border: none;
+    border-bottom: 1px solid var(--color-border);
+    border-radius: 0;
+    padding-left: 0;
+    padding-right: 0;
+}
+body[data-page] select.meta-input { padding-right: 1.6em !important; background-position: right 0 center; }
+body[data-page] .meta-input:focus { box-shadow: none; border-bottom-color: var(--color-accent); }
+body[data-page] .client, body[data-page] .indexer { border-top-color: color-mix(in srgb, var(--color-border) 60%, transparent); }
+body[data-page] .client:last-of-type, body[data-page] .indexer-list { border-bottom-color: color-mix(in srgb, var(--color-border) 60%, transparent); }
+body[data-page] .settings-save { background: var(--color-bg-base); }

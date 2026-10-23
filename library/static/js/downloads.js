@@ -208,10 +208,10 @@ function initDownloadLists() {
         return h('li', {class: 'entry', title: [d.title, d.indexer, formatSize(d.size)].filter(Boolean).join(' · ')},
             h('div', {class: 'entry__main'},
                 h('span', {class: 'entry__title'}, d.item ? h('a', {href: d.item.url}, d.item.label) : h('span', {class: 'muted'}, 'Removed')),
-                // Just its state and when; the release, indexer and size are in its tooltip.
-                h('span', {class: 'entry__meta'}, h('strong', {class: tone}, state), ' · ', timeAgo(d.updated_at || d.created_at)),
-                showError ? h('span', {class: 'entry__error'}, d.error) : null,
-                where === 'active' && d.client !== 'blackhole' && d.status !== 'importing' ? h('span', {class: 'entry__bar'}, h('span', {style: `width: ${percent}%`})) : null),
+                // Two lines: what it is, then its state and why (a failure)
+                // or when; the release, indexer and size are in its tooltip.
+                h('span', {class: 'entry__meta', title: showError ? d.error : null}, h('strong', {class: tone}, state), ' · ', showError ? d.error : timeAgo(d.updated_at || d.created_at))),
+            where === 'active' && d.client !== 'blackhole' && d.status !== 'importing' ? h('span', {class: 'entry__bar'}, h('span', {style: `width: ${percent}%`})) : null,
             h('span'),
             more);
     }
