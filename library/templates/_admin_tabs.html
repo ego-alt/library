@@ -1,0 +1,5 @@
+{# Downloads and Settings: two tabs of one place, in the shelves' tab style. #}
+<nav class="status-filter admin-tabs" aria-label="Downloads and Settings">
+    <a href="{{ url_for('downloads.downloads_page') }}"{% if shelf == 'downloads' %} aria-current="page"{% endif %}>Downloads</a>
+    <a href="{{ url_for('downloads.settings_page') }}"{% if shelf == 'settings' %} aria-current="page"{% endif %}>Settings</a>
+</nav>

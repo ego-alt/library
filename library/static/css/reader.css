@@ -70,7 +70,15 @@ a {
 /* Comfortable reading: 70–85 characters a line, generous leading, a
    blank line between paragraphs, an even right edge (balanced lines, gentle
    hyphenation), and slightly thinner text at night to stop it blooming. */
+/* The book's face (Aa › Font): a serif made for reading on screens by
+   default, as paid readers do; a classic book serif; or Inter. */
+:root {
+    --font-reading-serif: "Literata", "Iowan Old Style", "Charter", Georgia, serif;
+    --font-reading-classic: "Iowan Old Style", "Charter", "Georgia", "Noto Serif", serif;
+    --reader-font: var(--font-reading-serif);
+}
 #chapter-content {
+    font-family: var(--reader-font);
     margin: 0 auto var(--space-8);
     max-width: 58ch;
     font-size: var(--reader-font-size, 17px);
@@ -83,8 +91,7 @@ a {
     text-wrap: pretty;
     font-feature-settings: "kern", "liga", "calt";
 }
-/* Scroll mode reads as one continuous column, so it can be a little wider:
-   about 85 characters of Inter. */
+/* Scroll mode reads as one continuous column, so it can be a little wider. */
 html:not(.paginated) #chapter-content { max-width: var(--reader-measure, 70ch); }
 .dark-mode #chapter-content {
     -webkit-font-smoothing: antialiased;
@@ -103,7 +110,7 @@ html:not(.paginated) #chapter-content { max-width: var(--reader-measure, 70ch); 
    English passage inside keeps Inter. */
 :root { --font-cjk-serif: "Songti TC", "Noto Serif TC", "Source Han Serif TC", "Songti SC", "Noto Serif CJK TC", serif; }
 #chapter-content.cjk { font-family: var(--font-cjk-serif); }
-#chapter-content.cjk :lang(en) { font-family: var(--font-sans); }
+#chapter-content.cjk :lang(en) { font-family: var(--reader-font); }
 #chapter-content :where(p, div):where(:not(:empty):not(:has(p, div, h1, h2, h3, h4, h5, h6, figure, img, table, ul, ol, blockquote))) {
     margin-top: 0;      /* only vertical: the book's own left indents (poems,   */
     margin-bottom: 1em; /* quotes) come through from its style subset          */
@@ -904,7 +911,7 @@ html.vertical .running-head { text-align: right; }
 /* <== READ ALOUD (read_aloud.js) ==> */
 .listen-button { min-width: 44px; display: inline-flex; align-items: center; justify-content: center; }
 .listen-button[hidden] { display: none; }
-.listen-button svg { width: 18px; height: 18px; }
+.listen-button .icon { width: 18px; height: 18px; }
 .listen-button.active { color: var(--color-accent); border-color: var(--color-accent); }
 
 /* The sentence being read, and the word where the voice reports it. */
@@ -957,7 +964,7 @@ body.reading-aloud .back-pill { bottom: calc(76px + env(safe-area-inset-bottom, 
 .rs-select {
     min-height: 36px;
     padding: 0 8px;
-    background: transparent;
+    background-color: transparent;
     color: var(--reader-ink);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-sm);

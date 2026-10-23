@@ -28,7 +28,7 @@
         <div class="series-head__actions">
             {% if up_next %}<a class="btn btn-primary" href="{{ url_for('comics.read_page', issue_id=up_next.id) }}">{{ 'Continue' if up_next.page and not up_next.finished else 'Read' }} #{{ up_next.number }}</a>{% endif %}
             {% if is_admin %}
-            <button type="button" class="book-button series-head__more" data-action="series-menu" data-menu-anchor aria-label="More for {{ series.name }}"><i class="fas fa-ellipsis-h" aria-hidden="true"></i></button>
+            <button type="button" class="book-button series-head__more" data-action="series-menu" data-menu-anchor aria-label="More for {{ series.name }}">{{ icon('ellipsis') }}</button>
             {% endif %}
         </div>
     </div>
@@ -63,7 +63,7 @@
     {% call cover_card(href, label, '#' ~ issue.number, meta, issue.cover, {'data-issue-id': issue.id, 'data-have': '1' if issue.has_file else '0'}, {'referrerpolicy': 'no-referrer'}, classes) %}
         {% if is_admin or issue.has_file %}
         <div class="book-buttons">
-            <button type="button" class="book-button" data-action="menu" data-menu-anchor aria-label="More for #{{ issue.number }}" title="More"><i class="fas fa-ellipsis-h" aria-hidden="true"></i></button>
+            <button type="button" class="book-button" data-action="menu" data-menu-anchor aria-label="More for #{{ issue.number }}" title="More">{{ icon('ellipsis') }}</button>
         </div>
         {% endif %}
     {% endcall %}

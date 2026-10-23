@@ -45,7 +45,7 @@
    night the frosted pane. */
 :root { --card-bg: rgba(251, 248, 242, 0.5); --card-edge: rgba(255, 255, 255, 0.7); --card-shadow: 0 10px 30px -26px rgba(60, 40, 20, 0.5); }
 .dark-mode { --card-bg: var(--pane); --card-edge: var(--pane-edge); --card-shadow: 0 10px 30px -22px var(--color-shadow); }
-body[data-page="downloads"] .section, .settings .section {
+body[data-page="downloads"] .section, body[data-page="settings"] .section {
     margin-bottom: var(--space-4);
     padding: var(--space-4) var(--space-5);
     background: var(--card-bg);
@@ -66,24 +66,20 @@ body[data-page="downloads"] section.section > .sub-head + .entries { margin-top:
 body[data-page="downloads"] .section .section__head, .settings .section .section__head { min-height: 0; }
 body[data-page="downloads"] section.section > .btn, .settings section.section > .btn { align-self: flex-start; }
 /* The first card sits where every page's first thing does (index.css). */
-body[data-page="downloads"] > .container { padding-top: var(--page-top); }
+
 body[data-page="downloads"] .section__actions .btn, .settings .section__actions .btn { min-height: 36px; margin-block: -6px; padding-block: 0; }
 body[data-page="downloads"] .section .entries:last-child > .entry:last-child,
 body[data-page="downloads"] .section .entries:last-child > .entry-group:last-child > details:not([open]) > .entry { border-bottom: none; padding-bottom: 0; min-height: 40px; }
 body[data-page="downloads"] .section > :last-child, .settings .section > :last-child { margin-bottom: 0; }
 @media (max-width: 640px) {
-    body[data-page="downloads"] .section, .settings .section { padding: var(--space-3) var(--space-4); }
+    body[data-page="downloads"] .section, body[data-page="settings"] .section { padding: var(--space-3) var(--space-4); }
 }
 
-/* Settings, the one fold: folded at the foot of Downloads, the closed card
-   is just its title (the same card and title as every other); open, its
-   cards follow. */
-.settings-fold > summary { display: block; list-style: none; cursor: pointer; }
-.settings-fold > summary .section__title { margin: 0; }
-.settings-fold > summary::-webkit-details-marker { display: none; }
-.settings-fold > summary .section__title { display: flex; align-items: center; gap: var(--space-2); }
-.settings-fold > summary .section__title::before { content: "▸"; font-size: var(--text-sm); color: var(--color-text-muted); transition: transform var(--dur-fast) ease; }
-.settings-fold[open] > summary .section__title::before { transform: rotate(90deg); }
+/* Downloads | Settings: the shelves' tabs, as links. */
+.admin-tabs { margin: var(--page-top) 0 var(--space-5); }
+.admin-tabs a { color: var(--color-text-muted); text-decoration: none; font-size: 1rem; font-weight: 500; min-height: 44px; display: inline-flex; align-items: center; border-bottom: 1px solid transparent; }
+.admin-tabs a:hover { color: var(--color-text-primary); }
+.admin-tabs a[aria-current="page"] { color: var(--color-text-primary); border-bottom-color: var(--color-accent); }
 
 /* --- Rows --- */
 .entries { list-style: none; padding: 0; margin: 0; }
@@ -126,8 +122,7 @@ body[data-page="downloads"] .section > :last-child, .settings .section > :last-c
 /* A group that folds open (a comic series and its wanted issues). */
 .entry-group > details > summary { cursor: pointer; }
 .entry-group > details > summary::-webkit-details-marker { display: none; }
-.entry__fold { display: inline-block; width: 1.1em; color: var(--color-text-muted); transition: transform var(--dur-fast) ease; }
-.entry-group > details[open] .entry__fold { transform: rotate(90deg); }
+.entry__fold { margin-right: 0.3em; color: var(--color-text-muted); }
 .entry-group .entries .entry { padding-left: 1.1em; }
 
 /* A file waiting to be matched: its controls sit under it. */
@@ -153,8 +148,10 @@ body[data-page="downloads"] .section > :last-child, .settings .section > :last-c
 .entry__more { position: relative; }
 .entry__more::after { content: ""; position: absolute; inset: -4px; }
 
-/* Only when something's wrong (the worker's down, a client isn't answering). */
-.status-line { padding: 0 0 var(--space-3); color: var(--color-danger); }
+/* Only when something needs saying: a client that isn't answering in the
+   danger colour, the reassuring "paused" in plain muted text. */
+.status-line { padding: 0 0 var(--space-3); color: var(--color-text-muted); }
+.status-line.is-bad { color: var(--color-danger); }
 body.is-stale .section { opacity: 0.55; transition: opacity var(--dur-base) ease; }
 
 @media (max-width: 640px) {

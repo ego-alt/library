@@ -1,5 +1,5 @@
-// Downloads: following everything on its way into the library, the files
-// that need a series, and Settings folded at the foot. Also the release
+// Downloads: following everything on its way into the library, and the
+// files that need a series (Settings is the tab beside it). Also the release
 // chooser the comics series page uses. Asking for books and following series
 // is under the shelves' search (get.js); adding files is the shelves' +.
 // Helpers are in ui.js.
@@ -13,7 +13,7 @@ function pickerOverlay() {
     if (picker) return picker;
     picker = h('div', {class: 'metadata-overlay', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'releasesTitle'},
         h('div', {class: 'metadata-content releases-panel'},
-            h('button', {class: 'close-metadata btn btn-ghost', 'aria-label': 'Close', dataset: {close: ''}}, '×'),
+            h('button', {class: 'close-metadata btn btn-ghost', 'aria-label': 'Close', dataset: {close: ''}}, iconEl('x')),
             h('h3', {id: 'releasesTitle'}, 'Releases'),
             h('p', {class: 'comics-hint', id: 'releasesStatus'}),
             h('ol', {class: 'release-list', id: 'releaseList'})));
@@ -85,7 +85,6 @@ function initDownloads() {
     initWanted();
     initDownloadLists();
     initImport();
-    initSettingsFold();
 }
 
 // Wanted: compact rows, each with a ⋯ menu; a comic series' row acts on all
@@ -208,7 +207,7 @@ function initDownloadLists() {
             : where === 'attention'
                 ? [retry, d.item ? {label: 'Stop looking…', danger: true, onClick: () => stopLooking(d, more)} : null, {label: 'Remove from history', onClick: () => act(`/api/downloads/${d.id}`, 'DELETE', 'Removed')}]
                 : [d.status === 'failed' && d.item && d.error !== 'Cancelled.' ? retry : null, {label: 'Remove from history', onClick: () => act(`/api/downloads/${d.id}`, 'DELETE', 'Removed')}];
-        const more = h('button', {type: 'button', class: 'entry__more', 'aria-label': `More for ${label}`, dataset: {menuAnchor: ''}, onclick: (e) => openMenu(e.currentTarget, actions)}, h('i', {class: 'fas fa-ellipsis-h', 'aria-hidden': 'true'}));
+        const more = h('button', {type: 'button', class: 'entry__more', 'aria-label': `More for ${label}`, dataset: {menuAnchor: ''}, onclick: (e) => openMenu(e.currentTarget, actions)}, iconEl('ellipsis'));
         const showError = d.error && d.error !== 'Cancelled.' && where !== 'active';
         return h('li', {class: 'entry', title: d.title},
             h('div', {class: 'entry__main'},
@@ -225,9 +224,10 @@ function initDownloadLists() {
         boost();
     }
 
-    function showStatus(text) {
+    function showStatus(text, bad = false) {
         statusLine.textContent = text || '';
         statusLine.hidden = !text;
+        statusLine.classList.toggle('is-bad', bad);
     }
 
     async function refresh() {
@@ -237,14 +237,15 @@ function initDownloadLists() {
         } catch (e) {
             misses += 1;
             if (misses >= 2) {
-                showStatus('Can’t reach the library. Retrying…');
+                showStatus('Can’t reach the library. Retrying…', true);
                 document.body.classList.add('is-stale');
             }
             return;
         }
         misses = 0;
         document.body.classList.remove('is-stale');
-        showStatus(data.clients.length ? data.clients.join(' ') : (data.paused ? 'Downloads are paused. They’ll pick up again in a moment.' : ''));
+        if (data.clients.length) showStatus(data.clients.join(' '), true);
+        else showStatus(data.paused ? 'Downloads are paused. They’ll pick up again in a moment.' : '');
         activeSection.hidden = !data.active.length && !data.attention.length;
         attentionList.replaceChildren(...data.attention.map(d => downloadRow(d, 'attention')));
         activeList.replaceChildren(...data.active.map(d => downloadRow(d, 'active')));
@@ -280,28 +281,6 @@ function initImport() {
     });
     load();
 }
-
-// --- Settings, folded at the foot: opened by a link to one of its parts ---
-
-function initSettingsFold() {
-    const fold = document.getElementById('settings');
-    const open = (hash) => {
-        fold.open = true;
-        const target = hash && document.querySelector(hash);
-        (target || fold).scrollIntoView({behavior: 'smooth', block: 'start'});
-    };
-    const fromHash = () => { if (location.hash && (location.hash === '#settings' || fold.querySelector(location.hash))) open(location.hash); };
-    document.addEventListener('click', (e) => {
-        const link = e.target.closest('[data-open-settings]');
-        if (!link) return;
-        e.preventDefault();
-        history.replaceState(null, '', link.getAttribute('href'));
-        open(link.getAttribute('href'));
-    });
-    window.addEventListener('hashchange', fromHash);
-    fromHash();
-}
-
 
 const DOWNLOAD_PAGES = {downloads: initDownloads};
 document.addEventListener('DOMContentLoaded', () => {

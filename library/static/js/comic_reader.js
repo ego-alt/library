@@ -68,7 +68,12 @@
         root.classList.toggle('is-rtl', rtl);
         document.querySelectorAll('[data-mode]').forEach(b => b.setAttribute('aria-checked', String(b.dataset.mode === mode)));
         document.getElementById('rtlButton').setAttribute('aria-pressed', String(rtl));
-        document.getElementById('fitButton').textContent = fit === 'height' ? 'Fit height' : 'Fit width';
+        // Shows what a press does: fit to width while fitted to height, and back.
+        const fitButton = document.getElementById('fitButton');
+        const toWidth = fit === 'height';
+        fitButton.innerHTML = icon(toWidth ? 'unfold-horizontal' : 'unfold-vertical');
+        fitButton.title = `Fit to ${toWidth ? 'width' : 'height'} (F)`;
+        fitButton.setAttribute('aria-label', `Fit to ${toWidth ? 'width' : 'height'}`);
         slider.style.direction = rtl ? 'rtl' : 'ltr';
         if (mode === 'scroll') return renderScroll();
 

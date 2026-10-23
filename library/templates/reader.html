@@ -16,6 +16,8 @@
           if (theme === 'sepia' || theme === 'black') root.classList.add('theme-' + theme);
           var leading = {tight: '1.5', normal: '1.7', loose: '1.9'}[get('readerLeading')];
           if (leading) root.style.setProperty('--reader-leading', leading);
+          var face = {classic: 'var(--font-reading-classic)', sans: 'var(--font-sans)'}[get('readerFont')];
+          if (face) root.style.setProperty('--reader-font', face);
           var measure = {narrow: '60ch', normal: '70ch', wide: '80ch'}[get('readerWidth')];
           if (measure) root.style.setProperty('--reader-measure', measure);
           if (get('readingMode') === 'paginate') root.classList.add('paginated');
@@ -38,8 +40,9 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="Library">
     <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
-    <link href="{{ url_for('static', filename='vendor/fontawesome-6.0.0-subset/icons.css') }}" rel="stylesheet">
+    <link rel="preload" href="{{ url_for('static', filename='fonts/literata/literata-latin-wght-normal.woff2') }}" as="font" type="font/woff2" crossorigin>
     <link href="{{ url_for('static', filename='fonts/inter/inter.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='fonts/literata/literata.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/base.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/structural.css') }}" rel="stylesheet">
     <link href="{{ url_for('static', filename='css/tokens.css') }}" rel="stylesheet">
@@ -54,16 +57,16 @@
     <div class="top-controls">
         <div class="d-flex align-items-center gap-3">
             <button class="btn btn-secondary" id="menu-toggle" aria-label="Contents" title="Contents">
-                <i class="fas fa-bars"></i>
+                {{ icon('list') }}
             </button>
             <a href="{{ url_for('index_routes.index') }}" class="btn btn-secondary" aria-label="Back to library" title="Back to library">
-                <i class="fas fa-arrow-left"></i>
+                {{ icon('arrow-left') }}
             </a>
         </div>
         <div class="display-controls">
             {# Read aloud with this device's voices (shown by read_aloud.js where supported). #}
             <button class="btn btn-secondary listen-button" id="read-aloud-toggle" aria-label="Read aloud" title="Read aloud (L)" hidden>
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 14v-2a8 8 0 0 1 16 0v2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><rect x="3" y="13" width="4.5" height="7" rx="1.5" fill="currentColor"/><rect x="16.5" y="13" width="4.5" height="7" rx="1.5" fill="currentColor"/></svg>
+                {{ icon('headphones') }}
             </button>
             <button class="btn btn-secondary aa-button" id="settings-toggle" aria-label="Reading settings" title="Reading settings" aria-expanded="false" aria-controls="reader-settings">Aa</button>
         </div>
@@ -75,6 +78,14 @@
                     <button type="button" data-size="-1" aria-label="Smaller text">A−</button>
                     <span id="rs-size">17</span>
                     <button type="button" data-size="1" aria-label="Larger text">A+</button>
+                </div>
+            </div>
+            <div class="rs-row">
+                <span class="rs-label">Font</span>
+                <div class="rs-seg rs-fonts" data-setting="font">
+                    <button type="button" data-value="serif" style="font-family: var(--font-reading-serif)">Literata</button>
+                    <button type="button" data-value="classic" style="font-family: var(--font-reading-classic)">Classic</button>
+                    <button type="button" data-value="sans" style="font-family: var(--font-sans)">Sans</button>
                 </div>
             </div>
             <div class="rs-row">

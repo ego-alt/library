@@ -21,7 +21,6 @@
 .field-actions { display: flex; gap: var(--space-2); }
 .field-help { margin: var(--space-1) 0 0; font-size: var(--text-sm); color: var(--color-text-muted); }
 .field-path { font-size: var(--text-sm); color: var(--color-text-secondary); word-break: break-all; }
-select.meta-input { padding-right: var(--space-5); }
 @media (max-width: 640px) { .field-pair { grid-template-columns: 1fr; } }
 
 /* Download clients and indexers: a line each, opened to edit. */
@@ -38,8 +37,6 @@ select.meta-input { padding-right: var(--space-5); }
     list-style: none;
 }
 .client summary::-webkit-details-marker, .indexer__summary::-webkit-details-marker { display: none; }
-.client summary::before, .indexer__summary::before { content: "▸"; color: var(--color-text-muted); transition: transform var(--dur-fast) ease; }
-.client[open] summary::before, .indexer details[open] .indexer__summary::before { transform: rotate(90deg); }
 .client__name, .indexer__name { font-size: var(--text-base); font-weight: 500; }
 .client__state, .indexer__meta { color: var(--color-text-muted); font-size: var(--text-sm); word-break: break-all; }
 .client.is-set .client__state { color: var(--color-success); }

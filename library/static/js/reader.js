@@ -613,10 +613,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // translate foreign text, or gloss a passage — the server picks).
     selectionMenu.innerHTML = `
         <button class="ask-button" title="Ask about this (A)">
-            <i class="fas fa-comment" aria-hidden="true"></i><span>Ask</span>
+            ${icon('message-circle')}<span>Ask</span>
         </button>
         <button class="explain-button" title="Explain this (E)">
-            <i class="fas fa-lightbulb" aria-hidden="true"></i><span>Explain</span>
+            ${icon('lightbulb')}<span>Explain</span>
         </button>
     `;
     document.body.appendChild(selectionMenu);
@@ -1148,7 +1148,7 @@ function maybeOfferFinished() {
     dismiss.type = 'button';
     dismiss.className = 'finish-offer__dismiss';
     dismiss.setAttribute('aria-label', 'Not yet');
-    dismiss.textContent = '×';
+    dismiss.innerHTML = icon('x');
     dismiss.addEventListener('click', () => offer.remove());
     offer.append(text, yes, dismiss);
     document.body.append(offer);
@@ -1899,7 +1899,7 @@ function showBackPill(from) {
         pill.id = 'back-pill';
         pill.className = 'back-pill';
         pill.innerHTML = '<button type="button" class="back-pill__go">↩ Back to where you were</button>'
-            + '<button type="button" class="back-pill__close" aria-label="Dismiss">×</button>';
+            + '<button type="button" class="back-pill__close" aria-label="Dismiss">' + icon('x') + '</button>';
         document.body.appendChild(pill);
         pill.querySelector('.back-pill__close').addEventListener('click', () => { pill.hidden = true; });
     }
@@ -1946,9 +1946,9 @@ function showNote(link, target, index, id) {
     note.setAttribute('role', 'dialog');
     note.setAttribute('aria-label', `Note ${link.textContent.trim()}`);
     note.innerHTML = `<div class="note-popover__head"><span>Note ${link.textContent.trim()}</span>`
-        + '<button type="button" class="note-popover__close" aria-label="Close">×</button></div>'
+        + '<button type="button" class="note-popover__close" aria-label="Close">' + icon('x') + '</button></div>'
         + '<div class="note-popover__body"></div>'
-        + '<button type="button" class="note-popover__open">Open in the notes →</button>';
+        + '<button type="button" class="note-popover__open arrow-after">Open in the notes</button>';
     note.querySelector('.note-popover__body').append(...body.childNodes);
     document.body.appendChild(note);
     note.querySelector('.note-popover__close').addEventListener('click', closeNote);
@@ -1984,7 +1984,7 @@ function addChapterEnd(root) {
     nav.setAttribute('aria-label', 'Next chapter');
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.innerHTML = '<span class="chapter-end__label">Next</span><span class="chapter-end__title"></span><span aria-hidden="true">→</span>';
+    btn.innerHTML = '<span class="chapter-end__label">Next</span><span class="chapter-end__title arrow-after"></span>';
     btn.querySelector('.chapter-end__title').textContent = title;
     btn.addEventListener('click', () => nextChapter());
     nav.append(btn);
@@ -2010,6 +2010,7 @@ window.addEventListener('resize', alignRunningLines);
 // Size, line spacing, width, theme and layout, remembered per device. The
 // <head> script applies them before the first paint; this keeps them in sync.
 const LEADING = {tight: '1.5', normal: '1.7', loose: '1.9'};
+const FACES = {serif: 'var(--font-reading-serif)', classic: 'var(--font-reading-classic)', sans: 'var(--font-sans)'};
 const MEASURE = {narrow: '60ch', normal: '70ch', wide: '80ch'};
 const THEMES = ['day', 'sepia', 'night', 'black'];
 
@@ -2043,6 +2044,13 @@ function setTheme(theme) {
 function toggleNight() {
     const t = currentTheme();
     setTheme(t === 'night' || t === 'black' ? 'day' : 'night');
+}
+
+function setFont(value) {
+    storeSetting('readerFont', value);
+    document.documentElement.style.setProperty('--reader-font', FACES[value] || FACES.serif);
+    if (isPaginated()) relayoutPreservingPosition();
+    alignRunningLines();
 }
 
 function setLeading(value) {
@@ -2096,6 +2104,7 @@ function syncSettingsPanel() {
     const size = document.getElementById('rs-size');
     if (size) size.textContent = currentFontSize;
     const values = {
+        font: readerSetting('readerFont', 'serif'),
         leading: readerSetting('readerLeading', 'normal'),
         width: readerSetting('readerWidth', 'normal'),
         theme: currentTheme(),
@@ -2142,7 +2151,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (b.dataset.size) { adjustFontSize(Number(b.dataset.size)); return; }
         const setting = b.closest('.rs-seg')?.dataset.setting;
         const v = b.dataset.value;
-        if (setting === 'leading') setLeading(v);
+        if (setting === 'font') setFont(v);
+        else if (setting === 'leading') setLeading(v);
         else if (setting === 'width') setWidth(v);
         else if (setting === 'theme') setTheme(v);
         else if (setting === 'layout' && v !== (isPaginated() ? 'paginate' : 'scroll')) toggleReadingMode();

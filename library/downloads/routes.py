@@ -2,8 +2,8 @@
 and the APIs behind asking for books and series from the shelves' search
 and adding files with the shelves' +.
 
-  /downloads           in progress, wanted, files that need a series,
-                       history, and Settings folded at the foot
+  /downloads           in progress, wanted, files that need a series, history
+  /settings            the tab beside it: indexers, clients, comics
   /api/get/...         searching Open Library and ComicVine/Metron
   /api/downloads/...   the queue; /api/wanted/<kind>/<id>/... searches and
                        grabs for a comic issue or a book request alike
@@ -99,6 +99,15 @@ def _wanted_item(kind: str, item_id: int):
 # Pages
 
 
+@downloads_blueprint.get("/settings")
+@login_required
+def settings_page():
+    """Settings, the tab beside Downloads."""
+    if not is_admin():
+        return redirect(url_for("index_routes.index"))
+    return render_template("settings.html", import_dir=comic_files.import_dir(), comic_dir=comic_files.comic_dir())
+
+
 @downloads_blueprint.get("/downloads")
 @login_required
 def downloads_page():
@@ -120,8 +129,6 @@ def downloads_page():
         wanted_comics=list(groups.values()),
         can_search=bool(settings.get("indexers")),
         search_every=every,
-        import_dir=comic_files.import_dir(),
-        comic_dir=comic_files.comic_dir(),
     )
 
 

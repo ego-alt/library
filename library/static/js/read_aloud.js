@@ -385,7 +385,7 @@
             <button type="button" class="read-aloud__btn" data-act="next" aria-label="Next sentence" title="Next sentence">${ICONS.next}</button>
             <button type="button" class="read-aloud__rate" data-act="rate" title="Speed"></button>
             <span class="read-aloud__note" id="read-aloud-note" hidden></span>
-            <button type="button" class="read-aloud__close" data-act="close" aria-label="Stop reading aloud" title="Stop">×</button>`;
+            <button type="button" class="read-aloud__close" data-act="close" aria-label="Stop reading aloud" title="Stop">${icon('x')}</button>`;
         bar.addEventListener('click', (e) => {
             const act = e.target.closest('[data-act]')?.dataset.act;
             if (act === 'play') return playing ? pause() : startAt(stale() ? null : index);

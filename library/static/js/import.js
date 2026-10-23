@@ -106,7 +106,7 @@ async function reviewOne(file) {
         h('img', {src: appUrl(`${stagePath}/cover`), alt: '', onerror: (e) => e.currentTarget.remove()}));
     const overlay = h('div', {class: 'metadata-overlay', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'reviewTitle', style: 'display: flex'},
         h('div', {class: 'metadata-content'},
-            h('button', {class: 'close-metadata btn btn-ghost', 'aria-label': 'Close', dataset: {close: ''}}, '×'),
+            h('button', {class: 'close-metadata btn btn-ghost', 'aria-label': 'Close', dataset: {close: ''}}, iconEl('x')),
             h('header', {class: 'meta-header'}, title, h('p', {class: 'meta-author'}, staged.name)),
             h('section', {class: 'meta-body'}, cover,
                 h('div', {class: 'meta-fields'},

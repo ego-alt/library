@@ -88,7 +88,7 @@ const KINDS = {
  * element to put it after, `kind` books or comics. */
 function attachShelfGet({kind, input, after}) {
     const {make, none} = KINDS[kind];
-    const ask = h('button', {type: 'button', class: 'shelf-get__ask'});
+    const ask = h('button', {type: 'button', class: 'shelf-get__ask arrow-after'});
     const note = h('p', {class: 'shelf-get__note', 'aria-live': 'polite'});
     const results = h('div', {class: 'row library get-results'});
     const section = h('section', {class: 'shelf-get', hidden: true, 'aria-label': kind === 'books' ? 'Books to get' : 'Comic series to follow'}, ask, note, results);

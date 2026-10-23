@@ -5,9 +5,9 @@
 {% block styles %}
     {{ super() }}
     <link href="{{ url_for('static', filename='css/manage.css') }}" rel="stylesheet">
-    <link href="{{ url_for('static', filename='css/settings.css') }}" rel="stylesheet">
 {% endblock %}
 {% block content %}
+{% include "_admin_tabs.html" %}
 {# Only when something's wrong: the worker is down or a client isn't answering. #}
 <p class="section__hint status-line" id="statusLine" role="status" hidden></p>
 
@@ -24,7 +24,7 @@
         {% if can_search and (wanted_books or wanted_comics) %}<div class="section__actions"><button type="button" class="btn btn-secondary" data-action="search-all">Find now</button></div>{% endif %}
     </div>
     {% if wanted_books or wanted_comics %}
-    <p class="section__hint">{% if can_search %}Looked for every {{ search_every }} hour{{ 's' if search_every != 1 }}.{% else %}Looked for once there's an indexer in <a href="#indexers" data-open-settings>Settings</a>.{% endif %}</p>
+    <p class="section__hint">{% if can_search %}Looked for every {{ search_every }} hour{{ 's' if search_every != 1 }}.{% else %}Looked for once there's an indexer in <a href="{{ url_for('downloads.settings_page') }}#indexers">Settings</a>.{% endif %}</p>
     {% if wanted_books %}
     <h3 class="sub-head">Books <span class="count" data-count>{{ wanted_books|length }}</span></h3>
     <ol class="entries">
@@ -32,7 +32,7 @@
         <li class="entry" data-kind="book" data-item-id="{{ r.id }}" data-label="{{ r.title }}">
             <div class="entry__main"><span class="entry__title">{{ r.title }}{% if r.author %} <span class="muted">· {{ r.author }}</span>{% endif %}</span></div>
             <span class="entry__side">Asked {{ r.created_at|comic_date }}</span>
-            <button type="button" class="entry__more" data-action="menu" data-menu-anchor aria-label="More for {{ r.title }}"><i class="fas fa-ellipsis-h" aria-hidden="true"></i></button>
+            <button type="button" class="entry__more" data-action="menu" data-menu-anchor aria-label="More for {{ r.title }}">{{ icon('ellipsis') }}</button>
         </li>
     {% endfor %}
     </ol>
@@ -45,16 +45,16 @@
         <li class="entry-group" data-series-id="{{ group.series.id }}" data-label="{{ group.series.display_name }}">
             <details>
                 <summary class="entry">
-                    <div class="entry__main"><span class="entry__title"><span class="entry__fold" aria-hidden="true">▸</span>{{ group.series.display_name }} <span class="muted">· {% for i in group.issues[:3] %}#{{ i.number }}{{ ', ' if not loop.last }}{% endfor %}{% if n > 3 %} +{{ n - 3 }}{% endif %}</span></span></div>
-                    <span class="entry__side">Out {{ group.issues[0].date|comic_date }}</span>
-                    <button type="button" class="entry__more" data-action="menu" data-menu-anchor aria-label="More for {{ group.series.display_name }}"><i class="fas fa-ellipsis-h" aria-hidden="true"></i></button>
+                    <div class="entry__main"><span class="entry__title"><span class="entry__fold disclosure" aria-hidden="true"></span>{{ group.series.display_name }} <span class="muted">· {% for i in group.issues[:3] %}#{{ i.number }}{{ ', ' if not loop.last }}{% endfor %}{% if n > 3 %} +{{ n - 3 }}{% endif %}</span></span></div>
+                    <span class="entry__side">Released {{ group.issues[0].date|comic_date }}</span>
+                    <button type="button" class="entry__more" data-action="menu" data-menu-anchor aria-label="More for {{ group.series.display_name }}">{{ icon('ellipsis') }}</button>
                 </summary>
                 <ol class="entries">
                 {% for issue in group.issues %}
                     <li class="entry" data-kind="comic" data-item-id="{{ issue.id }}" data-label="{{ group.series.display_name }} #{{ issue.number }}"{% if loop.index > 10 %} hidden data-more{% endif %}>
                         <div class="entry__main"><span class="entry__title">#{{ issue.number }}{% if issue.title %} <span class="muted">· {{ issue.title }}</span>{% endif %}</span></div>
-                        <span class="entry__side">Out {{ issue.date|comic_date }}</span>
-                        <button type="button" class="entry__more" data-action="menu" data-menu-anchor aria-label="More for {{ group.series.display_name }} #{{ issue.number }}"><i class="fas fa-ellipsis-h" aria-hidden="true"></i></button>
+                        <span class="entry__side">Released {{ issue.date|comic_date }}</span>
+                        <button type="button" class="entry__more" data-action="menu" data-menu-anchor aria-label="More for {{ group.series.display_name }} #{{ issue.number }}">{{ icon('ellipsis') }}</button>
                     </li>
                 {% endfor %}
                 {% if n > 10 %}<li class="entry entry--more"><button type="button" class="entry__more entry__more--text" data-action="show-more">Show {{ n - 10 }} more</button></li>{% endif %}
@@ -86,14 +86,8 @@
     <ol class="entries" id="historyList"></ol>
 </section>
 
-{# Settings, folded at the foot: they're set once and rarely changed. #}
-<details class="settings-fold" id="settings">
-    <summary class="section settings-fold__head"><h2 class="section__title">Settings</h2></summary>
-    {% include "_settings_form.html" %}
-</details>
 {% endblock %}
 {% block scripts %}
     <script src="{{ url_for('static', filename='js/import.js') }}"></script>
     <script src="{{ url_for('static', filename='js/downloads.js') }}"></script>
-    <script src="{{ url_for('static', filename='js/settings.js') }}"></script>
 {% endblock %}

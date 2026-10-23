@@ -64,12 +64,12 @@ def test_every_page_renders(admin_client, saga, tmp_path, comic_dir):
     from library.comics import files
 
     files.import_file(str(make_cbz(tmp_path / "Saga 001.cbz")), issue)
-    for path in ["/comics/", "/", f"/comics/series/{saga.id}", "/downloads", f"/comics/read/{issue.id}"]:
+    for path in ["/comics/", "/", f"/comics/series/{saga.id}", "/downloads", "/settings", f"/comics/read/{issue.id}"]:
         response = admin_client.get(path)
         assert response.status_code == 200, path
     assert b"Saga" in admin_client.get("/comics/").data
     downloads = admin_client.get("/downloads").data.decode()
-    assert "Needs a series" in downloads and 'id="settingsForm"' in downloads and "Coming up" not in downloads and "Background jobs" not in downloads
+    assert "Needs a series" in downloads and 'id="settingsForm"' not in downloads and "Coming up" not in downloads and "Background jobs" not in downloads
 
 
 def test_empty_comics_page_says_what_to_do(admin_client, comic_dir):
@@ -118,7 +118,7 @@ def test_downloads_sends_readers_home(standard_client, comic_dir):
 
 
 def test_old_pages_are_gone(admin_client, comic_dir):
-    assert admin_client.get("/get").status_code == 404 and admin_client.get("/settings").status_code == 404
+    assert admin_client.get("/get").status_code == 404
 
 
 @pytest.mark.parametrize(
@@ -262,10 +262,14 @@ def test_settings_tests_use_the_form_without_saving(admin_client, comic_dir, tmp
     assert response.status_code == 502 and "isn't set up" in response.get_json()["error"]
 
 
-def test_settings_are_folded_into_downloads(admin_client, comic_dir):
-    page = admin_client.get("/downloads").data.decode()
-    assert '<details class="settings-fold" id="settings">' in page and 'id="indexers"' in page and 'id="metadata"' in page
-    assert 'href="/downloads"' in admin_client.get("/").data.decode()
+def test_settings_is_the_tab_beside_downloads(admin_client, comic_dir):
+    page = admin_client.get("/settings").data.decode()
+    assert 'id="indexers"' in page and 'id="metadata"' in page and 'href="/downloads"' in page
+    assert 'href="/settings"' in admin_client.get("/downloads").data.decode()
+
+
+def test_settings_sends_readers_home(standard_client, comic_dir):
+    assert standard_client.get("/settings").location.endswith("/")
 
 
 def test_readers_get_issue_covers_they_can_mark_read(standard_client, comic_dir, tmp_path):

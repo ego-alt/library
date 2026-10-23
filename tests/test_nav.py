@@ -13,7 +13,7 @@ def test_readers_never_see_admin_links(standard_client, comic_dir, tmp_path, boo
     db.session.add_all([s, i])
     db.session.commit()
     files.import_file(str(make_cbz(tmp_path / "X 001.cbz")), i)
-    for path in ["/", "/comics/", f"/comics/series/{s.id}", f"/read/{book.filename}", f"/comics/read/{i.id}", "/downloads"]:
+    for path in ["/", "/comics/", f"/comics/series/{s.id}", f"/read/{book.filename}", f"/comics/read/{i.id}", "/downloads", "/settings"]:
         r = standard_client.get(path, follow_redirects=True)
         page = r.data.decode()
         assert r.status_code == 200, path

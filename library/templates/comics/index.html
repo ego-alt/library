@@ -11,11 +11,11 @@
 <div class="library-toolbar">
     <div class="library-search-row">
         <div class="library-search">
-            <i class="fas fa-magnifying-glass" aria-hidden="true"></i>
+            {{ icon('search') }}
             <input type="search" id="librarySearch" class="library-search__input" placeholder="Search series" aria-label="Search series" autocomplete="off" enterkeyhint="search">
         </div>
         {% if is_admin %}
-        <button type="button" class="library-add" id="addComics" aria-label="Add a comic" title="Add a comic"><i class="fas fa-plus" aria-hidden="true"></i></button>
+        <button type="button" class="library-add" id="addComics" aria-label="Add a comic" title="Add a comic">{{ icon('plus') }}</button>
         <input type="file" id="addComicsInput" accept=".cbz,.cbr,.cb7,.zip,.rar,.7z" hidden>
         {% endif %}
     </div>
@@ -33,7 +33,7 @@
         {% if card.href != url_for('comics.series_page', series_id=s.id) %}
         <div class="book-buttons">
             <a class="book-button" href="{{ url_for('comics.series_page', series_id=s.id) }}" aria-label="All issues of {{ s.display_name }}" title="All issues">
-                <i class="fas fa-ellipsis-h" aria-hidden="true"></i>
+                {{ icon('ellipsis') }}
             </a>
         </div>
         {% endif %}

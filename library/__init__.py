@@ -1,11 +1,12 @@
 import logging
 import os
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, render_template, request, url_for
 from flask_caching import Cache
 from flask_compress import Compress
 from flask_login import LoginManager
 from flask_migrate import Migrate
+from markupsafe import Markup, escape
 from werkzeug.exceptions import HTTPException
 from werkzeug.middleware.proxy_fix import ProxyFix
 
@@ -109,6 +110,12 @@ def create_app(config_overrides: dict | None = None):
     @login_manager.request_loader
     def load_user_from_request(_request):
         return load_user_from_proxy_header()
+
+    @app.template_global()
+    def icon(name: str, cls: str = "") -> Markup:
+        """An icon from the app's one set (static/icons.svg, Lucide)."""
+        href = url_for("static", filename="icons.svg")
+        return Markup(f'<svg class="icon{" " + cls if cls else ""}" aria-hidden="true"><use href="{href}#{escape(name)}"></use></svg>')
 
     @app.context_processor
     def inject_proxy_mode():

@@ -11,14 +11,14 @@
             <div class="section__head"><h2 class="section__title">Indexers</h2></div>
             <p class="section__hint">Where to search: Newznab for usenet indexers, Torznab for torrent sites (through Prowlarr or Jackett).</p>
             <ol class="indexer-list" id="indexerList"></ol>
-            <button type="button" class="btn btn-secondary" id="addIndexer"><i class="fas fa-plus" aria-hidden="true"></i> Add an indexer</button>
+            <button type="button" class="btn btn-secondary" id="addIndexer">{{ icon('plus') }} Add an indexer</button>
         </section>
 
         <section class="section" id="clients">
             <div class="section__head"><h2 class="section__title">Download clients</h2></div>
             <p class="section__hint">Usenet releases go to SABnzbd and torrents to qBittorrent. With neither, NZB and torrent files are saved to a folder for another client to pick up.</p>
             <details class="client" data-client="sabnzbd">
-                <summary><span class="client__name">SABnzbd</span> <span class="client__state"></span></summary>
+                <summary class="disclosure"><span class="client__name">SABnzbd</span> <span class="client__state"></span></summary>
                 <div class="field-stack">
                     {{ field('Address', 'sabnzbd.url', 'url', 'http://192.168.8.194:8080', 's-sab-url') }}
                     {{ field('API key', 'sabnzbd.api_key', extra='spellcheck="false"') }}
@@ -30,7 +30,7 @@
                 </div>
             </details>
             <details class="client" data-client="qbittorrent">
-                <summary><span class="client__name">qBittorrent</span> <span class="client__state"></span></summary>
+                <summary class="disclosure"><span class="client__name">qBittorrent</span> <span class="client__state"></span></summary>
                 <div class="field-stack">
                     {{ field('Address', 'qbittorrent.url', 'url', 'http://192.168.8.194:8081', 's-qb-url') }}
                     <div class="field-pair">
@@ -45,7 +45,7 @@
                 </div>
             </details>
             <details class="client" data-client="blackhole">
-                <summary><span class="client__name">A folder</span> <span class="client__state"></span></summary>
+                <summary class="disclosure"><span class="client__name">A folder</span> <span class="client__state"></span></summary>
                 <div class="field-stack">
                     <div class="field-with-button">
                         {{ field('Folder', 'blackhole_dir', placeholder='/data/comics/_blackhole', id='s-bh') }}
@@ -135,7 +135,7 @@
 <template id="indexerTemplate">
     <li class="indexer">
         <details>
-            <summary class="indexer__summary">
+            <summary class="indexer__summary disclosure">
                 <span class="indexer__name"></span>
                 <span class="indexer__meta"></span>
             </summary>

@@ -16,14 +16,13 @@ function toggleDarkMode() {
     updateDarkModeIcon();
 }
 
-// Helper to update the dark mode icon
+// The bar's button shows the mode a click switches to: the sun at night,
+// the moon by day.
 function updateDarkModeIcon() {
-    const icon = document.getElementById('dark-mode-icon');
-    if (icon) {
-        // Shows the mode a click switches to: the sun at night, the moon by day.
-        const dark = document.documentElement.classList.contains('dark-mode');
-        icon.className = dark ? 'fas fa-circle' : 'fas fa-moon';
-        const button = icon.closest('button');
-        if (button) button.setAttribute('aria-label', dark ? 'Day mode' : 'Night mode');
-    }
-} 
+    const slot = document.getElementById('dark-mode-icon');
+    if (!slot) return;
+    const dark = document.documentElement.classList.contains('dark-mode');
+    slot.innerHTML = icon(dark ? 'sun' : 'moon');
+    const button = slot.closest('button');
+    if (button) button.setAttribute('aria-label', dark ? 'Day mode' : 'Night mode');
+}

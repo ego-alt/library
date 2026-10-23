@@ -1,0 +1,16 @@
+{% extends "comics/base.html" %}
+{% set shelf = 'settings' %}
+{% block page_title %}Settings{% endblock %}
+{% block page %}settings{% endblock %}
+{% block styles %}
+    {{ super() }}
+    <link href="{{ url_for('static', filename='css/manage.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/settings.css') }}" rel="stylesheet">
+{% endblock %}
+{% block content %}
+{% include "_admin_tabs.html" %}
+{% include "_settings_form.html" %}
+{% endblock %}
+{% block scripts %}
+    <script src="{{ url_for('static', filename='js/settings.js') }}"></script>
+{% endblock %}

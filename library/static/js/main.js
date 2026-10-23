@@ -33,7 +33,7 @@ function appendBookToLibrary(book) {
 function getBookTemplate(book) {
     const n = Math.floor((book.progress || 0) * 100);
     const lock = book.access_level && book.access_level !== 'standard'
-        ? h('span', {class: 'book-lock', title: 'Private — only admins can see this', 'aria-label': 'Private'}, h('i', {class: 'fas fa-lock', 'aria-hidden': 'true'}))
+        ? h('span', {class: 'book-lock', title: 'Private — only admins can see this', 'aria-label': 'Private'}, iconEl('lock'))
         : null;
     return coverCard({
         href: appUrl(`/read/${encodeURIComponent(book.filename)}`),
@@ -43,7 +43,7 @@ function getBookTemplate(book) {
         cover: book.cover,
         extras: [lock, h('div', {class: 'book-buttons'},
             h('button', {class: 'book-button', dataset: {action: 'show-metadata', filename: book.filename}, 'aria-label': 'Details', title: 'Details'},
-                h('i', {class: 'fas fa-ellipsis-h', 'aria-hidden': 'true'})))],
+                iconEl('ellipsis')))],
     });
 }
 
@@ -374,7 +374,7 @@ function generateMetadataHtml(data, isUpload = false) {
     const coverChange = (isAdmin && !isUpload)
         ? `<button type="button" class="meta-cover__change"
                    data-action="change-cover" data-filename="${escapeHtml(data.filename)}">
-              <i class="fas fa-camera"></i><span>Change cover</span>
+              ${icon('camera')}<span>Change cover</span>
            </button>`
         : '';
     const cover = `
@@ -444,12 +444,12 @@ function generateMetadataHtml(data, isUpload = false) {
 
     const downloadButton = !isUpload
         ? `<a class="btn btn-secondary meta-download" href="${appUrl(`/download/${encodeURIComponent(data.filename)}`)}" download
-              title="Download the EPUB"><i class="fas fa-download" aria-hidden="true"></i><span>Download</span></a>`
+              title="Download the EPUB">${icon('download')}<span>Download</span></a>`
         : '';
     const deleteButton = (isAdmin && !isUpload)
         ? `<button type="button" class="delete-book-button btn btn-danger"
                    data-action="delete-book" data-filename="${escapeHtml(data.filename)}">
-              <i class="fas fa-trash"></i><span>Delete</span>
+              ${icon('trash-2')}<span>Delete</span>
            </button>`
         : '';
     const saveLabel = isUpload ? 'Add to library' : 'Save changes';
@@ -1057,10 +1057,10 @@ function addTag(text, container) {
     tag.className = 'tag';
     tag.appendChild(document.createTextNode(cleanText + ' '));
 
-    const removeBtn = document.createElement('span');
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
     removeBtn.className = 'remove-tag';
-    removeBtn.textContent = '×';
-    removeBtn.setAttribute('role', 'button');
+    removeBtn.innerHTML = icon('x');
     removeBtn.setAttribute('aria-label', `Remove tag ${cleanText}`);
     removeBtn.addEventListener('click', () => tag.remove());
     tag.appendChild(removeBtn);
