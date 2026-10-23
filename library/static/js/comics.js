@@ -33,7 +33,7 @@ function initSeries() {
         }
         empty.hidden = shown > 0;
         if (!shown) {
-            empty.querySelector('h3').textContent = `Nothing matches "${search.value.trim()}"`;
+            empty.querySelector('h3').textContent = `Nothing matches “${search.value.trim()}”`;
             empty.querySelector('p').textContent = 'Try a different word, or clear the search.';
         }
     }

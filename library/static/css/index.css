@@ -184,11 +184,11 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     overflow: hidden;
 }
 .book-caption__author {
-    font-size: 0.75rem;
+    font-size: 0.8125rem;
     font-variant: small-caps;
-    letter-spacing: 0.16em;
+    letter-spacing: 0.12em;
     text-transform: lowercase;
-    color: var(--color-text-muted);
+    color: var(--color-text-secondary);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -412,11 +412,15 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 .meta-author-input:hover {
     background: var(--color-highlight-soft);
 }
+/* They read as the book's title and author, not as boxes: a field shows
+   only when you're in it, as a line under the text. */
 .meta-title-input:focus,
 .meta-author-input:focus {
     outline: none;
-    background: var(--color-bg-inset);
-    border-color: var(--color-border);
+    background: transparent;
+    border-color: transparent;
+    box-shadow: 0 1px 0 var(--color-accent);
+    border-radius: 0;
 }
 .meta-author,
 .meta-author-input {
@@ -649,9 +653,13 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
         max-width: 200px;
         margin: 0 auto;
     }
-    .meta-footer { flex-direction: row; align-items: center; }
-    .meta-footer-actions { justify-content: flex-end; }
-    .meta-footer-info { text-align: left; white-space: nowrap; }
+    /* When it was added on a line of its own, then the actions in one row. */
+    .meta-footer { flex-wrap: wrap; align-items: center; row-gap: var(--space-2); }
+    .meta-footer-info { flex-basis: 100%; text-align: left; }
+    .meta-footer-actions { flex: 1; justify-content: flex-end; gap: var(--space-1); }
+    .meta-footer-actions .btn { white-space: nowrap; }
+    .meta-footer-actions .meta-download, .meta-footer-actions .delete-book-button { padding-left: var(--space-2); padding-right: var(--space-2); }
+    .meta-fields { padding-bottom: var(--space-4); }
 }
 .tag-input-container {
     background: var(--color-bg-inset);
@@ -950,8 +958,8 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 .meta-status { align-self: flex-start; }
 @media (max-width: 640px) {
     .library-search-row { max-width: none; flex-basis: 100%; }
-    .library .status-filter, .library-toolbar .status-filter { width: 100%; }
-    .library-toolbar .status-filter button { flex: 1; min-height: 44px; }
+    /* Left-aligned and compact, so every tab fits on any phone. */
+    .library-toolbar .status-filter button { min-height: 44px; }
 
 }
 
@@ -975,9 +983,11 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 .shelf-get__note:empty { display: none; }
 .shelf-get .is-busy .book { opacity: 0.6; }
 
+/* Empty shelves and searches that found nothing: plain lines at the left,
+   where the "Get …" offer under them starts too. */
 .empty-state {
-    text-align: center;
-    padding: var(--space-8) var(--space-4);
+    text-align: left;
+    padding: var(--space-2) 0 var(--space-5);
     color: var(--color-text-muted);
 }
 .empty-state h3 { font-size: var(--text-lg); color: var(--color-text-secondary); margin-bottom: var(--space-2); }
@@ -1016,8 +1026,7 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 }
 .meta-download:hover { color: var(--color-text-primary); }
 @media (max-width: 640px) {
-    .meta-download span { display: none; }  /* icon-only in the sheet footer */
-    .meta-download { min-width: 44px; min-height: 44px; }
+    .meta-download { min-height: 44px; }
 }
 
 /* Adding books: drop target and the brief highlight on a newly added card */

@@ -43,8 +43,8 @@
 .series-head__desc.is-folded { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .series-head__more-text { padding: 0; border: none; background: none; color: var(--color-text-muted); font: inherit; font-size: var(--text-sm); text-decoration: underline; cursor: pointer; min-height: 32px; }
 .series-head__actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin-top: var(--space-3); }
-/* The same round ⋯ as on a cover, sitting on the wall. */
-.series-head__more { width: 44px; height: 44px; border: 1px solid var(--color-border); color: var(--color-text-secondary); }
+/* ⋯ beside Continue, as an ordinary secondary button. */
+.series-head__more { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 40px; padding: 0 var(--space-3); }
 @media (max-width: 640px) {
     /* A small cover beside the title; the rest flows under it. */
     .series-head { display: block; }

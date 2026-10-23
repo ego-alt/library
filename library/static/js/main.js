@@ -187,7 +187,7 @@ function renderEmptyState() {
     let [title, body] = ["Your shelves are empty", window.isAuthenticated
         ? "Add an EPUB to begin." : "Sign in to add books."];
     if (searching) {
-        [title, body] = [`Nothing matches "${currentFilters.q}"`, "Try a different word, or clear the search."];
+        [title, body] = [`Nothing matches “${currentFilters.q}”`, "Try a different word, or clear the search."];
     } else if (EMPTY_STATES[currentView]) {
         [title, body] = EMPTY_STATES[currentView];
     }
@@ -367,7 +367,8 @@ function generateMetadataHtml(data, isUpload = false) {
 
     const authorEl = editable
         ? `<input type="text" id="${ids.author}" class="meta-author-input"
-                  value="${escapeHtml(data.author || '')}" placeholder="Author">`
+                  value="${escapeHtml(data.author_display || data.author || '')}" placeholder="Author"
+                  data-raw="${escapeHtml(data.author || '')}" data-shown="${escapeHtml(data.author_display || data.author || '')}">`
         : `<p id="${ids.author}" class="meta-author">${escapeHtml(data.author_display || data.author || 'Unknown author')}</p>`;
 
     // --- Cover with hover overlay for admins ---
@@ -443,7 +444,7 @@ function generateMetadataHtml(data, isUpload = false) {
         : `<span class="meta-footer-info"></span>`;
 
     const downloadButton = !isUpload
-        ? `<a class="btn btn-secondary meta-download" href="${appUrl(`/download/${encodeURIComponent(data.filename)}`)}" download
+        ? `<a class="btn btn-ghost meta-download" href="${appUrl(`/download/${encodeURIComponent(data.filename)}`)}" download
               title="Download the EPUB">${icon('download')}<span>Download</span></a>`
         : '';
     const deleteButton = (isAdmin && !isUpload)
@@ -560,20 +561,12 @@ document.addEventListener('keydown', (e) => {
 const COARSE_POINTER = window.matchMedia('(hover: none), (pointer: coarse)').matches;
 
 function focusFirstMetadataField() {
-    // Defer until after the fadeIn so focus actually lands on a visible input.
-    // Place the caret at the end of the existing text rather than at the start.
+    // The card opens as a book, not a form: no field is entered until you
+    // tap one. Keyboard focus goes inside the dialog, on its close button.
     setTimeout(() => {
-        const first = document.querySelector('#metadataContent .meta-title-input');
-        if (!first) {
-            // Read-only details: put keyboard focus inside the dialog anyway.
-            if (!COARSE_POINTER) document.querySelector('.close-metadata')?.focus();
-            return;
-        }
-        autoGrow(first);
-        if (COARSE_POINTER) return;
-        first.focus();
-        const end = first.value.length;
-        first.setSelectionRange(end, end);
+        const title = document.querySelector('#metadataContent .meta-title-input');
+        if (title) autoGrow(title);
+        if (!COARSE_POINTER) document.querySelector('.close-metadata')?.focus({preventScroll: true});
     }, 50);
 }
 
@@ -685,7 +678,11 @@ function saveMetadata(filename) {
 
     // For each metadata field, check if it is rendered as an input (editable) or as a span.
     const title = $('#metadata-title').is('input, textarea') ? $('#metadata-title').val() : $('#metadata-title').text().trim();
-    const author = $('#metadata-author').is('input') ? $('#metadata-author').val() : $('#metadata-author').text().trim();
+    // The author is shown as people write it ("Tony Judt"); left as shown,
+    // it's saved as it was stored ("Judt, Tony").
+    const authorEl = document.getElementById('metadata-author');
+    let author = $('#metadata-author').is('input') ? $('#metadata-author').val() : $('#metadata-author').text().trim();
+    if (authorEl && authorEl.dataset.shown !== undefined && author === authorEl.dataset.shown) author = authorEl.dataset.raw;
     const genre = $('#metadata-genre').is('input') ? $('#metadata-genre').val() : $('#metadata-genre').text().trim();
 
     // Include a tag that was typed but not yet confirmed with Enter.

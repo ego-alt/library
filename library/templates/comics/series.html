@@ -18,7 +18,7 @@
         {% set have = issues|selectattr('has_file')|list|length %}
         {% set read = issues|selectattr('finished')|list|length %}
         <p class="series-head__count">
-            {% if is_admin and issues|length > have %}<button type="button" class="series-head__toggle" id="haveToggle" aria-pressed="false" title="Show only the issues here">{{ have }} of {{ issues|length }} here</button>{% else %}{{ have }} issue{{ 's' if have != 1 }}{% endif %}{% if read %} · {{ read }} read{% endif %}
+            {% if is_admin and issues|length > have %}<button type="button" class="series-head__toggle" id="haveToggle" aria-pressed="false" title="Show only the issues here">{{ have }} of {{ issues|length }} issues</button>{% else %}{{ have }} issue{{ 's' if have != 1 }}{% endif %}{% if read %} · {{ read }} read{% endif %}
         </p>
         {% if is_admin and series.provider != 'local' %}
         {% set getting = {'future': 'new issues', 'all': 'every missing issue', 'none': 'only the issues you choose'}[series.monitor] %}
@@ -28,7 +28,7 @@
         <div class="series-head__actions">
             {% if up_next %}<a class="btn btn-primary" href="{{ url_for('comics.read_page', issue_id=up_next.id) }}">{{ 'Continue' if up_next.page and not up_next.finished else 'Read' }} #{{ up_next.number }}</a>{% endif %}
             {% if is_admin %}
-            <button type="button" class="book-button series-head__more" data-action="series-menu" data-menu-anchor aria-label="More for {{ series.name }}">{{ icon('ellipsis') }}</button>
+            <button type="button" class="btn btn-secondary series-head__more" data-action="series-menu" data-menu-anchor aria-label="More for {{ series.name }}">{{ icon('ellipsis') }}</button>
             {% endif %}
         </div>
     </div>
