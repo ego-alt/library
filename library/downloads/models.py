@@ -40,7 +40,7 @@ class Download(db.Model):
     # never sent to the browser.
     url = db.Column(db.Text)
     size = db.Column(db.BigInteger)
-    client = db.Column(db.String(20))  # sabnzbd | qbittorrent | blackhole
+    client = db.Column(db.String(20))  # sabnzbd | qbittorrent
     client_ref = db.Column(db.String(200))  # the client's id for the job
     status = db.Column(db.String(12), nullable=False, default=DL_QUEUED, index=True)
     progress = db.Column(db.Float, default=0)

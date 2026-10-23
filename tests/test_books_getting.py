@@ -95,17 +95,6 @@ def test_request_search_download_and_import(app, wanted, tmp_path, monkeypatch, 
     assert wanted.book_id == book.id and book.title == "The Left Hand of Darkness" and (book_dir / book.filename).exists()
 
 
-def test_import_folder_epub_fulfils_a_request(app, wanted, comic_dir, book_dir):
-    inbox = comic_dir / "_import"
-    inbox.mkdir()
-    (inbox / "the_left_hand_of_darkness.epub").write_bytes(build_epub3(title="tlhod", author="x"))
-    (inbox / "Something else.epub").write_bytes(build_epub3(title="Another Book", author="Somebody"))
-    result = getting.scan_import_dir(str(inbox))
-    assert len(result["imported"]) == 2 and wanted.status == DOWNLOADED
-    assert {b.title for b in Book.query} == {"The Left Hand of Darkness", "Another Book"}
-    assert not list(inbox.iterdir())
-
-
 def test_get_api_requests_a_book_once(admin_client, comic_dir):
     found = {"ol_key": "/works/OL1W", "title": "Piranesi", "author": "Susanna Clarke", "year": 2020}
     first = admin_client.post("/api/get/books", json=found)
@@ -117,14 +106,6 @@ def test_get_api_requests_a_book_once(admin_client, comic_dir):
     request_id = first.get_json()["id"]
     assert admin_client.delete(f"/api/book-requests/{request_id}").status_code == 200
     assert BookRequest.query.count() == 0
-
-
-def test_epub_in_the_import_folder_joins_the_library(admin_client, comic_dir, book_dir):
-    inbox = comic_dir / "_import"
-    inbox.mkdir()
-    (inbox / "dropped.epub").write_bytes(build_epub3(title="Dropped In", author="A Writer"))
-    result = admin_client.post("/api/import/scan").get_json()
-    assert len(result["imported"]) == 1 and Book.query.one().title == "Dropped In"
 
 
 def test_openlibrary_search_parses_docs():

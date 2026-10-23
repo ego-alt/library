@@ -1,11 +1,10 @@
 """Comic files: matching them to issues, and bringing them into COMIC_DIR.
 
-Files arrive in the import folder (finished downloads, or anything dropped or
-uploaded there). Each is matched to an issue of a followed series by its
-ComicInfo.xml or its name, written into the library as a tagged CBZ at
-<Publisher>/<Series (Year)>/<Series> #<001> (<Year>).cbz, and removed from the
-import folder. Files that match nothing stay put and are listed on the Import
-page to be matched by hand.
+A file arrives as a finished download (for the issue it was started for) or
+from a shelf's + (checked by hand first). It's matched to an issue of a
+followed series by its ComicInfo.xml or its name, and written into the
+library as a tagged CBZ at <Publisher>/<Series (Year)>/<Series> #<001>
+(<Year>).cbz.
 """
 
 import logging
@@ -28,10 +27,6 @@ SERIES_MATCH = 0.86
 
 def comic_dir() -> str:
     return current_app.config["COMIC_DIR"]
-
-
-def import_dir() -> str:
-    return current_app.config.get("IMPORT_DIR") or os.path.join(comic_dir(), "_import")
 
 
 def abs_path(issue: ComicIssue) -> str:
@@ -148,41 +143,3 @@ def delete_file(issue: ComicIssue) -> None:
     issue.page_count = None
     issue.status = SKIPPED
     db.session.commit()
-
-
-def comic_files(folder: str) -> list[str]:
-    """Comic files under `folder`, oldest first; skips half-written ones."""
-    found = []
-    for root, _dirs, files in os.walk(folder):
-        for name in files:
-            if names.is_comic_file(name) and not name.endswith((".partial", ".new")):
-                found.append(os.path.join(root, name))
-    return sorted(found, key=lambda p: os.path.getmtime(p))
-
-
-def scan_import_dir() -> dict:
-    """Import every file in the import folder that matches an issue."""
-    folder = import_dir()
-    os.makedirs(folder, exist_ok=True)
-    imported, unmatched, failed = [], [], []
-    for path in comic_files(folder):
-        match = match_file(path)
-        if match.issue is None:
-            unmatched.append(os.path.relpath(path, folder))
-            continue
-        try:
-            import_file(path, match.issue)
-            imported.append(match.issue.id)
-        except archive.ArchiveError as e:
-            logger.warning("Couldn't import %s: %s", path, e)
-            failed.append(os.path.relpath(path, folder))
-    return {"imported": imported, "unmatched": unmatched, "failed": failed}
-
-
-def import_folder_path(rel: str) -> str:
-    """A file in the import folder by its relative path; refuses anything outside it."""
-    folder = os.path.realpath(import_dir())
-    path = os.path.realpath(os.path.join(folder, rel))
-    if not path.startswith(folder + os.sep) or not os.path.isfile(path):
-        raise FileNotFoundError(rel)
-    return path

@@ -1,5 +1,5 @@
-// Downloads: following everything on its way into the library, and the
-// files that need a series (Settings is the tab beside it). Also the release
+// Downloads: following everything on its way into the library (Settings is
+// the tab beside it). Also the release
 // chooser the comics series page uses. Asking for books and following series
 // is under the shelves' search (get.js); adding files is the shelves' +.
 // Helpers are in ui.js.
@@ -84,7 +84,6 @@ async function run(work, done) {
 function initDownloads() {
     initWanted();
     initDownloadLists();
-    initImport();
 }
 
 // Wanted: compact rows, each with a ⋯ menu; a comic series' row acts on all
@@ -177,7 +176,6 @@ function initDownloadLists() {
         const percent = Math.round((d.progress || 0) * 100);
         if (where === 'active') {
             if (d.status === 'importing') return ['Adding to the library', null];
-            if (d.client === 'blackhole') return ['Waiting for your download client', null];
             if (d.stalled) return [`Stalled at ${percent}%`, 'is-bad'];
             return [`${percent}%`, null];
         }
@@ -197,22 +195,23 @@ function initDownloadLists() {
     // that still needs you).
     function downloadRow(d, where) {
         const percent = Math.round((d.progress || 0) * 100);
+        const showError = d.error && where !== 'active';
         const [state, tone] = stateOf(d, where);
         const label = d.item ? d.item.label : 'Removed';
         const retry = d.item ? {label: 'Try another release', onClick: () => act(`/api/downloads/${d.id}/retry`, 'POST', 'Looking for another release')} : null;
+        // A failure's reason heads its menu; the row itself stays one line.
+        const why = showError ? {note: d.error} : null;
         const actions = where === 'active'
             ? [d.stalled ? retry : null, {label: 'Cancel…', danger: true, onClick: () => confirmMenu(more, `Cancel ${label}?`, [{label: 'Keep downloading'}, {label: 'Cancel the download', danger: true, onClick: () => act(`/api/downloads/${d.id}/cancel`, 'POST', 'Cancelled')}])}]
-            : [retry, d.item ? {label: 'Stop looking…', danger: true, onClick: () => stopLooking(d, more)} : null, {label: 'Dismiss', onClick: () => act(`/api/downloads/${d.id}`, 'DELETE', 'Dismissed')}];
+            : [why, retry, d.item ? {label: 'Stop looking…', danger: true, onClick: () => stopLooking(d, more)} : null, {label: 'Dismiss', onClick: () => act(`/api/downloads/${d.id}`, 'DELETE', 'Dismissed')}];
         const more = h('button', {type: 'button', class: 'entry__more', 'aria-label': `More for ${label}`, dataset: {menuAnchor: ''}, onclick: (e) => openMenu(e.currentTarget, actions)}, iconEl('ellipsis'));
-        const showError = d.error && where !== 'active';
-        return h('li', {class: 'entry', title: [d.title, d.indexer, formatSize(d.size)].filter(Boolean).join(' · ')},
+        // One line: what it is, then its state on the right (like Wanted's
+        // dates). When, the release, indexer and size are in its tooltip.
+        return h('li', {class: 'entry', title: [d.title, d.indexer, formatSize(d.size), timeAgo(d.updated_at || d.created_at), showError ? d.error : null].filter(Boolean).join(' · ')},
             h('div', {class: 'entry__main'},
-                h('span', {class: 'entry__title'}, d.item ? h('a', {href: d.item.url}, d.item.label) : h('span', {class: 'muted'}, 'Removed')),
-                // Two lines: what it is, then its state and why (a failure)
-                // or when; the release, indexer and size are in its tooltip.
-                h('span', {class: 'entry__meta', title: showError ? d.error : null}, h('strong', {class: tone}, state), ' · ', showError ? d.error : timeAgo(d.updated_at || d.created_at))),
-            where === 'active' && d.client !== 'blackhole' && d.status !== 'importing' ? h('span', {class: 'entry__bar'}, h('span', {style: `width: ${percent}%`})) : null,
-            h('span'),
+                h('span', {class: 'entry__title'}, d.item ? h('a', {href: d.item.url}, d.item.label) : h('span', {class: 'muted'}, 'Removed'))),
+            where === 'active' && d.status !== 'importing' ? h('span', {class: 'entry__bar'}, h('span', {style: `width: ${percent}%`})) : null,
+            h('span', {class: `entry__side entry__state${tone ? ` ${tone}` : ''}`}, state),
             more);
     }
 
@@ -259,20 +258,6 @@ function initDownloadLists() {
     poll();
 }
 
-
-// --- Needs a series: comic files waiting in the import folder (import.js) ---
-
-function initImport() {
-    const section = document.getElementById('import');
-    const list = document.getElementById('importList');
-    const load = async () => { section.hidden = !(await comicImport.fillWaiting(list, load)); };
-    document.getElementById('importScan').addEventListener('click', async (e) => {
-        e.currentTarget.textContent = 'Matching…';
-        await busy(e.currentTarget, () => run(() => apiFetch('/api/import/scan', {method: 'POST'}), data => showToast(comicImport.describe(data), 'success')));
-        load();
-    });
-    load();
-}
 
 const DOWNLOAD_PAGES = {downloads: initDownloads};
 document.addEventListener('DOMContentLoaded', () => {

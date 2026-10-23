@@ -106,11 +106,10 @@ def book(app, book_dir, sample_epub_bytes):
 
 @pytest.fixture
 def comic_dir(app, tmp_path):
-    """COMIC_DIR (with its _import folder) for comics tests."""
+    """COMIC_DIR for comics tests."""
     d = tmp_path / "comics"
     d.mkdir()
     app.config["COMIC_DIR"] = str(d)
-    app.config["IMPORT_DIR"] = None
     app.config["WORKER_STATE_DIR"] = str(tmp_path / "state")
     return d
 

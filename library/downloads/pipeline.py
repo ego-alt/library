@@ -37,9 +37,6 @@ from .models import (
 
 logger = logging.getLogger(__name__)
 
-# A blackhole grab that hasn't shown up in the import folder by then has failed.
-BLACKHOLE_GIVE_UP = timedelta(days=3)
-
 _handlers: dict = {}
 
 
@@ -207,7 +204,7 @@ STALLED_AFTER = timedelta(hours=6)
 
 
 def is_stalled(download: Download) -> bool:
-    return download.status == DL_DOWNLOADING and download.client != "blackhole" and download.updated_at is not None and _utcnow().replace(tzinfo=None) - download.updated_at > STALLED_AFTER
+    return download.status == DL_DOWNLOADING and download.updated_at is not None and _utcnow().replace(tzinfo=None) - download.updated_at > STALLED_AFTER
 
 
 def check_downloads() -> int:
@@ -215,10 +212,6 @@ def check_downloads() -> int:
     how many are still active."""
     client_problems.clear()
     for download in Download.query.filter(Download.status.in_(DL_ACTIVE)).all():
-        if download.client == "blackhole":
-            if _utcnow().replace(tzinfo=None) - download.created_at > BLACKHOLE_GIVE_UP:
-                fail(download, "Its file never showed up in the import folder.")
-            continue
         if download.status == DL_IMPORTING:
             continue
         try:
@@ -242,7 +235,7 @@ def active_count() -> int:
 
 
 def mark_imported(kind: str, item_ids: list[int]) -> None:
-    """Downloads whose item arrived another way (a blackhole, or by hand) are done."""
+    """Downloads whose item arrived another way (added by hand) are done."""
     if not item_ids:
         return
     column = getattr(Download, handler(kind).fk)

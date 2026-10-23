@@ -54,7 +54,7 @@ def saga(app, comic_dir, admin_client, provider):
 
 def test_comics_need_sign_in(client, comic_dir):
     assert client.get("/comics/").status_code in (302, 401)
-    assert client.get("/api/import").status_code == 401
+    assert client.post("/api/import/stage").status_code == 401
     assert client.get("/downloads").status_code in (302, 401)
     assert client.put("/comics/api/issues/1/progress", json={"page": 1}).status_code == 401
 
@@ -69,7 +69,7 @@ def test_every_page_renders(admin_client, saga, tmp_path, comic_dir):
         assert response.status_code == 200, path
     assert b"Saga" in admin_client.get("/comics/").data
     downloads = admin_client.get("/downloads").data.decode()
-    assert "Needs a series" in downloads and 'id="settingsForm"' not in downloads and "Coming up" not in downloads and "Background jobs" not in downloads
+    assert "Needs a series" not in downloads and 'id="settingsForm"' not in downloads and "Coming up" not in downloads and "Background jobs" not in downloads
 
 
 def test_empty_comics_page_says_what_to_do(admin_client, comic_dir):
@@ -134,8 +134,7 @@ def test_old_pages_are_gone(admin_client, comic_dir):
         ("post", "/api/wanted/comic/1/search"),
         ("get", "/api/wanted/book/1/releases"),
         ("post", "/comics/api/issues/1/upload"),
-        ("get", "/api/import"),
-        ("post", "/api/import/scan"),
+        ("post", "/api/import/stage"),
         ("get", "/api/downloads"),
         ("post", "/api/jobs/search"),
         ("post", "/api/downloads/1/retry"),
@@ -175,31 +174,18 @@ def test_monitor_all_and_bulk(admin_client, saga):
     assert admin_client.post("/comics/api/issues/bulk", json={"ids": ids, "status": "skipped"}).get_json()["changed"] == 3
 
 
-def test_import_folder_matches_and_files(admin_client, saga, comic_dir):
-    inbox = comic_dir / "_import"
-    inbox.mkdir()
-    make_cbz(inbox / "Saga 002 (2024) (Digital).cbz")
-    (inbox / "notes.txt").write_text("x")
-    result = admin_client.post("/api/import/scan").get_json()
-    assert len(result["imported"]) == 1
-    assert saga.issues[1].status == DOWNLOADED
-
-
-def test_manual_import_into_a_new_local_series(admin_client, comic_dir):
-    inbox = comic_dir / "_import"
-    inbox.mkdir()
-    make_cbz(inbox / "Zine 004 (2021).cbz")
-    listing = admin_client.get("/api/import").get_json()
-    assert listing["files"][0]["reason"].startswith("No followed series")
-    response = admin_client.post("/api/import/file", json={"path": "Zine 004 (2021).cbz", "new_series": "Zine"})
+def test_a_comic_no_series_knows_goes_into_a_new_local_one(admin_client, comic_dir):
+    data = {"file": (io.BytesIO(make_cbz(comic_dir / "tmp.cbz").read_bytes()), "Zine 004 (2021).cbz")}
+    row = admin_client.post("/api/import/stage", data=data, content_type="multipart/form-data").get_json()["file"]
+    assert row["reason"].startswith("No followed series")
+    response = admin_client.post(f"/api/import/stage/{row['path']}", json={"new_series": "Zine"})
     assert response.status_code == 200
     series = ComicSeries.query.one()
     assert series.provider == "local" and series.issues[0].number == "4" and series.issues[0].status == DOWNLOADED
 
 
-def test_import_refuses_paths_outside_the_folder(admin_client, comic_dir):
-    response = admin_client.post("/api/import/file", json={"path": "../../etc/passwd", "new_series": "x"})
-    assert response.status_code == 404
+def test_staged_files_refuse_paths_outside_their_folder(admin_client, comic_dir):
+    assert admin_client.post("/api/import/stage/../../etc/passwd", json={"new_series": "x"}).status_code == 404
 
 
 def test_reading_pages_and_progress(admin_client, saga, tmp_path, admin_user):
@@ -250,12 +236,7 @@ def test_books_page_links_to_comics(admin_client):
     assert b"/comics/" in admin_client.get("/").data
 
 
-def test_settings_tests_use_the_form_without_saving(admin_client, comic_dir, tmp_path):
-    folder = tmp_path / "hole"
-    folder.mkdir()
-    response = admin_client.post("/api/settings/test", json={"what": "blackhole", "values": {"blackhole_dir": str(folder)}})
-    assert response.status_code == 200, response.get_json()
-    assert settings.get("blackhole_dir") == ""
+def test_settings_tests_use_the_form_without_saving(admin_client, comic_dir):
     # A masked key on the form stands for the saved one.
     settings.set_many({"sabnzbd": {"url": "", "api_key": "saved-key-1234", "category": "comics", "book_category": "books"}})
     response = admin_client.post("/api/settings/test", json={"what": "sabnzbd", "values": {"url": "", "api_key": settings.masked("saved-key-1234")}})

@@ -82,8 +82,6 @@ def test_settings():
             message = clients.SABnzbd({**values, "api_key": _merge_secret(values.get("api_key", ""), current["sabnzbd"].get("api_key", ""))}).test()
         elif what == "qbittorrent":
             message = clients.QBittorrent({**values, "password": _merge_secret(values.get("password", ""), current["qbittorrent"].get("password", ""))}).test()
-        elif what == "blackhole":
-            message = clients.Blackhole(values.get("blackhole_dir", "")).test()
         else:
             return jsonify({"error": "Nothing to test here."}), 400
     except (providers.ProviderError, indexers.IndexerError, clients.ClientError) as e:

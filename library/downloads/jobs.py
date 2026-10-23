@@ -19,9 +19,7 @@ from datetime import datetime, timezone
 from flask import current_app
 
 from .. import settings
-from ..books import getting as books
 from ..comics import downloads as comic_downloads
-from ..comics import files as comic_files
 from ..comics.series import due_for_refresh, refresh_series
 from ..config import DATA_DIR
 from ..models import db
@@ -32,11 +30,10 @@ logger = logging.getLogger(__name__)
 TICK = 5  # seconds between looks at the request files
 EVERY = {
     "downloads": 60,
-    "import": 120,
     "refresh": 30 * 60,
     # "search" comes from settings (search_interval_hours).
 }
-JOBS = ("downloads", "import", "refresh", "search")
+JOBS = ("downloads", "refresh", "search")
 
 _started = False
 _start_lock = threading.Lock()
@@ -102,31 +99,11 @@ def _save_state(state: dict) -> None:
     os.replace(tmp, _state_path())
 
 
-def import_all() -> dict:
-    """Import what's in the import folder: comics to their issues, EPUBs to
-    the books. Returns {"imported", "unmatched", "failed"} counts' lists."""
-    result = comic_files.scan_import_dir()
-    comic_downloads.mark_imported(result["imported"])
-    found = books.scan_import_dir(comic_files.import_dir())
-    return {"imported": result["imported"] + found["imported"], "unmatched": result["unmatched"], "failed": result["failed"] + found["failed"]}
-
-
-def describe_import(result: dict) -> str:
-    parts = [f"Added {len(result['imported'])}."]
-    if result["unmatched"]:
-        parts.append(f"{len(result['unmatched'])} need{'s' if len(result['unmatched']) == 1 else ''} a series.")
-    if result["failed"]:
-        parts.append(f"{len(result['failed'])} couldn't be opened.")
-    return " ".join(parts)
-
-
 def run_job(job: str) -> str:
     """Run one job now, in this thread. Returns a sentence about what it did."""
     if job == "downloads":
         active = pipeline.check_downloads()
         return f"{active} download{'s' if active != 1 else ''} in progress."
-    if job == "import":
-        return describe_import(import_all())
     if job == "refresh":
         due = due_for_refresh()
         new, errors = 0, []

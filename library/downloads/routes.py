@@ -2,13 +2,12 @@
 and the APIs behind asking for books and series from the shelves' search
 and adding files with the shelves' +.
 
-  /downloads           in progress (failures that need you first), wanted,
-                       and files that need a series
+  /downloads           in progress (failures that need you first) and wanted
   /settings            the tab beside it: indexers, clients, comics
   /api/get/...         searching Open Library and ComicVine/Metron
   /api/downloads/...   the queue; /api/wanted/<kind>/<id>/... searches and
                        grabs for a comic issue or a book request alike
-  /api/import/...      the import folder, and one comic staged to check
+  /api/import/stage    one comic from a shelf's +, staged to check
 """
 
 import difflib
@@ -106,7 +105,7 @@ def settings_page():
     """Settings, the tab beside Downloads."""
     if not is_admin():
         return redirect(url_for("index_routes.index"))
-    return render_template("settings.html", import_dir=comic_files.import_dir(), comic_dir=comic_files.comic_dir())
+    return render_template("settings.html", comic_dir=comic_files.comic_dir())
 
 
 @downloads_blueprint.get("/downloads")
@@ -351,7 +350,7 @@ def forget_download(download_id):
     return jsonify({"ok": True})
 
 
-# API: the import folder
+# API: adding one comic from a shelf's +
 
 
 def _series_names() -> dict:
@@ -416,19 +415,8 @@ def _file_issue(path: str, issue):
     return jsonify(issue_json(issue))
 
 
-@downloads_blueprint.get("/api/import")
-@json_admin_required
-def import_list():
-    """Comics in the import folder that didn't match an issue on their own."""
-    folder = comic_files.import_dir()
-    os.makedirs(folder, exist_ok=True)
-    series_names = _series_names()
-    rows = [_file_row(path, folder, series_names) for path in comic_files.comic_files(folder)]
-    return jsonify({"files": rows, "folder": folder, "series": _series_options(series_names)})
-
-
-# Adding one comic from a shelf's +: it waits, unfiled, while you check what
-# it matched (or choose its series), as a book waits in its review panel.
+# It waits, unfiled, while you check what it matched (or choose its series),
+# as a book waits in its review panel.
 
 def _staged_dir() -> str:
     return os.path.join(comic_files.comic_dir(), "_staged")
@@ -496,37 +484,3 @@ def import_unstage(name):
     except Exception:
         pass
     return jsonify({"ok": True})
-
-
-@downloads_blueprint.post("/api/import/scan")
-@json_admin_required
-def import_scan():
-    return jsonify(jobs.import_all())
-
-
-@downloads_blueprint.post("/api/import/file")
-@json_admin_required
-def import_one():
-    """File one comic from the import folder as an issue you pick, or as a
-    new local series when no provider knows it."""
-    data = request.get_json(silent=True) or {}
-    try:
-        path = comic_files.import_folder_path(data.get("path", ""))
-    except FileNotFoundError:
-        return jsonify({"error": "That file isn't in the import folder any more."}), 404
-    issue, error = _issue_for(data, path)
-    if error:
-        return jsonify({"error": error}), 400
-    return _file_issue(path, issue)
-
-
-@downloads_blueprint.delete("/api/import/file")
-@json_admin_required
-def import_delete():
-    try:
-        path = comic_files.import_folder_path(request.args.get("path", ""))
-    except FileNotFoundError:
-        return jsonify({"ok": True})
-    os.remove(path)
-    return jsonify({"ok": True})
-

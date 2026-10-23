@@ -20,12 +20,10 @@ DEFAULTS = {
     # {"name", "kind": "newznab"|"torznab", "url", "api_key", "enabled",
     #  "categories" (comics, 7030 on most), "book_categories" (ebooks, 7020)}
     "indexers": [],
-    # Where grabs go. Usenet results go to SABnzbd, torrents to qBittorrent;
-    # with neither, a blackhole folder that some other client watches. Each
-    # client files comics and books under their own category.
+    # Where grabs go: usenet results to SABnzbd, torrents to qBittorrent,
+    # each filing comics and books under their own category.
     "sabnzbd": {"url": "", "api_key": "", "category": "comics", "book_category": "books"},
     "qbittorrent": {"url": "", "username": "", "password": "", "category": "comics", "book_category": "books"},
-    "blackhole_dir": "",
     # The client sees its download folder at remote_path; this app sees the
     # same folder at local_path.
     "path_map": {"remote_path": "", "local_path": ""},

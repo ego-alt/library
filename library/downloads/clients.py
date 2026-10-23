@@ -2,16 +2,12 @@
 
   SABnzbd (usenet):         api?mode=addurl, then mode=queue / mode=history
   qBittorrent (torrents):   /api/v2/torrents/add, then /api/v2/torrents/info
-  Blackhole:                the .nzb/.torrent saved in a folder another client
-                            watches; its finished files are picked up from the
-                            import folder.
 
 Each job is tagged with the download's id, so we only ever touch our own, and
 filed under the client's category for comics or for books.
 """
 
 import os
-import re
 from dataclasses import dataclass
 
 import httpx
@@ -181,56 +177,14 @@ class QBittorrent:
             self._request("POST", "torrents/delete", data={"hashes": torrent["hash"], "deleteFiles": "true"})
 
 
-class Blackhole:
-    name = "blackhole"
-
-    def __init__(self, folder: str, transport: httpx.BaseTransport | None = None):
-        if not folder:
-            raise ClientError("No blackhole folder is set.")
-        self.folder = folder
-        self.transport = transport
-
-    def test(self) -> str:
-        if not os.path.isdir(self.folder):
-            raise ClientError(f"{self.folder} isn't a folder this app can see.")
-        return f"Grabs will be saved in {self.folder}."
-
-    def add(self, url: str, title: str, download_id: int, protocol: str = "usenet", kind: str = "comic") -> str:
-        try:
-            with httpx.Client(timeout=60, headers={"User-Agent": USER_AGENT}, follow_redirects=True, transport=self.transport) as http:
-                response = http.get(url)
-        except httpx.HTTPError as e:
-            raise ClientError(f"Couldn't fetch the {'NZB' if protocol == 'usenet' else 'torrent'} ({e.__class__.__name__}).") from e
-        if response.status_code >= 400:
-            raise ClientError(f"The indexer answered {response.status_code} for the file.")
-        ext = ".nzb" if protocol == "usenet" else ".torrent"
-        name = re.sub(r'[\\/:*?"<>|]', " ", title)[:150].strip() + ext
-        os.makedirs(self.folder, exist_ok=True)
-        with open(os.path.join(self.folder, name), "wb") as f:
-            f.write(response.content)
-        return name
-
-    def state(self, ref: str) -> JobState:
-        # We can't see the other client; the import folder scan finishes the job.
-        return JobState("downloading", 0.0)
-
-    def remove(self, ref: str) -> None:
-        try:
-            os.remove(os.path.join(self.folder, ref))
-        except OSError:
-            pass
-
-
 def client_for(protocol: str, name: str | None = None):
     """The client a release of this protocol goes to (or the named one)."""
-    sab, qbit, blackhole = settings.get("sabnzbd"), settings.get("qbittorrent"), settings.get("blackhole_dir")
+    sab, qbit = settings.get("sabnzbd"), settings.get("qbittorrent")
     if name == "sabnzbd" or (name is None and protocol == "usenet" and sab.get("url")):
         return SABnzbd(sab)
     if name == "qbittorrent" or (name is None and protocol == "torrent" and qbit.get("url")):
         return QBittorrent(qbit)
-    if name == "blackhole" or (name is None and blackhole):
-        return Blackhole(blackhole)
-    raise ClientError(f"No download client for {protocol} is set up: add {'SABnzbd' if protocol == 'usenet' else 'qBittorrent'} or a blackhole folder in Settings.")
+    raise ClientError(f"No download client for {protocol} is set up: add {'SABnzbd' if protocol == 'usenet' else 'qBittorrent'} in Settings.")
 
 
 def can_download(protocol: str) -> bool:

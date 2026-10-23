@@ -427,7 +427,7 @@ def upload_issue_file(issue_id):
     upload = request.files.get("file")
     if upload is None or not names.is_comic_file(upload.filename or ""):
         return jsonify({"error": "Choose a CBZ, CBR or CB7 file."}), 400
-    folder = os.path.join(files.import_dir(), ".uploads")
+    folder = os.path.join(files.comic_dir(), "_staged", "uploads")
     os.makedirs(folder, exist_ok=True)
     path = os.path.join(folder, secure_filename(upload.filename) or "upload.cbz")
     upload.save(path)

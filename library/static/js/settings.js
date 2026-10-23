@@ -47,10 +47,10 @@ function initSettings() {
         let anyClient = false;
         document.querySelectorAll('details.client').forEach(el => {
             const name = el.dataset.client;
-            const address = name === 'blackhole' ? form.elements.blackhole_dir.value.trim() : form.elements[`${name}.url`].value.trim();
+            const address = form.elements[`${name}.url`].value.trim();
             el.querySelector('.client__state').textContent = address || 'Not set up';
             el.classList.toggle('is-set', Boolean(address));
-            if (address && name !== 'blackhole') anyClient = true;
+            if (address) anyClient = true;
         });
         // Only a client in another container needs its folders mapped.
         document.getElementById('pathMap').hidden = !anyClient && !form.elements['path_map.remote_path'].value;
@@ -104,7 +104,6 @@ function initSettings() {
         const all = collect();
         if (what === 'comicvine') return {comicvine_api_key: all.comicvine_api_key};
         if (what === 'metron') return {metron_username: all.metron_username, metron_password: all.metron_password};
-        if (what === 'blackhole') return {blackhole_dir: all.blackhole_dir};
         return all[what];
     }
 

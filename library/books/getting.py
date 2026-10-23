@@ -153,37 +153,6 @@ class BookKind:
 kind = BookKind()
 
 
-def match_request(path: str) -> BookRequest | None:
-    """The wanted request an EPUB's name or contents point to, if any."""
-    names = set(_words(os.path.basename(path)))
-    for request in BookRequest.query.filter(BookRequest.status.in_((WANTED, "snatched"))):
-        if set(_title_words(request.title)) <= names:
-            return request
-    return None
-
-
-def scan_import_dir(folder: str) -> dict:
-    """EPUBs in the import folder join the library: as the book they were
-    requested as when their name matches one, else as they are."""
-    result = {"imported": [], "failed": []}
-    if not os.path.isdir(folder):
-        return result
-    for name in sorted(os.listdir(folder)):
-        path = os.path.join(folder, name)
-        if not name.lower().endswith(".epub") or not os.path.isfile(path):
-            continue
-        request = match_request(path)
-        try:
-            book = import_epub(path, request)
-        except NotABookError:
-            result["failed"].append(name)
-            continue
-        result["imported"].append(book.id)
-        if request is not None:
-            pipeline.mark_imported(KIND_BOOK, [request.id])
-    return result
-
-
 def request_book(found: dict, user_id: int | None) -> tuple[BookRequest, bool]:
     """Ask for a book found on Open Library. Returns (request, new)."""
     existing = BookRequest.query.filter_by(ol_key=found.get("ol_key")).first() if found.get("ol_key") else None

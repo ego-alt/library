@@ -110,22 +110,6 @@ def test_import_keeps_names_when_renaming_is_off(app, comic_dir, tmp_path, serie
         assert zf.namelist()[0] == "001.png"
 
 
-def test_scan_import_dir(app, comic_dir, series):
-    inbox = comic_dir / "_import"
-    inbox.mkdir()
-    make_cbz(inbox / "Saga 001 (2012).cbz")
-    sub = inbox / "Saga.002.2012.Digital-Group"
-    sub.mkdir()
-    make_cbz(sub / "Saga.002.2012.Digital-Group.cbz")
-    make_cbz(inbox / "Something Else 004 (2020).cbz")
-    (inbox / "broken.cbr").write_bytes(b"not an archive")
-
-    result = files.scan_import_dir()
-    assert len(result["imported"]) == 2
-    assert sorted(result["unmatched"]) == ["Something Else 004 (2020).cbz", "broken.cbr"]
-    assert series.issues[0].status == DOWNLOADED and series.issues[1].status == DOWNLOADED
-
-
 def test_sync_issues_on_first_add_wants_only_whats_coming(app):
     s = ComicSeries(provider="comicvine", provider_id="9", name="New Thing", monitor=MONITOR_FUTURE)
     db.session.add(s)

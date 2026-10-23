@@ -37,10 +37,7 @@ class Config:
     # Comics: the library's CBZs. The default sits in instance/, which
     # survives redeploys; on the Pi COMIC_DIR points at the big disk.
     COMIC_DIR = os.getenv("COMIC_DIR", os.path.join(DATA_DIR, "comics"))
-    # A folder whose comics and EPUBs get imported (blackhole downloads, or
-    # anything you drop in). Default: COMIC_DIR/_import.
-    IMPORT_DIR = os.getenv("IMPORT_DIR") or None
-    # Run the download jobs (search, downloads, imports, refreshing series)
+    # Run the download jobs (search, downloads, refreshing series)
     # in this process.
     DOWNLOADS_WORKER = os.getenv("DOWNLOADS_WORKER", "1") == "1"
 

@@ -16,7 +16,7 @@
 
         <section class="section" id="clients">
             <div class="section__head"><h2 class="section__title">Download clients</h2></div>
-            <p class="section__hint">Usenet releases go to SABnzbd and torrents to qBittorrent. With neither, NZB and torrent files are saved to a folder for another client to pick up.</p>
+            <p class="section__hint">Usenet releases go to SABnzbd, torrents to qBittorrent.</p>
             <details class="client" data-client="sabnzbd">
                 <summary class="disclosure"><span class="client__name">SABnzbd</span> <span class="client__state"></span></summary>
                 <div class="field-stack">
@@ -42,15 +42,6 @@
                         {{ field('Category for books', 'qbittorrent.book_category') }}
                     </div>
                     <div><button type="button" class="btn btn-secondary" data-test="qbittorrent">Test qBittorrent</button></div>
-                </div>
-            </details>
-            <details class="client" data-client="blackhole">
-                <summary class="disclosure"><span class="client__name">A folder</span> <span class="client__state"></span></summary>
-                <div class="field-stack">
-                    <div class="field-with-button">
-                        {{ field('Folder', 'blackhole_dir', placeholder='/data/comics/_blackhole', id='s-bh') }}
-                        <button type="button" class="btn btn-secondary" data-test="blackhole">Test</button>
-                    </div>
                 </div>
             </details>
             <div id="pathMap" class="field-stack" hidden>
@@ -112,7 +103,6 @@
             <div class="section__head"><h2 class="section__title">Files</h2></div>
             <div class="field-stack">
                 <div class="meta-field"><span class="meta-label">Library folder</span><code class="field-path">{{ comic_dir }}</code></div>
-                <div class="meta-field"><span class="meta-label">Import folder</span><code class="field-path">{{ import_dir }}</code></div>
                 <label class="meta-field meta-checkbox-field"><input type="checkbox" name="convert_webp"> <span class="meta-label">Convert pages to WebP (smaller files; slower to import on the Pi)</span></label>
                 <div class="field-pair">
                     {{ field('WebP quality', 'webp_quality', 'number', id='s-q', extra='min="50" max="100"') }}

@@ -69,20 +69,9 @@
     {% endif %}
 </section>
 
-{# Comic files waiting for a series: from the import folder, or a finished
-   download that didn't match an issue. Shown only when there are some. #}
-<section class="section" id="import" hidden>
-    <div class="section__head">
-        <h2 class="section__title">Needs a series</h2>
-        <div class="section__actions"><button type="button" class="btn btn-ghost" id="importScan">Match again</button></div>
-    </div>
-    <p class="section__hint">These didn't match an issue on their own. Choose each one's series and check the number.</p>
-    <ol class="entries" id="importList"></ol>
-</section>
 
 
 {% endblock %}
 {% block scripts %}
-    <script src="{{ url_for('static', filename='js/import.js') }}"></script>
     <script src="{{ url_for('static', filename='js/downloads.js') }}"></script>
 {% endblock %}

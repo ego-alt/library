@@ -44,8 +44,9 @@ Comics (`/comics/`) work like the books: everyone signed in sees the series ther
 ## Getting books and comics (admins)
 
 - **Asking**: search the books or comics shelf, then "Get “dune”" under the results looks on Open Library (books) or ComicVine/Metron (series). Tap a book to ask for it (with Undo); tap a series to follow it (new issues from then on; the series page changes that).
-- **Wanted books and issues are searched for** every few hours on your Newznab (usenet) and Torznab (torrent, via Prowlarr or Jackett) indexers, in their ebook (7020) or comics (7030) categories. The best release goes to SABnzbd or qBittorrent, filed under the client's books or comics category, or is saved to a blackhole folder. Books need the title's words and the author's surname and an EPUB (audiobooks, PDFs and collections are skipped); comics are matched on series, issue number and year. A release that failed isn't downloaded again for the same thing; **Choose a release** shows every one and why each fits or doesn't.
-- **Downloads** (the gear in the bar, `/downloads`) is one page: what's downloading (failures that need you on top, stalled ones named), everything wanted (a line per book, a group per comic series), comic files from the import folder that need a series, the history, and **Settings** folded at the foot: indexers, download clients, where finished downloads are, how releases are chosen (with a size limit for books and one for comics), ComicVine/Metron and how comic files are written.
+- **Wanted books and issues are searched for** every few hours on your Newznab (usenet) and Torznab (torrent, via Prowlarr or Jackett) indexers, in their ebook (7020) or comics (7030) categories. The best release goes to SABnzbd or qBittorrent, filed under the client's books or comics category. Books need the title's words and the author's surname and an EPUB (audiobooks, PDFs and collections are skipped); comics are matched on series, issue number and year. A release that failed isn't downloaded again for the same thing; **Choose a release** shows every one and why each fits or doesn't.
+- **Downloads** (the clock in the bar, `/downloads`): what's downloading, a line each (failures that need you on top, stalled ones named), and everything wanted (a line per book, a group per comic series).
+- **Settings** (the tab beside Downloads, `/settings`): indexers, download clients, where finished downloads are, how releases are chosen (with a size limit for books and one for comics), ComicVine/Metron and how comic files are written.
 
 One background worker does it all, in one gunicorn process (a file lock picks it), from the first request after a restart.
 
@@ -73,7 +74,6 @@ Tests and lint: `uv run pytest` and `uvx ruff check .`
 | `ANTHROPIC_API_KEY` | Turns on Ask and Explain (optional) |
 | `TRASH_RETENTION_DAYS` | How long deleted books are kept (default 30) |
 | `COMIC_DIR` | Where comics live (default `instance/comics`) |
-| `IMPORT_DIR` | Folder whose comics and EPUBs get imported (default `COMIC_DIR/_import`) |
 | `COMICVINE_API_KEY`, `METRON_USERNAME`, `METRON_PASSWORD` | Metadata, if not set in the app |
 
 ## Home stack
