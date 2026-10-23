@@ -79,7 +79,6 @@ def download_json(d: Download) -> dict:
         "status": d.status,
         "progress": d.progress,
         "error": clients.plain_error(d.error),
-        "stalled": pipeline.is_stalled(d),
         "created_at": d.created_at.isoformat() + "Z",
         "updated_at": d.updated_at.isoformat() + "Z" if d.updated_at else None,
         "item": {"id": item.id, "label": kind.label(item), "url": kind.link(item)} if item is not None else None,

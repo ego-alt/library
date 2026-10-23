@@ -19,7 +19,6 @@ and `fk`, the Download column that points at its items.
 import logging
 import os
 import shutil
-from datetime import timedelta
 
 from .. import settings
 from ..models import _utcnow, db
@@ -198,14 +197,6 @@ def finish(download: Download, path: str | None) -> None:
 # Download clients that didn't answer at the last check: {name: message}.
 # The Downloads page says so once, rather than under every download.
 client_problems: dict[str, str] = {}
-
-# A download whose progress hasn't moved for this long is called stalled.
-STALLED_AFTER = timedelta(hours=6)
-
-
-def is_stalled(download: Download) -> bool:
-    return download.status == DL_DOWNLOADING and download.updated_at is not None and _utcnow().replace(tzinfo=None) - download.updated_at > STALLED_AFTER
-
 
 def check_downloads() -> int:
     """Ask the clients about active downloads; import finished ones. Returns

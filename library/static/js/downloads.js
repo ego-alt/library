@@ -176,7 +176,6 @@ function initDownloadLists() {
         const percent = Math.round((d.progress || 0) * 100);
         if (where === 'active') {
             if (d.status === 'importing') return ['Adding to the library', null];
-            if (d.stalled) return [`Stalled at ${percent}%`, 'is-bad'];
             return [`${percent}%`, null];
         }
         return ['Failed', 'is-bad'];
@@ -194,7 +193,6 @@ function initDownloadLists() {
     // what you can do about it. `where` is active, or attention (a failure
     // that still needs you).
     function downloadRow(d, where) {
-        const percent = Math.round((d.progress || 0) * 100);
         const showError = d.error && where !== 'active';
         const [state, tone] = stateOf(d, where);
         const label = d.item ? d.item.label : 'Removed';
@@ -202,7 +200,7 @@ function initDownloadLists() {
         // A failure's reason heads its menu; the row itself stays one line.
         const why = showError ? {note: d.error} : null;
         const actions = where === 'active'
-            ? [d.stalled ? retry : null, {label: 'Cancel…', danger: true, onClick: () => confirmMenu(more, `Cancel ${label}?`, [{label: 'Keep downloading'}, {label: 'Cancel the download', danger: true, onClick: () => act(`/api/downloads/${d.id}/cancel`, 'POST', 'Cancelled')}])}]
+            ? [{label: 'Cancel…', danger: true, onClick: () => confirmMenu(more, `Cancel ${label}?`, [{label: 'Keep downloading'}, {label: 'Cancel the download', danger: true, onClick: () => act(`/api/downloads/${d.id}/cancel`, 'POST', 'Cancelled')}])}]
             : [why, retry, d.item ? {label: 'Stop looking…', danger: true, onClick: () => stopLooking(d, more)} : null, {label: 'Dismiss', onClick: () => act(`/api/downloads/${d.id}`, 'DELETE', 'Dismissed')}];
         const more = h('button', {type: 'button', class: 'entry__more', 'aria-label': `More for ${label}`, dataset: {menuAnchor: ''}, onclick: (e) => openMenu(e.currentTarget, actions)}, iconEl('ellipsis'));
         // One line: what it is, then its state on the right (like Wanted's
@@ -210,7 +208,6 @@ function initDownloadLists() {
         return h('li', {class: 'entry', title: [d.title, d.indexer, formatSize(d.size), timeAgo(d.updated_at || d.created_at), showError ? d.error : null].filter(Boolean).join(' · ')},
             h('div', {class: 'entry__main'},
                 h('span', {class: 'entry__title'}, d.item ? h('a', {href: d.item.url}, d.item.label) : h('span', {class: 'muted'}, 'Removed'))),
-            where === 'active' && d.status !== 'importing' ? h('span', {class: 'entry__bar'}, h('span', {style: `width: ${percent}%`})) : null,
             h('span', {class: `entry__side entry__state${tone ? ` ${tone}` : ''}`}, state),
             more);
     }
