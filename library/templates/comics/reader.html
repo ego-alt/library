@@ -20,8 +20,7 @@
          data-version="{{ issue.file_size or 0 }}"
          data-page-url="{{ url_for('comics.issue_page', issue_id=issue.id, page=0)[:-1] }}"
          data-progress-url="{{ url_for('comics.save_progress', issue_id=issue.id) }}"
-         data-next-url="{{ url_for('comics.read_page', issue_id=next_issue.id) if next_issue else '' }}"
-         data-next-label="{{ ('#' ~ next_issue.number) if next_issue else '' }}">
+         data-next-url="{{ url_for('comics.read_page', issue_id=next_issue.id) if next_issue else '' }}">
         <header class="cr-bar" id="topBar">
             <a class="cr-btn" href="{{ url_for('comics.series_page', series_id=series.id) }}" aria-label="Back to {{ series.name }}">{{ icon('arrow-left') }}</a>
             <div class="cr-title"><strong>{{ series.name }}</strong> <span>#{{ issue.number }}{% if issue.title %} · {{ issue.title }}{% endif %}</span></div>

@@ -81,28 +81,25 @@ html, body { margin: 0; height: 100%; background: #0b0a09; color: #eadfca; font-
 .cr-btn .icon, .cr-modes .icon { width: 1.25em; height: 1.25em; }
 .cr-modes button { display: inline-flex; align-items: center; justify-content: center; }
 
-/* The end of an issue: a small card over the last page, not a page of its
-   own: the next issue (turning on again opens it), or that it's the last. */
+/* The last page of the last issue: a short note over the page, then gone. */
 .cr-end {
     position: absolute;
     left: 50%;
     bottom: calc(76px + env(safe-area-inset-bottom, 0px));
     transform: translateX(-50%);
     z-index: 20;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 10px 12px;
+    margin: 0;
+    padding: 10px 16px;
     border-radius: 12px;
     background: rgba(26, 23, 20, 0.94);
     border: 1px solid rgba(255, 230, 190, 0.15);
-    box-shadow: 0 12px 30px -10px rgba(0, 0, 0, 0.7);
+    color: #d9ccb2;
+    font-size: 0.9375rem;
+    white-space: nowrap;
     animation: cr-end-in 0.18s ease-out;
 }
 @keyframes cr-end-in { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
 @media (prefers-reduced-motion: reduce) { .cr-end { animation: none; } }
-.cr-end p { margin: 0 6px; color: #d9ccb2; font-size: 0.9375rem; }
-.cr-end__next { display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; border-radius: 8px; background: #8fb0cf; color: #0b0a09; font-weight: 600; text-decoration: none; }
 
 @media (max-width: 640px) {
     .cr-title span { display: none; }
