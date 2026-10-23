@@ -4,8 +4,8 @@
 {% block page %}series-detail{% endblock %}
 {% block content %}
 {# Read like a book's details: the cover, the title and its line, one
-   button to read; everything to do with getting issues is under ⋯. #}
-<section class="series-head" data-series-id="{{ series.id }}" data-monitor="{{ series.monitor }}" data-provider="{{ series.provider }}">
+   button to read. Which issues are got shows only once a downloader is set up. #}
+<section class="series-head" data-series-id="{{ series.id }}" data-monitor="{{ series.monitor }}" data-provider="{{ series.provider }}"{% if downloads_ready %} data-downloads="1"{% endif %}>
     <div class="series-head__cover book">
         <span class="cover-blank" aria-hidden="true">{{ series.name }}</span>
         {% if cover %}<img src="{{ cover }}" alt="" referrerpolicy="no-referrer" onload="this.parentNode.classList.add('is-loaded')" onerror="this.remove()">{% endif %}
@@ -20,28 +20,16 @@
         <p class="series-head__count">
             {% if is_admin and issues|length > have %}<button type="button" class="series-head__toggle" id="haveToggle" aria-pressed="false" title="Show only the issues here">{{ have }} of {{ issues|length }} issues</button>{% else %}{{ have }} issue{{ 's' if have != 1 }}{% endif %}{% if read %} · {{ read }} read{% endif %}
         </p>
-        {% if is_admin and series.provider != 'local' %}
+        {% if is_admin and downloads_ready and series.provider != 'local' %}
         {% set getting = {'future': 'new issues', 'all': 'every missing issue', 'none': 'only the issues you choose'}[series.monitor] %}
         <p class="series-head__getting">Getting {{ getting }} · <button type="button" class="series-head__change" data-action="monitor-menu" data-menu-anchor>Change</button></p>
         {% endif %}
         {% if series.description %}<p class="series-head__desc" id="seriesDesc">{{ series.description|truncate(600) }}</p><button type="button" class="series-head__more-text" id="descMore" hidden>More</button>{% endif %}
         <div class="series-head__actions">
             {% if up_next %}<a class="btn btn-primary" href="{{ url_for('comics.read_page', issue_id=up_next.id) }}">{{ 'Continue' if up_next.page and not up_next.finished else 'Read' }} #{{ up_next.number }}</a>{% endif %}
-            {% if is_admin %}
-            <button type="button" class="btn btn-secondary series-head__more" data-action="series-menu" data-menu-anchor aria-label="More for {{ series.name }}">{{ icon('ellipsis') }}</button>
-            {% endif %}
         </div>
     </div>
 </section>
-
-{% if is_admin and issues %}
-<div class="bulk" id="bulk" hidden>
-    <span id="bulkCount">Choose issues</span>
-    <button type="button" class="btn btn-secondary" data-bulk="wanted" disabled>Want</button>
-    <button type="button" class="btn btn-secondary" data-bulk="skipped" disabled>Skip</button>
-    <button type="button" class="btn btn-ghost" id="selectDone">Done</button>
-</div>
-{% endif %}
 
 {% if issues %}
 <div class="row library issue-wall" id="issueWall">

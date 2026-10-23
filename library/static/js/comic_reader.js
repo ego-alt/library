@@ -159,47 +159,69 @@
             return;
         }
         if (n >= total) return finished();
+        closeEnd();
         page = Math.max(0, Math.min(n, total - 1));
         render();
     }
 
     const next = () => {
-        if (mode === 'scroll') return stage.scrollBy({top: stage.clientHeight * 0.9, behavior: 'smooth'});
+        if (mode === 'scroll') {
+            // At the bottom of a scrolled issue, onwards is the next issue.
+            if (stage.scrollTop + stage.clientHeight >= stage.scrollHeight - 4) return finished();
+            return stage.scrollBy({top: stage.clientHeight * 0.9, behavior: 'smooth'});
+        }
         go(spreadAt(page).slice(-1)[0] + 1);
     };
     const prev = () => {
+        if (endCard) return closeEnd();
         if (mode === 'scroll') return stage.scrollBy({top: -stage.clientHeight * 0.9, behavior: 'smooth'});
         const first = spreadAt(page)[0];
         if (first > 0) go(spreadAt(first - 1)[0]);
     };
 
+    // Turning past the last page: the issue is marked read, and a small card
+    // over the page offers the next issue (turning on again opens it) or says
+    // it's the last one here. A tap anywhere else, or turning back, closes it.
+    let endCard = null;
+    function closeEnd() {
+        if (endCard) endCard.remove();
+        endCard = null;
+    }
     function finished() {
+        if (endCard) {
+            if (root.dataset.nextUrl) window.location = root.dataset.nextUrl;
+            return;
+        }
         clearTimeout(saveTimer);
         writeLocal({page: total - 1, finished: true, pending: true});
         send({page: total - 1, finished: true}).catch(() => {});
-        const end = document.createElement('div');
-        end.className = 'cr-end';
+        endCard = document.createElement('div');
+        endCard.className = 'cr-end';
+        endCard.setAttribute('role', 'status');
         const nextUrl = root.dataset.nextUrl;
-        end.innerHTML = `<p>The end.</p>`;
         if (nextUrl) {
             const a = document.createElement('a');
             a.className = 'cr-end__next';
             a.href = nextUrl;
-            a.textContent = 'Next issue';
-            end.append(a);
+            a.innerHTML = `Next: ${root.dataset.nextLabel} ${icon('arrow-right')}`;
+            endCard.append(a);
+        } else {
+            const p = document.createElement('p');
+            p.textContent = 'That’s the last issue here.';
+            endCard.append(p);
         }
-        const back = document.createElement('button');
-        back.type = 'button';
-        back.textContent = 'Back to the last page';
-        back.addEventListener('click', () => render());
-        end.append(back);
-        stage.replaceChildren(end);
-        root.classList.remove('bars-hidden');
+        root.append(endCard);
+        endCard.querySelector('a')?.focus({preventScroll: true});
     }
 
     // Tap zones.
     stage.addEventListener('click', (e) => {
         if (e.target.closest('.cr-end')) return;
+        if (endCard) {
+            const x = e.clientX / window.innerWidth;
+            const forward = mode !== 'scroll' && (x >= 0.65) !== rtl;
+            if (!forward) return closeEnd();
+        }
         if (mode === 'scroll') { root.classList.toggle('bars-hidden'); return; }
         const x = e.clientX / window.innerWidth;
         if (x > 0.35 && x < 0.65) { root.classList.toggle('bars-hidden'); return; }
@@ -236,7 +258,7 @@
         else if (key === '1' || key === '2' || key === '3') setMode({1: 'single', 2: 'double', 3: 'scroll'}[key]);
         else if (key === 'f' || key === 'F') toggleFit();
         else if (key === 'r' || key === 'R') toggleRtl();
-        else if (key === 'Escape') window.location = document.querySelector('.cr-bar a').href;
+        else if (key === 'Escape') { if (endCard) closeEnd(); else window.location = document.querySelector('.cr-bar a').href; }
         else return;
     });
 

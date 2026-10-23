@@ -181,7 +181,7 @@ def series_page(series_id):
     admin = _is_admin()
     shown = series.issues if admin else [i for i in series.issues if i.filename]
     progress = _progress_by_issue(i.id for i in shown)
-    # Reading order for everyone; admins sort out missing ones with Have / Missing.
+    # Reading order for everyone; admins see the missing ones too, greyed.
     issues = [issue_json(i, progress.get(i.id)) for i in shown]
     have = [i for i in series.issues if i.filename]
     up_next = None
@@ -189,7 +189,16 @@ def series_page(series_id):
         next_issue = _up_next(have, {i.id: progress[i.id] for i in have if i.id in progress})[0]
         up_next = next(i for i in issues if i["id"] == next_issue.id)
     pending = series.refreshed_at is None and series.provider in ("comicvine", "metron")
-    return _page("series.html", series=series, cover=_series_cover(series), issues=issues, up_next=up_next, pending=pending)
+    return _page("series.html", series=series, cover=_series_cover(series), issues=issues, up_next=up_next, pending=pending, downloads_ready=_downloads_ready())
+
+
+def _downloads_ready() -> bool:
+    """Whether anything can download issues: an indexer and a client. Without
+    them, what's wanted, finding and choosing releases mean nothing, so the
+    series page doesn't offer them."""
+    from .. import settings
+
+    return bool(settings.get("indexers")) and bool(settings.get("sabnzbd").get("url") or settings.get("qbittorrent").get("url"))
 
 
 @comics_blueprint.get("/read/<int:issue_id>")
@@ -332,30 +341,6 @@ def refresh(series_id):
         db.session.rollback()
         return jsonify({"error": str(e)}), 502
     return jsonify({"added": added})
-
-
-@comics_blueprint.delete("/api/series/<int:series_id>")
-@json_admin_required
-def delete_series(series_id):
-    series = _series_or_404(series_id)
-    delete_files = request.args.get("files") == "1"
-    removed = 0
-    if delete_files:
-        for issue in series.issues:
-            if issue.filename:
-                try:
-                    os.remove(files.abs_path(issue))
-                    removed += 1
-                except OSError:
-                    pass
-        if series.folder:
-            try:
-                os.rmdir(os.path.join(files.comic_dir(), series.folder))
-            except OSError:
-                pass
-    db.session.delete(series)
-    db.session.commit()
-    return jsonify({"ok": True, "files_removed": removed})
 
 
 @comics_blueprint.post("/api/series/<int:series_id>/search")

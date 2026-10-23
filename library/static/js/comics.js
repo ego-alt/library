@@ -69,10 +69,10 @@ function initSeries() {
     apply();
 }
 
-// --- One series: its issues as covers, each with a ⋯ menu (read, mark read,
-// download; for admins also find, choose a release, want or skip, add or
-// replace the file). Admins see the missing ones, faded, with what each is
-// waiting on in its caption. ---
+// --- One series: its issues as covers, each with a menu (mark read,
+// download; for admins also replace or delete the file, or add one to a
+// missing issue, and once a downloader is set up find, choose a release,
+// want or skip). Admins see the missing ones, greyed out. ---
 
 const MISSING_STATE = {wanted: 'Wanted', snatched: 'Downloading', skipped: 'Skipped'};
 const MONITOR_LABELS = [['future', 'New issues as they come out', 'new issues'], ['all', 'Every missing issue', 'every missing issue'], ['none', 'Only the ones I choose', 'only the issues you choose']];
@@ -88,8 +88,6 @@ function initSeriesDetail() {
     const wall = document.getElementById('issueWall');
     const issues = new Map(JSON.parse(document.getElementById('issuesData').textContent).map(i => [String(i.id), i]));
     const card = id => wall && wall.querySelector(`[data-issue-id="${id}"]`);
-    let selecting = false;  // admins' Select mode
-    const selected = new Set();
 
     // A just-followed series fills in as soon as the worker has its issues.
     if (document.getElementById('seriesPending')) {
@@ -158,7 +156,7 @@ function initSeriesDetail() {
         let timer = null, start = null;
         wall.addEventListener('touchstart', (e) => {
             const book = e.target.closest('.book');
-            if (!book || e.touches.length !== 1 || selecting) return;
+            if (!book || e.touches.length !== 1) return;
             pressed = false;
             start = {x: e.touches[0].clientX, y: e.touches[0].clientY};
             timer = setTimeout(() => {
@@ -183,14 +181,6 @@ function initSeriesDetail() {
         const el = e.target.closest('[data-issue-id]');
         if (!el) return;
         const issue = issues.get(el.dataset.issueId);
-        if (selecting) {
-            e.preventDefault();
-            if (issue.has_file || issue.status === 'snatched') return;
-            el.classList.toggle('is-selected');
-            el.classList.contains('is-selected') ? selected.add(issue.id) : selected.delete(issue.id);
-            updateBulk();
-            return;
-        }
         const button = e.target.closest('[data-action="menu"]');
         if (button) {
             openMenu(button, menuItems(issue, button));
@@ -212,6 +202,7 @@ function initSeriesDetail() {
     if (!window.isAdmin) return;
 
     // --- Admins ---
+    const downloads = head.dataset.downloads === '1';
     const upload = document.getElementById('issueUpload');
     let uploadFor = null;
 
@@ -224,11 +215,13 @@ function initSeriesDetail() {
             {label: 'Replace the file…', onClick: () => { uploadFor = issue; upload.click(); }},
             {label: 'Delete the file…', danger: true, onClick: () => confirmMenu(anchor, `Delete the file for #${issue.number}? This can’t be undone.`, [{label: 'Keep it'}, {label: 'Delete the file', danger: true, onClick: () => deleteFile(issue)}])},
         ];
-        const findable = issue.released && issue.status !== 'snatched';
+        // Finding, choosing a release and wanting only mean something once
+        // a downloader is set up; without one, a missing issue is a file to add.
+        const findable = downloads && issue.released && issue.status !== 'snatched';
         return [
             findable ? {label: 'Find now', onClick: () => findNow(issue)} : null,
             findable && window.pickRelease ? {label: 'Choose a release…', onClick: () => pickRelease({kind: 'comic', id: issue.id, label: `${issue.series} #${issue.number}`, onGrab: () => { issue.status = 'snatched'; showStatus(issue); }})} : null,
-            issue.status !== 'snatched' ? {label: issue.status === 'wanted' ? 'Skip' : 'Want', onClick: () => setStatus(issue, issue.status === 'wanted' ? 'skipped' : 'wanted')} : null,
+            downloads && issue.status !== 'snatched' ? {label: issue.status === 'wanted' ? 'Skip' : 'Want', onClick: () => setStatus(issue, issue.status === 'wanted' ? 'skipped' : 'wanted')} : null,
             {label: 'Add a file…', onClick: () => { uploadFor = issue; upload.click(); }},
         ];
     };
@@ -287,40 +280,6 @@ function initSeriesDetail() {
         wall.querySelectorAll('[data-issue-id]').forEach(el => { el.hidden = only && el.dataset.have !== '1'; });
     });
 
-    // Select (from ⋯), then Want or Skip.
-    const bulk = document.getElementById('bulk');
-    function updateBulk() {
-        if (!bulk) return;
-        bulk.querySelector('#bulkCount').textContent = selected.size ? `${selected.size} chosen` : 'Choose issues';
-        bulk.querySelectorAll('[data-bulk]').forEach(b => { b.disabled = !selected.size; });
-    }
-    function startSelect() {
-        selecting = true;
-        wall.classList.add('is-selecting');
-        bulk.hidden = false;
-        updateBulk();
-        bulk.scrollIntoView({block: 'nearest', behavior: 'smooth'});
-    }
-    function endSelect() {
-        selecting = false;
-        selected.clear();
-        wall.classList.remove('is-selecting');
-        wall.querySelectorAll('.is-selected').forEach(el => el.classList.remove('is-selected'));
-        bulk.hidden = true;
-    }
-    if (bulk) {
-        bulk.querySelector('#selectDone').addEventListener('click', endSelect);
-        bulk.addEventListener('click', async (e) => {
-            const button = e.target.closest('[data-bulk]');
-            if (!button) return;
-            try {
-                await comicsApi('/issues/bulk', {method: 'POST', body: {ids: [...selected], status: button.dataset.bulk}});
-                selected.forEach(id => { const issue = issues.get(String(id)); issue.status = button.dataset.bulk; showStatus(issue); });
-                endSelect();
-            } catch (err) { showToast(err.message, 'error'); }
-        });
-    }
-
     async function setMonitor(value) {
         try {
             const data = await comicsApi(`/series/${seriesId}`, {method: 'PATCH', body: {monitor: value}});
@@ -343,31 +302,11 @@ function initSeriesDetail() {
         } catch (err) { showToast(err.message, 'error'); }
     }
 
-    function stopFollowing(anchor) {
-        const hasFiles = [...issues.values()].some(i => i.has_file);
-        const leave = async (files) => {
-            try {
-                await comicsApi(`/series/${seriesId}${files ? '?files=1' : ''}`, {method: 'DELETE'});
-                window.location = appUrl('/comics/');
-            } catch (err) { showToast(err.message, 'error'); }
-        };
-        const name = head.querySelector('.meta-title').textContent;
-        confirmMenu(anchor, `Stop following ${name}?`, hasFiles
-            ? [{label: 'Keep the files', onClick: () => leave(false)}, {label: 'Delete the files too', danger: true, onClick: () => leave(true)}, {label: 'Cancel'}]
-            : [{label: 'Cancel'}, {label: 'Stop following', danger: true, onClick: () => leave(false)}]);
-    }
-
     document.addEventListener('click', (e) => {
-        const button = e.target.closest('[data-action="series-menu"], [data-action="monitor-menu"], [data-action="refresh"]');
+        const button = e.target.closest('[data-action="monitor-menu"], [data-action="refresh"]');
         if (!button) return;
         if (button.dataset.action === 'refresh') return refresh();
-        if (button.dataset.action === 'monitor-menu') {
-            return openMenu(button, MONITOR_LABELS.map(([value, label]) => ({label, checked: head.dataset.monitor === value, onClick: () => setMonitor(value)})));
-        }
-        openMenu(button, [
-            wall ? {label: 'Choose issues…', onClick: startSelect} : null,
-            {label: 'Stop following…', danger: true, onClick: () => stopFollowing(button)},
-        ]);
+        openMenu(button, MONITOR_LABELS.map(([value, label]) => ({label, checked: head.dataset.monitor === value, onClick: () => setMonitor(value)})));
     });
 }
 

@@ -42,8 +42,6 @@
 .series-head__desc.is-folded { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .series-head__more-text { padding: 0; border: none; background: none; color: var(--color-text-muted); font: inherit; font-size: var(--text-sm); text-decoration: underline; cursor: pointer; min-height: 32px; }
 .series-head__actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin-top: var(--space-3); }
-/* ⋯ beside Continue, as an ordinary secondary button. */
-.series-head__more { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 40px; padding: 0 var(--space-3); }
 @media (max-width: 640px) {
     /* A small cover beside the title; the rest flows under it. */
     .series-head { display: block; }
@@ -55,10 +53,6 @@
     .series-head__actions { clear: both; }
 }
 
-/* What's chosen while choosing (from ⋯ › Choose issues). */
-.bulk { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin: 0 0 var(--space-4); font-size: var(--text-sm); color: var(--color-text-secondary); }
-.bulk[hidden] { display: none; }
-.bulk #bulkCount { margin-right: var(--space-2); }
 
 /* Choosing a release by hand: rows in the details panel's overlay, which is
    a bottom sheet on phones. */
@@ -88,10 +82,6 @@
 .dark-mode .issue-wall .is-missing .book img { filter: grayscale(1) brightness(0.8); }
 .issue-wall .is-missing .book-caption { opacity: 0.6; }
 .issue-wall .status-wanted .book-caption__author { color: var(--color-accent); }
-.issue-wall.is-selecting .book { cursor: pointer; }
-.issue-wall.is-selecting .book-buttons { display: none; }
-.issue-wall.is-selecting [data-have="1"] .book, .issue-wall.is-selecting .status-snatched .book { opacity: 0.4; cursor: default; }
-.issue-wall .is-selected .book { outline: 3px solid var(--color-accent); outline-offset: 3px; }
 /* Denser than the books: seven across on a laptop, three on a phone, with
    a smaller label. */
 .library.row.issue-wall { grid-template-columns: repeat(7, 1fr); gap: 14px 18px; }
