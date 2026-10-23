@@ -229,6 +229,9 @@ def make_thumbnail(image_bytes: bytes, width: int) -> bytes:
     from PIL import Image
 
     with Image.open(BytesIO(image_bytes)) as img:
+        # A JPEG is decoded at a fraction of its size when that's still big
+        # enough: several times less memory and time for a full comic page.
+        img.draft("RGB", (width, width * 3))
         img = img.convert("RGBA" if img.mode in ("RGBA", "LA", "P") else "RGB")
         if img.width > width:
             height = round(img.height * width / img.width)

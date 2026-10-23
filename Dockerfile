@@ -27,4 +27,5 @@ EXPOSE 8002
 # Run the Flask application using Gunicorn with the correct module reference.
 # This tells Gunicorn to call the create_app() factory in app.py.
 # Straight from the virtualenv: `uv run` would install the dev tools on every start.
-CMD [".venv/bin/gunicorn", "app:create_app()", "--bind", "0.0.0.0:8002", "--workers", "3", "--threads", "8", "--timeout", "120", "--worker-class", "gthread"]
+# Two workers: each holds ~150 MB, and the Pi shares 1.8 GB with five other apps.
+CMD [".venv/bin/gunicorn", "app:create_app()", "--bind", "0.0.0.0:8002", "--workers", "2", "--threads", "8", "--timeout", "120", "--worker-class", "gthread"]

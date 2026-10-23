@@ -121,7 +121,10 @@ def write_cbz(src: str, dest: str, *, metadata: Callable[[int], tuple[str | None
     comes later, in the background: convert_pages). `metadata(page_count)`
     gives the ComicInfo.xml and MetronInfo.xml to embed. Returns the page
     count. `dest` appears whole or not at all."""
-    with tempfile.TemporaryDirectory(prefix="comic-") as tmp:
+    # Unpacked beside `dest`, on the comics disk: the SD card (the system's
+    # temporary folder) also holds the swap, so heavy writes there stall everything.
+    os.makedirs(os.path.dirname(dest) or ".", exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix=".comic-", dir=os.path.dirname(dest) or ".") as tmp:
         _unpack(src, tmp)
         pages = []
         for root, _dirs, files in os.walk(tmp):

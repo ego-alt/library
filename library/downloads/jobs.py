@@ -107,7 +107,12 @@ def run_job(job: str) -> str:
         active = pipeline.check_downloads()
         return f"{active} download{'s' if active != 1 else ''} in progress."
     if job == "convert":
-        done, more = comic_files.convert_next()
+        # Only when the Pi isn't busy (a burst of uploads, a deploy, another
+        # app's job): it waits and tries again, so the work catches up later.
+        if _busy():
+            request_run("convert", delay=60)
+            return "Waiting: the Pi is busy."
+        done, more = comic_files.convert_next(limit=1, pause=0.2)
         if more:
             request_run("convert")
         return f"Converted {done} issue{'s' if done != 1 else ''} to WebP." if done else "Every comic is in WebP."
@@ -134,6 +139,26 @@ def run_job(job: str) -> str:
     raise ValueError(job)
 
 
+# A load average above this (the Pi has four cores) counts as busy.
+BUSY_LOAD = 3.0
+
+
+def _busy() -> bool:
+    try:
+        return os.getloadavg()[0] > BUSY_LOAD
+    except OSError:
+        return False
+
+
+def _lower_priority() -> None:
+    """This thread at the lowest CPU priority (on Linux, niceness is per
+    thread), so background work never slows pages or other apps."""
+    try:
+        os.setpriority(os.PRIO_PROCESS, threading.get_native_id(), 19)
+    except (AttributeError, OSError):
+        pass
+
+
 def _loop(app) -> None:
     with app.app_context():
         os.makedirs(_state_dir(), exist_ok=True)
@@ -145,6 +170,7 @@ def _loop(app) -> None:
         except OSError:
             time.sleep(60)
     logger.info("Download worker running in process %s", os.getpid())
+    _lower_priority()
     with app.app_context():
         state = status()
     state.pop("alive", None)
