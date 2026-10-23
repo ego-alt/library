@@ -25,10 +25,12 @@
         {% set getting = {'future': 'new issues', 'all': 'every missing issue', 'none': 'only the issues you choose'}[series.monitor] %}
         <p class="series-head__getting">Getting {{ getting }} · <button type="button" class="series-head__change" data-action="monitor-menu" data-menu-anchor>Change</button></p>
         {% endif %}
-        {% if series.description %}<p class="series-head__desc" id="seriesDesc">{{ series.description|truncate(600) }}</p><button type="button" class="series-head__more-text" id="descMore" hidden>More</button>{% endif %}
+        {% if up_next %}
         <div class="series-head__actions">
-            {% if up_next %}<a class="btn btn-primary" href="{{ url_for('comics.read_page', issue_id=up_next.id) }}">{{ 'Continue' if up_next.page and not up_next.finished else 'Read' }} #{{ up_next.number }}</a>{% endif %}
+            <a class="btn btn-primary" href="{{ url_for('comics.read_page', issue_id=up_next.id) }}">{{ 'Continue' if up_next.page and not up_next.finished else 'Read' }} #{{ up_next.number }}</a>
         </div>
+        {% endif %}
+        {% if series.description %}<p class="series-head__desc" id="seriesDesc">{{ series.description|truncate(600) }}</p><button type="button" class="series-head__more-text" id="descMore" hidden>More</button>{% endif %}
     </div>
 </section>
 

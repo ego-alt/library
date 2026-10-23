@@ -38,19 +38,22 @@
 .series-head__toggle::after, .series-head__change::after { content: ""; position: absolute; inset: -12px -6px; }
 .series-head__toggle:hover, .series-head__change:hover { color: var(--color-accent); text-decoration-color: currentColor; }
 .series-head__toggle[aria-pressed="true"] { color: var(--color-accent); text-decoration-color: currentColor; }
-.series-head__desc { margin: var(--space-2) 0 0; color: var(--color-text-secondary); white-space: pre-line; font-size: var(--text-sm); }
+.series-head__desc { margin: var(--space-4) 0 0; color: var(--color-text-secondary); white-space: pre-line; font-size: var(--text-sm); }
 .series-head__desc.is-folded { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .series-head__more-text { padding: 0; border: none; background: none; color: var(--color-text-muted); font: inherit; font-size: var(--text-sm); text-decoration: underline; cursor: pointer; min-height: 32px; }
 .series-head__actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin-top: var(--space-3); }
 @media (max-width: 640px) {
-    /* A small cover beside the title; the rest flows under it. */
-    .series-head { display: block; }
-    .series-head::after { content: ""; display: table; clear: both; }
-    .series-head__cover { float: left; width: 72px; margin: 0 var(--space-3) var(--space-1) 0; }
+    /* Two columns: the cover on the left; the title, its lines and the
+       button beside it on the right; the description full width below. */
+    .series-head { grid-template-columns: 88px minmax(0, 1fr); column-gap: var(--space-4); row-gap: 0; }
+    .series-head__text { display: contents; }
+    .series-head__cover { grid-column: 1; grid-row: 1 / span 5; }
+    .series-head__header, .series-head__count, .series-head__getting, .series-head__actions { grid-column: 2; }
     .series-head .meta-title { font-size: var(--text-lg); }
-    .series-head__desc { clear: both; padding-top: var(--space-1); }
+    .series-head__actions { margin-top: var(--space-2); }
+    .series-head__desc, .series-head__more-text { grid-column: 1 / -1; }
+    .series-head__desc { margin-top: var(--space-4); }
     .series-head__desc.is-folded { -webkit-line-clamp: 2; }
-    .series-head__actions { clear: both; }
 }
 
 
