@@ -20,6 +20,7 @@ from flask import current_app
 
 from .. import settings
 from ..comics import downloads as comic_downloads
+from ..comics import files as comic_files
 from ..comics.series import due_for_refresh, refresh_series
 from ..config import DATA_DIR
 from ..models import db
@@ -30,10 +31,11 @@ logger = logging.getLogger(__name__)
 TICK = 5  # seconds between looks at the request files
 EVERY = {
     "downloads": 60,
+    "convert": 15 * 60,  # comic pages to WebP; also asked for after each add
     "refresh": 30 * 60,
     # "search" comes from settings (search_interval_hours).
 }
-JOBS = ("downloads", "refresh", "search")
+JOBS = ("downloads", "convert", "refresh", "search")
 
 _started = False
 _start_lock = threading.Lock()
@@ -104,6 +106,11 @@ def run_job(job: str) -> str:
     if job == "downloads":
         active = pipeline.check_downloads()
         return f"{active} download{'s' if active != 1 else ''} in progress."
+    if job == "convert":
+        done, more = comic_files.convert_next()
+        if more:
+            request_run("convert")
+        return f"Converted {done} issue{'s' if done != 1 else ''} to WebP." if done else "Every comic is in WebP."
     if job == "refresh":
         due = due_for_refresh()
         new, errors = 0, []

@@ -193,6 +193,8 @@ def test_reading_pages_and_progress(admin_client, saga, tmp_path, admin_user):
 
     issue = saga.issues[0]
     files.import_file(str(make_cbz(tmp_path / "Saga 001.cbz", pages=4)), issue)
+    assert admin_client.get(f"/comics/issue/{issue.id}/page/1").mimetype == "image/png"
+    files.convert_next()
     page = admin_client.get(f"/comics/issue/{issue.id}/page/1")
     assert page.status_code == 200 and page.mimetype == "image/webp"
     assert admin_client.get(f"/comics/issue/{issue.id}/page/9").status_code == 404

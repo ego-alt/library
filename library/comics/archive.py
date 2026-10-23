@@ -12,6 +12,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+import time
 import zipfile
 from collections.abc import Callable
 from xml.etree import ElementTree as ET
@@ -22,6 +23,9 @@ IMAGE_EXTENSIONS = (".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".avif", "
 _MIMETYPES = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp", ".gif": "image/gif", ".bmp": "image/bmp", ".avif": "image/avif", ".jxl": "image/jxl"}
 # WebP can't be wider or taller than this.
 WEBP_MAX_SIDE = 16383
+# Pages are converted to WebP in the background (convert_pages): this
+# quality, at the encoder's default effort.
+WEBP_QUALITY = 82
 
 
 class ArchiveError(Exception):
@@ -98,7 +102,7 @@ def _unpack(src: str, dest: str) -> None:
         raise ArchiveError(f"Unpacking {os.path.basename(src)} took too long.") from e
 
 
-def _to_webp(data: bytes, quality: int) -> bytes:
+def _to_webp(data: bytes, quality: int = WEBP_QUALITY) -> bytes:
     with Image.open(io.BytesIO(data)) as im:
         im.load()
         if im.mode not in ("RGB", "RGBA", "L", "LA"):
@@ -110,14 +114,13 @@ def _to_webp(data: bytes, quality: int) -> bytes:
         return out.getvalue()
 
 
-def write_cbz(src: str, dest: str, *, webp: bool, quality: int = 82, metadata: Callable[[int], tuple[str | None, str | None]] | None = None) -> int:
+def write_cbz(src: str, dest: str, *, metadata: Callable[[int], tuple[str | None, str | None]] | None = None) -> int:
     """Make the library's CBZ at `dest` from any comic archive at `src`.
 
-    Pages are renamed to their reading order and, with `webp`, re-encoded
-    (pages already in WebP are kept as they are; a page Pillow can't read is
-    kept too). `metadata(page_count)` gives the ComicInfo.xml and
-    MetronInfo.xml to embed. Returns the page count. `dest` appears whole or
-    not at all."""
+    Pages are renamed to their reading order and stored as they are (WebP
+    comes later, in the background: convert_pages). `metadata(page_count)`
+    gives the ComicInfo.xml and MetronInfo.xml to embed. Returns the page
+    count. `dest` appears whole or not at all."""
     with tempfile.TemporaryDirectory(prefix="comic-") as tmp:
         _unpack(src, tmp)
         pages = []
@@ -140,11 +143,6 @@ def write_cbz(src: str, dest: str, *, webp: bool, quality: int = 82, metadata: C
                     ext = os.path.splitext(rel)[1].lower()
                     with open(full, "rb") as f:
                         data = f.read()
-                    if webp and ext != ".webp":
-                        try:
-                            data, ext = _to_webp(data, quality), ".webp"
-                        except Exception:
-                            pass
                     # Images are already compressed: store them.
                     out.writestr(zipfile.ZipInfo(f"{i:0{width}d}{ext}", date_time=(2000, 1, 1, 0, 0, 0)), data, compress_type=zipfile.ZIP_STORED)
                 comicinfo, metroninfo = metadata(len(pages)) if metadata else (None, None)
@@ -157,6 +155,51 @@ def write_cbz(src: str, dest: str, *, webp: bool, quality: int = 82, metadata: C
             if os.path.exists(partial):
                 os.remove(partial)
         return len(pages)
+
+
+def needs_webp(path: str) -> bool:
+    """Whether a library CBZ still has pages that aren't WebP (reads only the
+    zip's list of names)."""
+    try:
+        with zipfile.ZipFile(path) as zf:
+            return any(not n.lower().endswith(".webp") for n in page_names(zf))
+    except (zipfile.BadZipFile, OSError):
+        return False
+
+
+def convert_pages(path: str, pause: float = 0.0) -> bool:
+    """Re-encode a library CBZ's pages as WebP, in place: everything else in
+    it (ComicInfo.xml, MetronInfo.xml, page order) is kept as it is, and a
+    page Pillow can't read stays as it was. `pause` seconds between pages
+    leave the Pi room for everything else. Returns whether it was rewritten;
+    the file is replaced whole, and not at all if it changed meanwhile."""
+    before = os.stat(path)
+    partial = f"{path}.webp-partial"
+    pages = 0
+    try:
+        with zipfile.ZipFile(path) as src, zipfile.ZipFile(partial, "w") as out:
+            for info in src.infolist():
+                data = src.read(info)
+                name = info.filename
+                if _is_page(name) and not name.lower().endswith(".webp"):
+                    try:
+                        data = _to_webp(data)
+                        name = os.path.splitext(name)[0] + ".webp"
+                        pages += 1
+                    except Exception:
+                        pass
+                    if pause:
+                        time.sleep(pause)
+                stored = zipfile.ZIP_STORED if _is_page(name) else zipfile.ZIP_DEFLATED
+                out.writestr(zipfile.ZipInfo(name, date_time=info.date_time), data, compress_type=stored)
+        after = os.stat(path)
+        if not pages or (after.st_size, after.st_mtime) != (before.st_size, before.st_mtime):
+            return False
+        os.replace(partial, path)
+        return True
+    finally:
+        if os.path.exists(partial):
+            os.remove(partial)
 
 
 def _xml(root: ET.Element) -> str:

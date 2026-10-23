@@ -103,10 +103,6 @@
             <div class="section__head"><h2 class="section__title">Files</h2></div>
             <div class="field-stack">
                 <div class="meta-field"><span class="meta-label">Library folder</span><code class="field-path">{{ comic_dir }}</code></div>
-                <label class="meta-field meta-checkbox-field"><input type="checkbox" name="convert_webp"> <span class="meta-label">Convert pages to WebP (smaller files; slower to import on the Pi)</span></label>
-                <div class="field-pair">
-                    {{ field('WebP quality', 'webp_quality', 'number', id='s-q', extra='min="50" max="100"') }}
-                </div>
                 <div>
                     <label class="meta-field meta-checkbox-field"><input type="checkbox" name="rename"> <span class="meta-label">Rename files to “Series #001 (Year).cbz”</span></label>
                     <p class="field-help">Every file keeps its original name in its ComicInfo.xml notes.</p>

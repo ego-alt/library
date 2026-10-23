@@ -26,12 +26,17 @@ def series(app):
     return s
 
 
-def test_write_cbz_orders_converts_and_tags(app, tmp_path, series):
+def test_write_cbz_orders_and_tags_then_pages_become_webp(app, tmp_path, series):
     src = make_cbz(tmp_path / "Saga 065 (2023) (Digital).cbz", pages=12)
     dest = tmp_path / "out.cbz"
     issue = series.issues[2]
-    pages = archive.write_cbz(str(src), str(dest), webp=True, metadata=lambda n: (archive.comicinfo_xml(issue, series, n, src.name), archive.metroninfo_xml(issue, series, n, src.name)))
+    pages = archive.write_cbz(str(src), str(dest), metadata=lambda n: (archive.comicinfo_xml(issue, series, n, src.name), archive.metroninfo_xml(issue, series, n, src.name)))
     assert pages == 12
+    # Stored as they came (quick to add), then converted in the background.
+    with zipfile.ZipFile(dest) as zf:
+        assert zf.namelist()[0] == "001.png"
+    assert archive.needs_webp(str(dest)) and archive.convert_pages(str(dest))
+    assert not archive.needs_webp(str(dest)) and not archive.convert_pages(str(dest))
     with zipfile.ZipFile(dest) as zf:
         names = zf.namelist()
         assert names[:3] == ["001.webp", "002.webp", "003.webp"]
@@ -54,7 +59,7 @@ def test_write_cbz_rejects_an_archive_without_pages(tmp_path):
     with zipfile.ZipFile(src, "w") as zf:
         zf.writestr("readme.txt", "nothing")
     with pytest.raises(archive.ArchiveError):
-        archive.write_cbz(str(src), str(tmp_path / "out.cbz"), webp=False)
+        archive.write_cbz(str(src), str(tmp_path / "out.cbz"))
     assert not (tmp_path / "out.cbz").exists()
 
 
@@ -66,7 +71,7 @@ def test_write_cbz_reads_7z(tmp_path):
         zf.extractall(pages)
     src = tmp_path / "x.cb7"
     subprocess.run(["bsdtar", "--format", "7zip", "-cf", str(src), "-C", str(pages), "."], check=True)
-    assert archive.write_cbz(str(src), str(tmp_path / "out.cbz"), webp=False) == 2
+    assert archive.write_cbz(str(src), str(tmp_path / "out.cbz")) == 2
 
 
 def test_match_file_by_name_and_by_comicinfo(app, comic_dir, tmp_path, series):
@@ -102,7 +107,7 @@ def test_import_file_files_it_under_the_series(app, comic_dir, tmp_path, series)
 
 
 def test_import_keeps_names_when_renaming_is_off(app, comic_dir, tmp_path, series):
-    settings.set_many({"rename": False, "convert_webp": False})
+    settings.set_many({"rename": False})
     issue = series.issues[0]
     files.import_file(str(make_cbz(tmp_path / "saga_01_scan.cbz")), issue)
     assert os.path.basename(issue.filename) == "saga_01_scan.cbz"
@@ -146,3 +151,13 @@ def test_set_monitor(app, series):
     series.issues[0].status = DOWNLOADED
     set_monitor(series, "none")
     assert [i.status for i in series.issues] == [DOWNLOADED, SKIPPED, SKIPPED, SKIPPED]
+
+
+def test_the_worker_converts_added_issues_to_webp(app, comic_dir, tmp_path, series):
+    issue = series.issues[0]
+    files.import_file(str(make_cbz(tmp_path / "Saga 001 (2012).cbz", pages=3)), issue)
+    size = issue.file_size
+    assert archive.needs_webp(files.abs_path(issue))
+    assert files.convert_next() == (1, False)
+    assert not archive.needs_webp(files.abs_path(issue)) and issue.file_size != size
+    assert files.convert_next() == (0, False)

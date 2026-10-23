@@ -109,7 +109,7 @@ def import_file(src: str, issue: ComicIssue, *, remove_source: bool = True) -> C
     old = abs_path(issue) if issue.filename else None
     tmp_dest = f"{dest}.new"
     try:
-        pages = archive.write_cbz(src, tmp_dest, webp=opts["convert_webp"], quality=int(opts["webp_quality"]), metadata=lambda pages: (archive.comicinfo_xml(issue, series, pages, original), archive.metroninfo_xml(issue, series, pages, original)))
+        pages = archive.write_cbz(src, tmp_dest, metadata=lambda pages: (archive.comicinfo_xml(issue, series, pages, original), archive.metroninfo_xml(issue, series, pages, original)))
         os.replace(tmp_dest, dest)
     finally:
         if os.path.exists(tmp_dest):
@@ -129,7 +129,34 @@ def import_file(src: str, issue: ComicIssue, *, remove_source: bool = True) -> C
             os.remove(src)
         except OSError as e:
             logger.warning("Imported %s but couldn't remove it: %s", src, e)
+    # Its pages become WebP in the background, so adding it doesn't wait.
+    from ..downloads import jobs
+
+    try:
+        jobs.request_run("convert")
+    except OSError:
+        pass
     return issue
+
+
+def convert_next(limit: int = 3, pause: float = 0.05) -> tuple[int, bool]:
+    """Convert up to `limit` issues whose pages aren't all WebP yet. Returns
+    (how many were converted, whether more are waiting)."""
+    done = 0
+    for issue in ComicIssue.query.filter(ComicIssue.filename.isnot(None)).order_by(ComicIssue.added_at.desc()):
+        path = abs_path(issue)
+        if not os.path.isfile(path) or not archive.needs_webp(path):
+            continue
+        if done == limit:
+            return done, True
+        filename = issue.filename
+        if archive.convert_pages(path, pause=pause):
+            db.session.refresh(issue)
+            if issue.filename == filename:
+                issue.file_size = os.path.getsize(path)
+                db.session.commit()
+        done += 1
+    return done, False
 
 
 def delete_file(issue: ComicIssue) -> None:

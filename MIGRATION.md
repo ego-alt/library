@@ -5,6 +5,7 @@
 1. Migration `f2b7c9d1e4a5` adds when each wanted issue and book request was last looked for (applied on start behind the dashboard).
 2. The import folder and the "A folder" (blackhole) download client are gone: comics and EPUBs arrive as downloads (SABnzbd or qBittorrent) or through a shelf's +. `IMPORT_DIR` is no longer read, and a saved `blackhole_dir` setting is ignored. Anything left in `COMIC_DIR/_import` can be added with the comics shelf's + or deleted.
 3. Settings is the tab beside Downloads (`/settings`); Get is the "Get …" line under each shelf's search.
+4. Comic pages are always converted to WebP, in the background after a comic is added, instead of while you wait; the "Convert pages to WebP" and "WebP quality" settings are gone (a saved value is ignored). Comics already in the library that aren't WebP are converted the same way.
 
 ## October 2026: comics
 
