@@ -81,9 +81,6 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 /* Something is downloading. */
 .bar-icon__dot { position: absolute; top: 9px; right: 9px; width: 7px; height: 7px; border-radius: 50%; background: var(--color-accent); }
 
-/* The shelf switch: a solid drawing the size and weight of the icons
-   beside it. */
-.bar-svg { width: 1.15em; height: 1.15em; fill: currentColor; vertical-align: -0.15em; }
 .lib-bar { margin-bottom: 0; }  /* the page sets its own top (--page-top) */
 .count {
     display: inline-block;

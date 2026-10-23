@@ -1,6 +1,5 @@
 """Putting an EPUB into the library: a unique file name in BOOK_DIR, a Book
-row, and its cover found inside the file. Used by uploads, downloads and the
-import folder."""
+row, and its cover found inside the file. Used by finished downloads."""
 
 import os
 import re

@@ -65,11 +65,6 @@
 .entry__title a { color: inherit; text-decoration: none; }
 .entry__title a:hover { color: var(--color-accent); text-decoration: underline; }
 .entry__title .muted { color: var(--color-text-muted); }
-.entry__meta { color: var(--color-text-muted); font-size: var(--text-sm); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.entry__meta strong { color: var(--color-text-secondary); font-weight: 600; }
-.entry__meta .is-bad { color: var(--color-danger); }
-.entry__meta .is-good { color: var(--color-success); }
-.entry__error { color: var(--color-danger); font-size: var(--text-sm); white-space: normal; }
 .entry__side { color: var(--color-text-muted); font-size: var(--text-sm); white-space: nowrap; font-variant-numeric: tabular-nums; text-align: right; }
 /* A download's state: its percentage, quietly, like a date; only a failure
    stands out. */

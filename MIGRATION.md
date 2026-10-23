@@ -1,10 +1,16 @@
 # Migrating an Existing Deployment
 
+## October 2026: downloads and settings
+
+1. Migration `f2b7c9d1e4a5` adds when each wanted issue and book request was last looked for (applied on start behind the dashboard).
+2. The import folder and the "A folder" (blackhole) download client are gone: comics and EPUBs arrive as downloads (SABnzbd or qBittorrent) or through a shelf's +. `IMPORT_DIR` is no longer read, and a saved `blackhole_dir` setting is ignored. Anything left in `COMIC_DIR/_import` can be added with the comics shelf's + or deleted.
+3. Settings is the tab beside Downloads (`/settings`); Get is the "Get …" line under each shelf's search.
+
 ## October 2026: comics
 
 1. **Rebuild the image**: it now installs `libarchive-tools` (bsdtar, for CBR and CB7 files).
 2. Migration `c4d8e1f2a9b6` adds the comics tables (applied on start behind the dashboard).
-3. Optional: set `COMIC_DIR` to where comics should live and mount it (the default, `instance/comics`, is on the same disk as the database). Add a ComicVine key or Metron account, indexers and a download client in Settings (in the menu, top right).
+3. Optional: set `COMIC_DIR` to where comics should live and mount it (the default, `instance/comics`, is on the same disk as the database). Add a ComicVine key or Metron account, indexers and a download client in Settings.
 
 ## October 2026: audit fixes (`audit-fixes` branch)
 
