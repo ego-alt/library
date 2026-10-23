@@ -107,7 +107,7 @@ def test_readers_see_only_what_there_is_to_read(standard_client, comic_dir, tmp_
     assert standard_client.get(f"/comics/read/{have.id}").status_code == 200
     assert standard_client.put(f"/comics/api/issues/{have.id}/progress", json={"page": 1}).status_code == 200
     page = standard_client.get("/comics/").data.decode()
-    assert 'aria-label="Continue Saga #1"' in page and "#1 · 50%" in page and 'role="radiogroup"' not in page
+    assert 'aria-label="Continue Saga #1"' in page and "#1 · 50%" in page and 'aria-checked="true">Reading<' in page
     assert standard_client.get(f"/comics/issue/{have.id}/download").status_code == 200
 
 

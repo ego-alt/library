@@ -170,8 +170,6 @@ function initDownloadLists() {
     const activeSection = document.getElementById('activeSection');
     const activeList = document.getElementById('activeList');
     const attentionList = document.getElementById('attentionList');
-    const historyList = document.getElementById('historyList');
-    const historyCount = document.getElementById('historyCount');
     const statusLine = document.getElementById('statusLine');
     let misses = 0;
 
@@ -183,8 +181,7 @@ function initDownloadLists() {
             if (d.stalled) return [`Stalled at ${percent}%`, 'is-bad'];
             return [`${percent}%`, null];
         }
-        if (d.status === 'done') return [d.kind === 'book' ? 'Added to Books' : 'Added to Comics', 'is-good'];
-        return d.error === 'Cancelled.' ? ['Cancelled', null] : ['Failed', 'is-bad'];
+        return ['Failed', 'is-bad'];
     }
 
     function stopLooking(d, anchor) {
@@ -195,8 +192,9 @@ function initDownloadLists() {
         }
     }
 
-    // A download as a row: what it's for, then its state and details; ⋯
-    // holds what you can do about it.
+    // A download as a row: what it's for, then its state and when; ⋯ holds
+    // what you can do about it. `where` is active, or attention (a failure
+    // that still needs you).
     function downloadRow(d, where) {
         const percent = Math.round((d.progress || 0) * 100);
         const [state, tone] = stateOf(d, where);
@@ -204,15 +202,14 @@ function initDownloadLists() {
         const retry = d.item ? {label: 'Try another release', onClick: () => act(`/api/downloads/${d.id}/retry`, 'POST', 'Looking for another release')} : null;
         const actions = where === 'active'
             ? [d.stalled ? retry : null, {label: 'Cancel…', danger: true, onClick: () => confirmMenu(more, `Cancel ${label}?`, [{label: 'Keep downloading'}, {label: 'Cancel the download', danger: true, onClick: () => act(`/api/downloads/${d.id}/cancel`, 'POST', 'Cancelled')}])}]
-            : where === 'attention'
-                ? [retry, d.item ? {label: 'Stop looking…', danger: true, onClick: () => stopLooking(d, more)} : null, {label: 'Remove from history', onClick: () => act(`/api/downloads/${d.id}`, 'DELETE', 'Removed')}]
-                : [d.status === 'failed' && d.item && d.error !== 'Cancelled.' ? retry : null, {label: 'Remove from history', onClick: () => act(`/api/downloads/${d.id}`, 'DELETE', 'Removed')}];
+            : [retry, d.item ? {label: 'Stop looking…', danger: true, onClick: () => stopLooking(d, more)} : null, {label: 'Dismiss', onClick: () => act(`/api/downloads/${d.id}`, 'DELETE', 'Dismissed')}];
         const more = h('button', {type: 'button', class: 'entry__more', 'aria-label': `More for ${label}`, dataset: {menuAnchor: ''}, onclick: (e) => openMenu(e.currentTarget, actions)}, iconEl('ellipsis'));
-        const showError = d.error && d.error !== 'Cancelled.' && where !== 'active';
-        return h('li', {class: 'entry', title: d.title},
+        const showError = d.error && where !== 'active';
+        return h('li', {class: 'entry', title: [d.title, d.indexer, formatSize(d.size)].filter(Boolean).join(' · ')},
             h('div', {class: 'entry__main'},
                 h('span', {class: 'entry__title'}, d.item ? h('a', {href: d.item.url}, d.item.label) : h('span', {class: 'muted'}, 'Removed')),
-                h('span', {class: 'entry__meta'}, h('strong', {class: tone}, state), ' · ', [d.kind === 'book' ? 'Book' : 'Comic', d.indexer, formatSize(d.size), timeAgo(d.updated_at || d.created_at)].filter(Boolean).join(' · ')),
+                // Just its state and when; the release, indexer and size are in its tooltip.
+                h('span', {class: 'entry__meta'}, h('strong', {class: tone}, state), ' · ', timeAgo(d.updated_at || d.created_at)),
                 showError ? h('span', {class: 'entry__error'}, d.error) : null,
                 where === 'active' && d.client !== 'blackhole' && d.status !== 'importing' ? h('span', {class: 'entry__bar'}, h('span', {style: `width: ${percent}%`})) : null),
             h('span'),
@@ -249,11 +246,6 @@ function initDownloadLists() {
         activeSection.hidden = !data.active.length && !data.attention.length;
         attentionList.replaceChildren(...data.attention.map(d => downloadRow(d, 'attention')));
         activeList.replaceChildren(...data.active.map(d => downloadRow(d, 'active')));
-        historyList.replaceChildren(...data.history.map(d => downloadRow(d, 'history')));
-        // Empty, the history is one line, like an empty Wanted.
-        document.getElementById('historyHint').textContent = data.history.length ? 'A release that failed isn’t downloaded again for the same book or issue; remove it from the history to allow it.' : 'Nothing downloaded yet.';
-        historyList.hidden = !data.history.length;
-        historyCount.textContent = data.history.length || '';
     }
     refreshDownloads = refresh;
 

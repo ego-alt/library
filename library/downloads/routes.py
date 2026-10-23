@@ -2,7 +2,8 @@
 and the APIs behind asking for books and series from the shelves' search
 and adding files with the shelves' +.
 
-  /downloads           in progress, wanted, files that need a series, history
+  /downloads           in progress (failures that need you first), wanted,
+                       and files that need a series
   /settings            the tab beside it: indexers, clients, comics
   /api/get/...         searching Open Library and ComicVine/Metron
   /api/downloads/...   the queue; /api/wanted/<kind>/<id>/... searches and
@@ -291,19 +292,17 @@ def grab_wanted(kind, item_id):
 @json_admin_required
 def activity():
     active = Download.query.filter(Download.status.in_(DL_ACTIVE)).order_by(Download.created_at.desc()).all()
-    history = Download.query.filter(~Download.status.in_(DL_ACTIVE)).order_by(Download.updated_at.desc()).limit(100).all()
+    finished = Download.query.filter(~Download.status.in_(DL_ACTIVE)).order_by(Download.updated_at.desc()).limit(100).all()
     # Failures that still need you: the last try for something still wanted.
     latest = {}
     for d in Download.query.order_by(Download.created_at.desc()):
         latest.setdefault((d.kind, d.issue_id or d.book_request_id), d.id)
-    attention = [d for d in history if d.status == DL_FAILED and d.item is not None and d.item.status == WANTED and d.error != "Cancelled." and latest.get((d.kind, d.issue_id or d.book_request_id)) == d.id]
-    history = [d for d in history if d not in attention]
+    attention = [d for d in finished if d.status == DL_FAILED and d.item is not None and d.item.status == WANTED and d.error != "Cancelled." and latest.get((d.kind, d.issue_id or d.book_request_id)) == d.id]
     worker = jobs.status()
     failed_jobs = [job for job in jobs.JOBS if worker.get(job) and not worker[job].get("ok", True)]
     return jsonify({
         "active": [download_json(d) for d in active],
         "attention": [download_json(d) for d in attention],
-        "history": [download_json(d) for d in history],
         "clients": list((worker.get("clients") or {}).values()),
         "paused": not worker.get("alive") or bool(failed_jobs),
     })
@@ -342,7 +341,8 @@ def retry_download(download_id):
 @downloads_blueprint.delete("/api/downloads/<int:download_id>")
 @json_admin_required
 def forget_download(download_id):
-    """Remove a finished or failed download from the history (and the blocklist)."""
+    """Dismiss a finished or failed download (a failed release can then be
+    downloaded again)."""
     download = db.session.get(Download, download_id) or abort(404)
     if download.status in DL_ACTIVE:
         return jsonify({"error": "Cancel it first."}), 409

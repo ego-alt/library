@@ -762,10 +762,11 @@ function saveMetadata(filename) {
     });
 }
 
-$('.close-metadata, .metadata-overlay').on('click', function(e) {
-    if (e.target === this) {
-        requestCloseMetadata();
-    }
+// × closes (a click on its icon counts); so does a click on the backdrop
+// itself, not on the card.
+$('#metadataOverlay .close-metadata').on('click', () => requestCloseMetadata());
+$('#metadataOverlay').on('click', function(e) {
+    if (e.target === this) requestCloseMetadata();
 });
 
 // After a cover change, swap the new (versioned) thumbnail URL into the
@@ -1226,10 +1227,9 @@ async function handleLogin(event) {
 }
 
 // Close dialog when clicking outside or on close button
-$('.close-login, .login-overlay').on('click', function(e) {
-    if (e.target === this) {
-        closeLoginDialog();
-    }
+$('.close-login').on('click', () => closeLoginDialog());
+$('.login-overlay').on('click', function(e) {
+    if (e.target === this) closeLoginDialog();
 });
 
 // Prevent closing when clicking inside the login content

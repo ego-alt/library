@@ -153,18 +153,24 @@ def _series_card(series: ComicSeries, progress: dict) -> dict:
     return {"series": series, "cover": _series_cover(series), "href": href, "label": label, "state": state, "line": line, "last": last.isoformat() if last else ""}
 
 
+VIEWS = ("all", "unread", "reading", "finished")
+
+
 @comics_blueprint.get("/")
 @login_required
 def index():
-    """The wall of series. Series are many issues each, so there's no
-    Unread / Reading / Finished: what you're partway through comes first
-    (the latest read first), then everything else A–Z."""
+    """The wall of series, filtered like the books: it opens on what you're
+    reading when there's something, else on everything (?view= picks).
+    Under All, what you're partway through comes first, then A–Z."""
     admin = _is_admin()
     progress = {p.issue_id: p for p in ComicProgress.query.filter_by(user_id=current_user.id)}
     cards = [_series_card(s, progress) for s in ComicSeries.query.order_by(ComicSeries.name) if admin or any(i.filename for i in s.issues)]
     reading = sorted((c for c in cards if c["line"].startswith("#")), key=lambda c: c["last"], reverse=True)
     cards = reading + [c for c in cards if c not in reading]
-    return _page("index.html", cards=cards)
+    view = request.args.get("view")
+    if view not in VIEWS:
+        view = "reading" if any(c["state"] == "reading" for c in cards) else "all"
+    return _page("index.html", cards=cards, current_view=view)
 
 
 @comics_blueprint.get("/series/<int:series_id>")
