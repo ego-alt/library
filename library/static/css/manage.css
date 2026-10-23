@@ -54,7 +54,9 @@
     align-items: center;
     gap: var(--space-3);
     min-height: 44px;
-    padding: 4px 0;
+    /* A pixel more above than below: Inter's letters sit a touch high in
+       their line, so this centres what the eye sees between the rules. */
+    padding: 5px 0 4px;
     border-bottom: 1px solid var(--color-border);
     list-style: none;
 }
@@ -123,16 +125,15 @@ body[data-page="downloads"] .section, body[data-page="settings"] .section { marg
 body[data-page="downloads"] .section[hidden] { display: none; }
 /* One spacing rule for every section: its parts sit one gap apart (hidden
    parts leave nothing behind), the heading line is no taller than its name
-   (a link beside it hangs in rather than pushing it down), and the last row
-   has no rule under it. */
+   (a link beside it hangs in rather than pushing it down); every row,
+   the last included, has its rule. */
 body[data-page] section.section { display: flex; flex-direction: column; gap: var(--space-2); }
 body[data-page] section.section > * { margin-top: 0; margin-bottom: 0; }
 body[data-page] section.section > [hidden] { display: none; }
 body[data-page] section.section > .sub-head { margin-top: var(--space-3); }
 body[data-page] section.section > .btn { align-self: flex-start; }
 body[data-page] .section .section__head { min-height: 0; }
-body[data-page] .section .entries:last-child > .entry:last-child,
-body[data-page] .section .entries:last-child > .entry-group:last-child > details:not([open]) > .entry { border-bottom: none; }
+
 body[data-page] .section .section__head { padding-bottom: var(--space-2); border-bottom: 1px solid var(--color-border); }
 body[data-page] .section__title {
     font-size: 0.8125rem;
