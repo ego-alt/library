@@ -1076,7 +1076,7 @@ async function stageUpload(file) {
     formData.append('file', file);
     const response = await fetch(appUrl('/upload_book'), {method: 'POST', body: formData});
     const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data.error || "Couldn't add this book.");
+    if (!response.ok) throw new Error(data.error || failureMessage(response.status));
     return data;
 }
 

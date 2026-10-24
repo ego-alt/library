@@ -57,15 +57,29 @@ async function apiFetch(path, {method = 'GET', body, form} = {}) {
         options.headers['Content-Type'] = 'application/json';
         options.body = JSON.stringify(body);
     }
-    const response = await fetch(appUrl(path), options);
+    let response;
+    try {
+        response = await fetch(appUrl(path), options);
+    } catch (e) {
+        throw Object.assign(new Error("Couldn't reach the library. Check your connection and try again."), {status: 0});
+    }
     let data = {};
     try { data = await response.json(); } catch (e) { /* empty answer */ }
     if (!response.ok) {
-        const error = new Error(data.error || "Couldn't reach the library. Try again.");
+        const error = new Error(data.error || failureMessage(response.status));
         error.status = response.status;
         throw error;
     }
     return data;
+}
+
+/** What a failed request means, when the answer didn't say (nginx, not the
+ * library, answered: too big, timed out, or the library is down). */
+function failureMessage(status) {
+    if (status === 413) return 'That file is too big to upload.';
+    if (status === 504) return 'The library took too long to answer. Try again.';
+    if (status === 502 || status === 503) return "The library isn't answering right now. Try again in a minute.";
+    return `Something went wrong (error ${status}). Try again.`;
 }
 
 function h(tag, attrs = {}, ...children) {
