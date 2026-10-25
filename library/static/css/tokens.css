@@ -1,6 +1,7 @@
-/* Theme tokens — a gallery wall by day, the same gallery after hours at night,
- * one ink-blue accent across both (tapes is Gruvbox orange, calendar Gruvbox
- * green; library takes the blue). The light, grain and frosted panes are in
+/* Theme tokens — a gallery wall by day, the same gallery after hours at night.
+ * The accent is slate by day (quiet on the paper, so the covers carry the
+ * colour) and gold at night (lamplight on the warm dark). Tapes is Gruvbox
+ * orange, calendar Gruvbox green. The light, grain and frosted panes are in
  * index.css; the reader's own calmer page is in reader.css.
  *
  * Structural tokens (spacing, radii, type, fonts, motion) live in
@@ -17,16 +18,16 @@
     --color-text-primary: #1f1d1a;       /* ink */
     --color-text-secondary: #4a433a;
     --color-text-muted: #85807a;
-    --color-accent: #2d5b8a;             /* ink blue */
-    --color-accent-hover: #234a72;
+    --color-accent: #535f5f;             /* slate: 6:1 on the wall */
+    --color-accent-hover: #414b4b;
     --color-on-accent: #f7f2e8;
     --color-danger: #a6352b;
     --color-danger-hover: #8c2a21;
     --color-success: #4f7a3a;
     --color-shadow: rgba(60, 45, 25, 0.18);
-    --color-highlight-soft: rgba(45, 91, 138, 0.08);
+    --color-highlight-soft: rgba(83, 95, 95, 0.08);
     /* App-specific: reading highlights, image scrims, covers with no image. */
-    --color-text-selection: rgba(45, 91, 138, 0.22);
+    --color-text-selection: rgba(83, 95, 95, 0.22);
     --color-scrim: rgba(0, 0, 0, 0.55);
     --wood: #8b6f47;
     --wood-edge: #6f5638;
@@ -43,15 +44,15 @@
     --color-text-primary: #eadfca;
     --color-text-secondary: #d9ccb2;
     --color-text-muted: #9a8e7a;
-    --color-accent: #8fb0cf;             /* the same ink blue, lit */
-    --color-accent-hover: #a9c4dd;
+    --color-accent: #d4b36a;             /* gold: 9:1 on the dark */
+    --color-accent-hover: #e3c88a;
     --color-on-accent: #141210;
     --color-danger: #cc241d;
     --color-danger-hover: #fb4934;
     --color-success: #98971a;
     --color-shadow: rgba(0, 0, 0, 0.35);
     --color-highlight-soft: rgba(255, 220, 160, 0.06);
-    --color-text-selection: rgba(143, 176, 207, 0.35);
+    --color-text-selection: rgba(212, 179, 106, 0.30);
     --color-scrim: rgba(0, 0, 0, 0.6);
     --wood: #4a3a26;
     --wood-edge: #2f2418;

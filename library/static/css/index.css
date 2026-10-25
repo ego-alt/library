@@ -550,7 +550,7 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 }
 
 /* --- Buttons (preserve legacy class names so JS keeps working) --- */
-/* One primary button for the whole app, in the accent blue. */
+/* One primary button for the whole app, in the accent. */
 .btn-primary {
     background: var(--color-accent);
     border-color: var(--color-accent);
