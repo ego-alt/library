@@ -71,7 +71,7 @@ def _filtered_book_query(filters=None, view=VIEW_ALL):
     """Build the base Book query with access, view and search applied.
 
     filters["q"] is the library's search box: every word must appear in the
-    title, author, genre, or one of your tags."""
+    title, author, or one of your tags."""
     query = Book.query.filter(Book.deleted_at.is_(None))
 
     if (
@@ -105,7 +105,6 @@ def _filtered_book_query(filters=None, view=VIEW_ALL):
             matches = [
                 Book.title.ilike(pattern),
                 Book.author.ilike(pattern),
-                Book.genre.ilike(pattern),
             ]
             if current_user.is_authenticated:
                 matches.append(_tag_match(Tag.name.ilike(pattern)))

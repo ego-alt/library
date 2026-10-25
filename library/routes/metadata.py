@@ -64,13 +64,11 @@ def book_metadata(filename):
             return jsonify({"error": "Authentication required"}), 401
 
         data = request.get_json()
-        # Title, author and genre are shared by everyone, so only admins edit
-        # them. Anyone signed in sets their own tags and reading status.
+        # Title and author are shared by everyone, so only admins edit them.
+        # Anyone signed in sets their own tags and reading status.
         if current_user.role == UserRoleChoice.ADMIN:
             book.title = (data.get("title") or book.title).strip()[:200]
             book.author = (data.get("author") or book.author).strip()[:200]
-            if "genre" in data:
-                book.genre = (data.get("genre") or "").strip()[:100] or None
 
         # Access level is admin-only to change. Non-admins (and unknown values)
         # leave it untouched — the toggle isn't rendered for them either.
@@ -126,7 +124,6 @@ def book_metadata(filename):
         "title": book.title,
         "author": book.author,
         "author_display": display_author(book.author),
-        "genre": book.genre,
         "created_at": book.created_at.strftime("%Y-%m-%d %H:%M:%S"),
         "tags": [],
         "status": BookProgressChoice.UNREAD.value,

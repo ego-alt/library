@@ -160,7 +160,6 @@ def upload_book_metadata():
             book = Book(
                 title=title[:200],
                 author=author[:200],
-                genre=(data.get("genre") or "").strip()[:100] or None,
                 filename=filename,
                 cover_path=data.get("cover_path"),
                 access_level="standard",

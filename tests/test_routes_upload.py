@@ -90,7 +90,6 @@ def test_confirm_moves_file_into_library_with_generated_name(
         "upload_id": payload["upload_id"],
         "title": "Brave New World (Revised)",
         "author": "Aldous Huxley",
-        "genre": "fiction",
         "tags": ["dystopia", " ", "dystopia"],
         "cover_path": payload["cover_path"],
     })

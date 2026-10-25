@@ -74,7 +74,6 @@ class Book(db.Model):
     author = db.Column(db.String(200), nullable=False)
     filename = db.Column(db.String(255), unique=True, nullable=False)
     cover_path = db.Column(db.String(255))  # Path to stored cover image
-    genre = db.Column(db.String(100))
     access_level = db.Column(db.String(20), nullable=False, default="standard")
     created_at = db.Column(db.DateTime, nullable=False, default=_utcnow)
     uploaded_by = db.Column(db.Integer, db.ForeignKey("users.id"))

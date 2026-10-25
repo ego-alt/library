@@ -1,5 +1,9 @@
 # Migrating an Existing Deployment
 
+## October 2026: genre folded into tags
+
+Migration `a9c3e5f7b2d4` drops `books.genre` (applied on start behind the dashboard). It was empty on every book; readers' own tags do the job. Nothing to move.
+
 ## October 2026: downloads and settings
 
 1. Migration `f2b7c9d1e4a5` adds when each wanted issue and book request was last looked for (applied on start behind the dashboard).

@@ -445,11 +445,11 @@ def _status(user, book, status):
     db.session.commit()
 
 
-def _second_book(book_dir, title="Other Book", author="Someone Else", genre=None):
+def _second_book(book_dir, title="Other Book", author="Someone Else"):
     from tests._epub_builder import build_epub3
 
     (book_dir / "other.epub").write_bytes(build_epub3(title=title))
-    b = Book(title=title, author=author, genre=genre, filename="other.epub")
+    b = Book(title=title, author=author, filename="other.epub")
     db.session.add(b)
     db.session.commit()
     return b
@@ -472,15 +472,14 @@ def test_status_views_fall_back_to_all_when_signed_out(client, book):
     assert len(client.get("/load_more/0?view=finished").get_json()) == 1
 
 
-def test_search_matches_title_author_genre_and_tags(standard_client, book, book_dir):
-    _second_book(book_dir, title="Postwar", author="Tony Judt", genre="History")
+def test_search_matches_title_author_and_tags(standard_client, book, book_dir):
+    _second_book(book_dir, title="Postwar", author="Tony Judt")
     standard_client.post(
         f"/book_metadata/{book.filename}",
         json={"title": book.title, "author": book.author, "tags": ["bedside"]},
     )
     q = lambda text: [b["filename"] for b in standard_client.get(f"/load_more/0?q={text}").get_json()]  # noqa: E731
     assert q("judt") == ["other.epub"]
-    assert q("history") == ["other.epub"]
     assert q("bedside") == [book.filename]
     assert q("tony postwar") == ["other.epub"]
     assert q("tony bedside") == []

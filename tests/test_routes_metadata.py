@@ -25,19 +25,18 @@ def test_post_metadata_requires_auth(client, book):
 def test_post_metadata_updates_fields(admin_client, book):
     r = admin_client.post(
         f"/book_metadata/{book.filename}",
-        json={"title": "Renamed", "author": "Other", "genre": "fiction", "tags": []},
+        json={"title": "Renamed", "author": "Other", "tags": []},
     )
     assert r.status_code == 200
     db.session.refresh(book)
     assert book.title == "Renamed"
     assert book.author == "Other"
-    assert book.genre == "fiction"
 
 
 def test_post_metadata_creates_user_tags(standard_client, book, standard_user):
     r = standard_client.post(
         f"/book_metadata/{book.filename}",
-        json={"title": book.title, "author": book.author, "genre": "", "tags": ["scifi", "favorite"]},
+        json={"title": book.title, "author": book.author, "tags": ["scifi", "favorite"]},
     )
     assert r.status_code == 200
     tags = Tag.query.filter_by(user_id=standard_user.id).all()
@@ -99,7 +98,7 @@ def test_get_metadata_exposes_access_level(client, book):
 def test_admin_can_set_access_level_restricted(admin_client, book):
     r = admin_client.post(
         f"/book_metadata/{book.filename}",
-        json={"title": book.title, "author": book.author, "genre": "",
+        json={"title": book.title, "author": book.author, 
               "tags": [], "access_level": "restricted"},
     )
     assert r.status_code == 200
@@ -112,7 +111,7 @@ def test_admin_can_clear_access_level_back_to_standard(admin_client, book):
     db.session.commit()
     r = admin_client.post(
         f"/book_metadata/{book.filename}",
-        json={"title": book.title, "author": book.author, "genre": "",
+        json={"title": book.title, "author": book.author, 
               "tags": [], "access_level": "standard"},
     )
     assert r.status_code == 200
@@ -123,7 +122,7 @@ def test_admin_can_clear_access_level_back_to_standard(admin_client, book):
 def test_standard_user_cannot_change_access_level(standard_client, book):
     r = standard_client.post(
         f"/book_metadata/{book.filename}",
-        json={"title": book.title, "author": book.author, "genre": "",
+        json={"title": book.title, "author": book.author, 
               "tags": [], "access_level": "restricted"},
     )
     assert r.status_code == 200  # the rest of the save still succeeds
@@ -134,7 +133,7 @@ def test_standard_user_cannot_change_access_level(standard_client, book):
 def test_admin_invalid_access_level_is_ignored(admin_client, book):
     r = admin_client.post(
         f"/book_metadata/{book.filename}",
-        json={"title": book.title, "author": book.author, "genre": "",
+        json={"title": book.title, "author": book.author, 
               "tags": [], "access_level": "superuser"},
     )
     assert r.status_code == 200
@@ -160,7 +159,7 @@ def test_list_tags_excludes_status_values(standard_client):
 def test_list_tags_returns_user_custom_tags_alphabetised(standard_client, book):
     standard_client.post(
         f"/book_metadata/{book.filename}",
-        json={"title": book.title, "author": book.author, "genre": "",
+        json={"title": book.title, "author": book.author, 
               "tags": ["zeta", "alpha", "mike"]},
     )
     r = standard_client.get("/tags")
@@ -188,10 +187,10 @@ def test_list_tags_does_not_leak_other_users_tags(standard_client):
 
 
 def test_standard_user_cannot_rename_shared_fields(standard_client, book):
-    """Title/author/genre are shared; only admins change them. Tags and
+    """Title and author are shared; only admins change them. Tags and
     status still save for everyone."""
     r = standard_client.post(f"/book_metadata/{book.filename}", json={
-        "title": "Hacked", "author": "Nobody", "genre": "x", "tags": ["mine"],
+        "title": "Hacked", "author": "Nobody", "tags": ["mine"],
         "status": "Finished",
     })
     assert r.status_code == 200
@@ -204,7 +203,7 @@ def test_standard_user_cannot_rename_shared_fields(standard_client, book):
 
 def test_admin_can_rename(admin_client, book):
     admin_client.post(f"/book_metadata/{book.filename}", json={
-        "title": "  New Title ", "author": "New Author", "genre": ""})
+        "title": "  New Title ", "author": "New Author"})
     payload = admin_client.get(f"/book_metadata/{book.filename}").get_json()
     assert payload["title"] == "New Title"
-    assert payload["genre"] is None
+    assert "genre" not in payload

@@ -314,7 +314,7 @@ function rerenderLibrary() {
 }
 
 // <== SEARCH ==>
-// One box: every word must match the title, author, genre or one of your tags.
+// One box: every word must match the title, author or one of your tags.
 function applyFilters() {
     // Reset pagination
     offset = 0;
@@ -354,10 +354,8 @@ function generateMetadataHtml(data, isUpload = false) {
     const editable = isAdmin || isUpload;
 
     const ids = isUpload
-        ? { title: 'upload-metadata-title', author: 'upload-metadata-author',
-            genre: 'upload-metadata-genre' }
-        : { title: 'metadata-title', author: 'metadata-author',
-            genre: 'metadata-genre' };
+        ? { title: 'upload-metadata-title', author: 'upload-metadata-author' }
+        : { title: 'metadata-title', author: 'metadata-author' };
 
     // --- Header: title and author act as the panel's heading ---
     // A textarea so long titles wrap and stay readable; autoGrow sizes it.
@@ -385,18 +383,6 @@ function generateMetadataHtml(data, isUpload = false) {
                  alt="Cover of ${escapeHtml(data.title || 'this book')}">
             ${coverChange}
         </figure>
-    `;
-
-    // --- Always-shown genre field ---
-    const genreField = `
-        <label class="meta-field">
-            <span class="meta-label">Genre</span>
-            ${editable
-                ? `<input type="text" id="${ids.genre}" class="meta-input"
-                          value="${escapeHtml(data.genre || '')}"
-                          placeholder="e.g. Fiction, Memoir">`
-                : `<span id="${ids.genre}" class="meta-value">${escapeHtml(data.genre || '—')}</span>`}
-        </label>
     `;
 
     // --- Admin-only access toggle (admins, existing books) ---
@@ -449,7 +435,7 @@ function generateMetadataHtml(data, isUpload = false) {
               title="Download the EPUB">${icon('download')}<span>Download</span></a>`
         : '';
     const deleteButton = (isAdmin && !isUpload)
-        ? `<button type="button" class="delete-book-button btn btn-danger"
+        ? `<button type="button" class="delete-book-button btn btn-ghost"
                    data-action="delete-book" data-filename="${escapeHtml(data.filename)}">
               ${icon('trash-2')}<span>Delete</span>
            </button>`
@@ -476,7 +462,6 @@ function generateMetadataHtml(data, isUpload = false) {
             ${cover}
             <div class="meta-fields">
                 ${statusField}
-                ${genreField}
                 ${extraField}
                 ${adminOnlyField}
             </div>
@@ -684,14 +669,12 @@ function saveMetadata(filename) {
     const authorEl = document.getElementById('metadata-author');
     let author = $('#metadata-author').is('input') ? $('#metadata-author').val() : $('#metadata-author').text().trim();
     if (authorEl && authorEl.dataset.shown !== undefined && author === authorEl.dataset.shown) author = authorEl.dataset.raw;
-    const genre = $('#metadata-genre').is('input') ? $('#metadata-genre').val() : $('#metadata-genre').text().trim();
 
     // Include a tag that was typed but not yet confirmed with Enter.
     const pendingTag = ($('#tags-input').val() || '').trim();
     const metadata = {
         title,
         author,
-        genre,
         tags: [
             ...Array.from($('#tags-container .tag')).map(tag =>
                 tag.textContent.replace(/×/g, '').trim()
@@ -1143,7 +1126,6 @@ async function saveNewBook() {
         cover_path: pendingUpload.cover_path,
         title: field('upload-metadata-title'),
         author: field('upload-metadata-author'),
-        genre: field('upload-metadata-genre'),
         tags: [
             ...Array.from($('#tags-container .tag')).map(t => t.textContent.replace(/×/g, '').trim()),
             ...(pendingTag ? [pendingTag] : []),
