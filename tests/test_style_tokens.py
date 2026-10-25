@@ -1,25 +1,25 @@
 """The app's sizes come from tokens.css: no stylesheet sets a raw font size,
-so the type scale can't creep back to a size a pixel from its neighbour."""
+so the type scale can't creep back to sizes a pixel apart."""
 import pathlib
 import re
 
 CSS = pathlib.Path(__file__).resolve().parent.parent / "library" / "static" / "css"
-# A token, inherited, or relative to the text around it (a book's headings, sub/sup).
-ALLOWED = re.compile(r"var\(--(text-\w+|reader-font-size)[^)]*\)|inherit|[\d.]+(em|%)")
+SIZE = r"var\(--(text-[\w-]+|reader-font-size)[^)]*\)|inherit|0|[\d.]+(em|%)"   # a token, inherited, or relative (a book's headings, sub/sup)
+
+
+def _sizes(css):
+    css = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+    yield from (v.strip() for v in re.findall(r"font-size:\s*([^;}!]+)", css))
+    for value in re.findall(r"(?<![\w-])font:\s*([^;}]+)", css):   # the shorthand's size: the token before any family
+        m = re.search(r"(var\(--text-[\w-]+\)|[\d.]+(?:px|rem|em|%))", value)
+        if m:
+            yield m.group(1)
 
 
 def test_font_sizes_come_from_tokens():
-    raw = []
-    for path in sorted(CSS.glob("*.css")):
-        if path.name == "tokens.css":
-            continue
-        css = re.sub(r"/\*.*?\*/", "", path.read_text(), flags=re.S)
-        for value in re.findall(r"font-size:\s*([^;}!]+)", css):
-            if not ALLOWED.fullmatch(value.strip()):
-                raw.append(f"{path.name}: font-size: {value.strip()}")
+    raw = [f"{p.name}: {v}" for p in sorted(CSS.glob("*.css")) if p.name != "tokens.css" for v in _sizes(p.read_text()) if not re.fullmatch(SIZE, v)]
     assert not raw, "use a --text-* token from tokens.css:\n" + "\n".join(raw)
 
 
 def test_type_scale_is_small():
-    sizes = re.findall(r"--text-[\w-]+:", (CSS / "tokens.css").read_text())
-    assert len(sizes) <= 5
+    assert len(re.findall(r"--text-[\w-]+:", (CSS / "tokens.css").read_text())) <= 5
