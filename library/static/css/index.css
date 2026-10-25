@@ -1092,9 +1092,10 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 .discard-bar .btn { font-size: var(--text-sm); white-space: nowrap; }
 .discard-bar .discard-button { color: var(--color-danger); }
 .discard-bar .discard-button:hover { color: var(--color-danger-hover); background: transparent; }
+/* On phones, centred like the footer it stands in for. */
 @media (max-width: 640px) {
-    .discard-bar span { flex-basis: 100%; }
-    .discard-bar { justify-content: flex-end; }
+    .discard-bar span { flex-basis: 100%; text-align: center; }
+    .discard-bar { justify-content: center; }
 }
 
 #library.is-refreshing { opacity: 0.45; transition: opacity var(--dur-base) ease; pointer-events: none; }
