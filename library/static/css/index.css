@@ -565,6 +565,11 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     color: var(--color-on-accent);
 }
 .btn-primary:active:not(:disabled) { transform: translateY(1px); }
+/* Save in the details panel: a text button like Download and Delete beside
+   it, set apart only by darker, heavier type (no fill). */
+.btn.save-button { color: var(--color-text-primary); font-weight: 600; }
+.btn.save-button:hover:not(:disabled) { text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+
 /* Delete in the details panel: a quiet text button like Download beside it,
    in red; the solid red is for the confirmation that follows. */
 .btn.delete-book-button { color: var(--color-danger); gap: var(--space-1); }

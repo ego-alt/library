@@ -440,14 +440,14 @@ function generateMetadataHtml(data, isUpload = false) {
               ${icon('trash-2')}<span>Delete</span>
            </button>`
         : '';
-    const saveLabel = isUpload ? 'Add to library' : 'Save changes';
+    const saveLabel = isUpload ? 'Add to library' : 'Save';
     const saveButton = isAuth
         ? (isUpload
-            ? `<button type="button" class="save-button btn btn-primary"
+            ? `<button type="button" class="save-button btn btn-ghost"
                        data-action="save-new-book">
                   ${saveLabel}
                </button>`
-            : `<button type="button" class="save-button btn btn-primary"
+            : `<button type="button" class="save-button btn btn-ghost"
                        data-action="save-metadata" data-filename="${escapeHtml(data.filename)}">
                   ${saveLabel}
                </button>`)
