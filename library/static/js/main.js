@@ -10,6 +10,9 @@ let currentFilters = {};
 const VIEWS = ['all', 'unread', 'reading', 'finished'];
 function normalizeView(v) { return v === 'mine' ? 'reading' : (VIEWS.includes(v) ? v : 'all'); }
 let currentView = normalizeView(window.initialView);
+// A search looks through the whole library, whatever tab is picked; the tabs
+// dim while it's on, and picking one clears it.
+function shownView() { return currentFilters.q ? 'all' : currentView; }
 // Mirror of every book currently displayed, in insertion order. Seeded from the
 // server-rendered HTML and appended to by loadMoreImages, so the wall can be
 // re-rendered (after a delete, or coming back from a book) without re-fetching.
@@ -39,7 +42,7 @@ function getBookTemplate(book) {
         href: appUrl(`/read/${encodeURIComponent(book.filename)}`),
         label: `Read ${bookLabel(book)}`,
         title: book.title || '',
-        meta: [book.author, n > 0 ? `${n}%` : ''],
+        meta: [book.author, n > 0 ? `${n}%` : (book.finished ? 'Read' : '')],
         cover: book.cover,
         extras: [lock, h('div', {class: 'book-buttons'},
             h('button', {class: 'book-button', dataset: {action: 'show-metadata', filename: book.filename}, 'aria-label': 'Details', title: 'Details'},
@@ -91,7 +94,7 @@ function loadMoreImages() {
     if (replacing) $('#library').addClass('is-refreshing');
 
     const queryParams = new URLSearchParams(currentFilters);
-    queryParams.set('view', currentView);
+    queryParams.set('view', shownView());
 
     $.get(appUrl(`/load_more/${offset}?${queryParams.toString()}`), function(data, _status, jqXHR) {
         skeletons.forEach(el => el.remove());
@@ -207,6 +210,7 @@ function setView(view) {
 }
 
 function updateViewUI() {
+    document.querySelector('.library-toolbar')?.classList.toggle('is-searching', Boolean(currentFilters.q));
     document.querySelectorAll('.status-filter [data-view]').forEach(btn => {
         btn.setAttribute('aria-checked', btn.dataset.view === currentView ? 'true' : 'false');
     });
@@ -214,7 +218,13 @@ function updateViewUI() {
 
 document.querySelectorAll('.status-filter [data-view]').forEach(btn => {
     btn.addEventListener('click', () => {
-        if (btn.dataset.view !== currentView) setView(btn.dataset.view);
+        if (currentFilters.q) {
+            const search = document.getElementById('librarySearch');
+            search.value = '';
+            currentFilters = {};
+            search.dispatchEvent(new Event('input'));   // so Get's offer goes too
+        } else if (btn.dataset.view === currentView) return;
+        setView(btn.dataset.view);
     });
 });
 
@@ -301,6 +311,7 @@ function seedLoadedBooksFromDOM() {
             author: col.dataset.author || '',
             cover: img ? img.getAttribute('src') || '' : '',
             progress: col.dataset.progress ? parseFloat(col.dataset.progress) : null,
+            finished: col.dataset.finished === 'true',
             // The lock badge encodes admin-only state in the server-rendered grid.
             access_level: col.querySelector('.book-lock') ? 'restricted' : 'standard',
         });
@@ -316,13 +327,10 @@ function rerenderLibrary() {
 // <== SEARCH ==>
 // One box: every word must match the title, author or one of your tags.
 function applyFilters() {
-    // Reset pagination
-    offset = 0;
-    allImagesLoaded = false;
-
     const q = ($('#librarySearch').val() || '').trim();
+    if (q === (currentFilters.q || '')) return;   // already showing it
     currentFilters = q ? {q} : {};
-
+    updateViewUI();
     reloadLibrary();
 }
 
@@ -379,7 +387,8 @@ function generateMetadataHtml(data, isUpload = false) {
         : '';
     const cover = `
         <figure class="meta-cover${isAdmin && !isUpload ? ' meta-cover--editable' : ''}">
-            <img id="cover-preview-image" src="${escapeHtml(data.cover)}"
+            <span class="cover-blank" aria-hidden="true">${escapeHtml(data.title || '')}</span>
+            <img id="cover-preview-image" src="${escapeHtml(data.cover || '')}" onerror="this.hidden = true" onload="this.hidden = false"
                  alt="Cover of ${escapeHtml(data.title || 'this book')}">
             ${coverChange}
         </figure>
@@ -568,11 +577,17 @@ function panelState() {
         status: $('.meta-status [aria-checked="true"]').data('status') || null,
     });
 }
-function snapshotPanel() { _panelSnapshot = panelState(); }
+function snapshotPanel() { _panelSnapshot = panelState(); refreshDirty(); }
 function panelIsDirty() {
     return Boolean(pendingUpload) || Boolean(pendingCover)
         || (_panelSnapshot !== null && panelState() !== _panelSnapshot);
 }
+// Save fills in only once there's something to save.
+function refreshDirty() {
+    document.querySelector('#metadataContent .meta-footer')?.classList.toggle('is-dirty', panelIsDirty());
+}
+['input', 'change', 'click', 'keyup'].forEach(type =>
+    document.getElementById('metadataContent')?.addEventListener(type, () => requestAnimationFrame(refreshDirty)));
 
 // Close from Esc, the backdrop or ×: ask first if something would be lost.
 function requestCloseMetadata() {
@@ -591,7 +606,7 @@ function requestCloseMetadata() {
     keep.addEventListener('click', () => bar.remove());
     const discard = document.createElement('button');
     discard.type = 'button';
-    discard.className = 'btn btn-danger';
+    discard.className = 'btn btn-ghost discard-button';
     discard.textContent = pendingUpload ? 'Discard book' : 'Discard changes';
     discard.addEventListener('click', () => { bar.remove(); closeMetadataOverlay(); });
     bar.append(text, keep, discard);
@@ -732,7 +747,8 @@ function saveMetadata(filename) {
                 saveButton.text(originalText);
                 _panelSnapshot = null;
                 closeMetadataOverlay();
-                showToast('Saved', 'success');
+                updateBookOnWall(filename, metadata);
+                showToast('Saved');
             },
             error: function(xhr, status, error) {
                 const msg = (xhr.responseJSON && xhr.responseJSON.error) || "Couldn't save your changes. Try again.";
@@ -752,6 +768,25 @@ $('#metadataOverlay .close-metadata').on('click', () => requestCloseMetadata());
 $('#metadataOverlay').on('click', function(e) {
     if (e.target === this) requestCloseMetadata();
 });
+
+// After a save, the wall shows the new title, author and status at once; a
+// book whose status no longer fits the tab you're on leaves it.
+const VIEW_STATUS = {unread: 'Unread', reading: 'In Progress', finished: 'Finished'};
+function updateBookOnWall(filename, metadata) {
+    const book = loadedBooks.find(b => b.filename === filename);
+    if (!book) return;
+    if (metadata.title) book.title = metadata.title;
+    if (metadata.author) book.author = $('#metadata-author').val() || book.author;
+    if (metadata.access_level) book.access_level = metadata.access_level;
+    if (metadata.status) {
+        book.finished = metadata.status === 'Finished';
+        if (metadata.status !== 'In Progress') book.progress = null;
+        const wanted = VIEW_STATUS[shownView()];
+        if (wanted && wanted !== metadata.status) loadedBooks.splice(loadedBooks.indexOf(book), 1);
+    }
+    rerenderLibrary();
+    if (!loadedBooks.length) renderEmptyState();
+}
 
 // After a cover change, swap the new (versioned) thumbnail URL into the
 // book's card and into the mirror used to re-render the wall.
@@ -796,7 +831,7 @@ async function deleteBook(filename) {
     rerenderLibrary();
     closeMetadataOverlay();
 
-    showToast(`Deleted "${title}"`, 'info', {
+    showToast(`Deleted “${title}”`, 'info', {
         label: 'Undo',
         onClick: () => restoreBook(filename, title, removed, index),
     });
@@ -809,14 +844,14 @@ async function restoreBook(filename, title, removed, index) {
         });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
     } catch (err) {
-        showToast(`Couldn't restore "${title}". Try again.`, 'error');
+        showToast(`Couldn't restore “${title}”. Try again.`, 'error');
         return;
     }
     if (removed) {
         loadedBooks.splice(Math.min(index, loadedBooks.length), 0, removed);
         rerenderLibrary();
     }
-    showToast(`Restored "${title}"`, 'success');
+    showToast(`Restored “${title}”`);
 }
 
 
@@ -1138,7 +1173,7 @@ async function saveNewBook() {
         pendingUpload = null;  // it's in the library now; nothing to discard
         closeMetadataOverlay();
         insertNewBook(book);
-        showToast(`Added "${book.title}"`, 'success');
+        showToast(`Added “${book.title}”`);
     } catch (err) {
         button.text('Add to library').prop('disabled', false);
         showToast(err.message, 'error');
@@ -1162,6 +1197,7 @@ async function handleCoverUpload(files) {
         // Held until Save; tied to the book the picker was opened for.
         const filename = document.getElementById('coverUploadInput').dataset.filename;
         pendingCover = {filename, file: files[0]};
+        refreshDirty();
         let reader = new FileReader();
         reader.onload = function(e) {
             // Update the cover preview immediately with the new image

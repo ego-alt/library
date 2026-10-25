@@ -56,12 +56,12 @@
     <div class="running-foot" id="running-foot"></div>
     <div class="top-controls">
         <div class="d-flex align-items-center gap-3">
-            <button class="btn btn-secondary" id="menu-toggle" aria-label="Contents" title="Contents">
-                {{ icon('list') }}
-            </button>
             <a href="{{ url_for('index_routes.index') }}" class="btn btn-secondary" aria-label="Back to library" title="Back to library">
                 {{ icon('arrow-left') }}
             </a>
+            <button class="btn btn-secondary" id="menu-toggle" aria-label="Contents" title="Contents">
+                {{ icon('list') }}
+            </button>
         </div>
         <div class="display-controls">
             {# Read aloud with this device's voices (shown by read_aloud.js where supported). #}

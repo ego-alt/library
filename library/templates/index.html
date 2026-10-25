@@ -50,8 +50,8 @@
             {% for book in images %}
                 {% set label = book.title ~ (' by ' ~ book.author if book.author else '') %}
                 {% set pct = ((book.progress or 0) * 100)|round(0, 'floor')|int %}
-                {% set attrs = {'data-title': book.title, 'data-author': book.author, 'data-progress': book.progress} %}
-                {% call cover_card(url_for('read_routes.read_book', filename=book.filename), 'Read ' ~ label, book.title, [book.author, (pct|string ~ '%') if pct > 0], book.cover, attrs) %}
+                {% set attrs = {'data-title': book.title, 'data-author': book.author, 'data-progress': book.progress, 'data-finished': 'true' if book.finished else 'false'} %}
+                {% call cover_card(url_for('read_routes.read_book', filename=book.filename), 'Read ' ~ label, book.title, [book.author, (pct|string ~ '%') if pct > 0 else ('Read' if book.finished)], book.cover, attrs) %}
                     {% if book.access_level and book.access_level != 'standard' %}
                     <span class="book-lock" title="Private — only admins can see this" aria-label="Private">{{ icon('lock') }}</span>
                     {% endif %}

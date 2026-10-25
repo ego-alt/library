@@ -35,9 +35,10 @@ function initSeries() {
 
     function apply() {
         const q = search.value.trim().toLowerCase();
+        search.closest('.library-toolbar')?.classList.toggle('is-searching', Boolean(q));
         let shown = 0;
         for (const card of cards) {
-            card.hidden = (view !== 'all' && card.dataset.state !== view) || (Boolean(q) && !card.dataset.name.includes(q));
+            card.hidden = q ? !card.dataset.name.includes(q) : (view !== 'all' && card.dataset.state !== view);
             if (!card.hidden) shown += 1;
         }
         empty.hidden = shown > 0;
@@ -50,7 +51,12 @@ function initSeries() {
 
     filter.addEventListener('click', (e) => {
         const button = e.target.closest('[data-view]');
-        if (!button || button.dataset.view === view) return;
+        if (!button) return;
+        if (search.value) {   // a tab clears the search, which looks through everything
+            search.value = '';
+            search.dispatchEvent(new Event('input'));
+        }
+        else if (button.dataset.view === view) return;
         view = button.dataset.view;
         setRadio(filter, button);
         rememberShelfView('comics', view);
@@ -74,7 +80,7 @@ function initSeries() {
 // missing issue, and once a downloader is set up find, choose a release,
 // want or skip). Admins see the missing ones, greyed out. ---
 
-const MISSING_STATE = {wanted: 'Wanted', snatched: 'Downloading', skipped: 'Skipped'};
+const MISSING_STATE = {wanted: 'Wanted', snatched: 'Downloading', skipped: 'Not wanted'};
 const MONITOR_LABELS = [['future', 'New issues as they come out', 'new issues'], ['all', 'Every missing issue', 'every missing issue'], ['none', 'Only the ones I choose', 'only the issues you choose']];
 
 // Mark an issue read (its last page) or unread (back to the start).
@@ -108,7 +114,7 @@ function initSeriesDetail() {
         if (!meta) el.querySelector('.book-caption').append(meta = h('span', {class: 'book-caption__author'}));
         let state = '';
         if (issue.has_file) state = issue.finished ? 'Read' : (issue.page && issue.pages ? `${Math.floor(100 * (issue.page + 1) / issue.pages)}%` : '');
-        else state = issue.released ? (MISSING_STATE[issue.status] || issue.status) : '';
+        else if (issue.released && (issue.status !== 'skipped' || head.dataset.downloads === '1')) state = MISSING_STATE[issue.status] || '';
         meta.textContent = issue.released || issue.has_file ? state : `Out ${formatDate(issue.date)}`;
     }
 
@@ -221,7 +227,7 @@ function initSeriesDetail() {
         return [
             findable ? {label: 'Find now', onClick: () => findNow(issue)} : null,
             findable && window.pickRelease ? {label: 'Choose a release…', onClick: () => pickRelease({kind: 'comic', id: issue.id, label: `${issue.series} #${issue.number}`, onGrab: () => { issue.status = 'snatched'; showStatus(issue); }})} : null,
-            downloads && issue.status !== 'snatched' ? {label: issue.status === 'wanted' ? 'Skip' : 'Want', onClick: () => setStatus(issue, issue.status === 'wanted' ? 'skipped' : 'wanted')} : null,
+            downloads && issue.status !== 'snatched' ? {label: issue.status === 'wanted' ? 'Don’t want' : 'Want', onClick: () => setStatus(issue, issue.status === 'wanted' ? 'skipped' : 'wanted')} : null,
             {label: 'Add a file…', onClick: () => { uploadFor = issue; upload.click(); }},
         ];
     };
@@ -240,7 +246,7 @@ function initSeriesDetail() {
             if (data.found === false) return showToast(data.message);
             issue.status = data.status;
             showStatus(issue);
-            showToast(`Downloading #${issue.number}`, 'success');
+            showToast(`Downloading #${issue.number}`);
         } catch (e) { showToast(e.message, 'error'); }
     }
 
@@ -290,7 +296,7 @@ function initSeriesDetail() {
             const page = await fetch(location.href).then(r => r.text());
             const fresh = JSON.parse(new DOMParser().parseFromString(page, 'text/html').getElementById('issuesData').textContent);
             fresh.forEach(f => { const issue = issues.get(String(f.id)); if (issue) { Object.assign(issue, f); showStatus(issue); } });
-            showToast(value === 'none' ? 'Only getting the issues you choose' : `Getting ${value === 'all' ? 'every missing issue' : 'new issues as they come out'}${data.wanted ? ` · ${data.wanted} wanted` : ''}`, 'success');
+            showToast(value === 'none' ? 'Only getting the issues you choose' : `Getting ${value === 'all' ? 'every missing issue' : 'new issues as they come out'}${data.wanted ? ` · ${data.wanted} wanted` : ''}`);
         } catch (e) { showToast(e.message, 'error'); }
     }
 

@@ -36,7 +36,7 @@ function bookCard(book) {
             book.status = data.status;
             book.request_id = data.id;
             setCaption(card, [book.author, BOOK_STATE[data.status] || 'Asked for']);
-            showToast(`Asked for ${book.title}`, 'success', data.created ? {label: 'Undo', onClick: () => undoAsk(book, card)} : null);
+            showToast(`Asked for ${book.title}`, 'info', data.created ? {label: 'Undo', onClick: () => undoAsk(book, card)} : null);
         } catch (err) {
             showToast(err.message, 'error');
         }
@@ -87,11 +87,13 @@ const KINDS = {
 /** Adds "Get …" under a shelf: `input` is its search box, `after` the
  * element to put it after, `kind` books or comics. */
 function attachShelfGet({kind, input, after}) {
-    const {make, none} = KINDS[kind];
+    const {make, source, none} = KINDS[kind];
     const ask = h('button', {type: 'button', class: 'shelf-get__ask arrow-after'});
+    // Once there are results, a heading says they come from outside the library.
+    const title = h('h2', {class: 'shelf-get__title meta-label', hidden: true}, `From ${source}`);
     const note = h('p', {class: 'shelf-get__note', 'aria-live': 'polite'});
     const results = h('div', {class: 'row library get-results'});
-    const section = h('section', {class: 'shelf-get', hidden: true, 'aria-label': kind === 'books' ? 'Books to get' : 'Comic series to follow'}, ask, note, results);
+    const section = h('section', {class: 'shelf-get', hidden: true, 'aria-label': kind === 'books' ? 'Books to get' : 'Comic series to follow'}, ask, title, note, results);
     after.after(section);
     let generation = 0;
     let shownFor = '';
@@ -105,6 +107,7 @@ function attachShelfGet({kind, input, after}) {
         shownFor = '';
         results.replaceChildren();
         note.textContent = '';
+        title.hidden = true;
         ask.hidden = false;
         ask.textContent = kind === 'books' ? `Get “${q}”` : `Find “${q}” to follow`;
     }
@@ -115,6 +118,7 @@ function attachShelfGet({kind, input, after}) {
         const mine = ++generation;
         shownFor = q;
         ask.hidden = true;
+        title.hidden = false;
         note.textContent = '';
         results.replaceChildren(...Array.from({length: 4}, () => h('div', {class: 'col-md-3 mb-3 book-skeleton-wrapper', 'aria-hidden': 'true'}, h('div', {class: 'book-skeleton'}))));
         let data;
@@ -125,7 +129,7 @@ function attachShelfGet({kind, input, after}) {
         }
         if (mine !== generation) return;  // a newer search has started
         results.replaceChildren(...data.results.map(make));
-        note.textContent = data.error || (data.results.length ? (kind === 'books' ? 'Not in your library yet: choose a cover to ask for it.' : 'Choose a series to follow it.') : none);
+        note.textContent = data.error || (data.results.length ? (kind === 'books' ? 'Choose a cover to ask for it.' : 'Choose a series to follow it.') : none);
     }
 
     ask.addEventListener('click', look);

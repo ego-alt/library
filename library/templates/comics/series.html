@@ -45,7 +45,8 @@
         {% set href = url_for('comics.read_page', issue_id=issue.id) %}
         {% set label = ('Continue' if started else 'Read') ~ ' #' ~ issue.number %}
     {% else %}
-        {% set state = {'wanted': 'Wanted', 'snatched': 'Downloading', 'skipped': 'Skipped'}.get(issue.status, issue.status) %}
+        {# The greyed cover already says it isn't here; "not wanted" only means something once there's a downloader. #}
+        {% set state = {'wanted': 'Wanted', 'snatched': 'Downloading', 'skipped': 'Not wanted' if downloads_ready else ''}.get(issue.status, '') %}
         {% set meta = ['Out ' ~ (issue.date|comic_date)] if not issue.released else [state] %}
         {% set href = '#' %}
         {% set label = '#' ~ issue.number ~ ', ' ~ (meta|select|join(', ')) %}

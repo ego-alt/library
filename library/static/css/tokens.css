@@ -17,7 +17,7 @@
     --color-border: #d9d4ca;
     --color-text-primary: #1f1d1a;       /* ink */
     --color-text-secondary: #4a433a;
-    --color-text-muted: #85807a;
+    --color-text-muted: #67625b;           /* 4.5:1 even on the lamp glow */
     --color-accent: #535f5f;             /* slate: 6:1 on the wall */
     --color-accent-hover: #414b4b;
     --color-on-accent: #f7f2e8;
@@ -47,8 +47,8 @@
     --color-accent: #d4b36a;             /* gold: 9:1 on the dark */
     --color-accent-hover: #e3c88a;
     --color-on-accent: #141210;
-    --color-danger: #cc241d;
-    --color-danger-hover: #fb4934;
+    --color-danger: #e46b5f;             /* 4.5:1 on the raised panels */
+    --color-danger-hover: #f08a7f;
     --color-success: #98971a;
     --color-shadow: rgba(0, 0, 0, 0.35);
     --color-highlight-soft: rgba(255, 220, 160, 0.06);

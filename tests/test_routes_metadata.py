@@ -98,7 +98,7 @@ def test_get_metadata_exposes_access_level(client, book):
 def test_admin_can_set_access_level_restricted(admin_client, book):
     r = admin_client.post(
         f"/book_metadata/{book.filename}",
-        json={"title": book.title, "author": book.author, 
+        json={"title": book.title, "author": book.author,
               "tags": [], "access_level": "restricted"},
     )
     assert r.status_code == 200
@@ -111,7 +111,7 @@ def test_admin_can_clear_access_level_back_to_standard(admin_client, book):
     db.session.commit()
     r = admin_client.post(
         f"/book_metadata/{book.filename}",
-        json={"title": book.title, "author": book.author, 
+        json={"title": book.title, "author": book.author,
               "tags": [], "access_level": "standard"},
     )
     assert r.status_code == 200
@@ -122,7 +122,7 @@ def test_admin_can_clear_access_level_back_to_standard(admin_client, book):
 def test_standard_user_cannot_change_access_level(standard_client, book):
     r = standard_client.post(
         f"/book_metadata/{book.filename}",
-        json={"title": book.title, "author": book.author, 
+        json={"title": book.title, "author": book.author,
               "tags": [], "access_level": "restricted"},
     )
     assert r.status_code == 200  # the rest of the save still succeeds
@@ -133,7 +133,7 @@ def test_standard_user_cannot_change_access_level(standard_client, book):
 def test_admin_invalid_access_level_is_ignored(admin_client, book):
     r = admin_client.post(
         f"/book_metadata/{book.filename}",
-        json={"title": book.title, "author": book.author, 
+        json={"title": book.title, "author": book.author,
               "tags": [], "access_level": "superuser"},
     )
     assert r.status_code == 200
@@ -159,7 +159,7 @@ def test_list_tags_excludes_status_values(standard_client):
 def test_list_tags_returns_user_custom_tags_alphabetised(standard_client, book):
     standard_client.post(
         f"/book_metadata/{book.filename}",
-        json={"title": book.title, "author": book.author, 
+        json={"title": book.title, "author": book.author,
               "tags": ["zeta", "alpha", "mike"]},
     )
     r = standard_client.get("/tags")

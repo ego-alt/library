@@ -512,13 +512,12 @@ function updateChapterNumberLabel() {
         || (chapter && chapter.title) || `Section ${currentChapterNum + 1}`;
     const pct = Math.floor(bookProgressFraction() * 100);
     // The chapter in the top margin, time left in the bottom one, like a
-    // book's running head and folio. The long words drop on phones (CSS).
+    // book's running head and folio. "in chapter" drops on phones (CSS).
     head.textContent = title;
     alignRunningLines();
     const left = timeLeft();
     foot.innerHTML = left
-        ? `${formatMinutes(left.chapter)}<span class="running-long"> left in chapter</span>`
-          + ` · ${formatMinutes(left.book)}<span class="running-long"> in book</span>`
+        ? `${formatMinutes(left.chapter)} left<span class="running-long"> in chapter</span> · ${formatMinutes(left.book)} in book`
         : `${pct}%`;
     foot.title = `${pct}% through the book · section ${currentChapterNum + 1} of ${currentBook.spine_length}`
         + (left ? ` · at ${Math.round(readingSpeed())} words a minute` : '');

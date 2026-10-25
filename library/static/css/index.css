@@ -217,7 +217,13 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     .book .book-buttons {
         opacity: 1;
         pointer-events: auto;
+        top: var(--space-1);
+        right: var(--space-1);
     }
+    /* Always there on touch, so small and see-through like the lock badge,
+       leaving the cover to be the cover; the hit area stays finger-sized. */
+    .book .book-button { width: 26px; height: 26px; background: var(--color-bg-overlay); color: #fff; }
+    .book .book-button::after { inset: -9px; }
 }
 .book-button {
     width: 32px;
@@ -314,17 +320,15 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     opacity: 1;
     transform: translateX(0);
 }
-.notice--success { background: var(--color-success); }
-.notice--error   { background: var(--color-danger); }
-.notice--info    { background: var(--color-text-primary); }
+/* One quiet chip for everything that worked; only failures take a colour. */
+.notice--error { background: var(--color-danger); }
 @media (max-width: 640px) {
     .notice-stack {
         right: var(--space-3);
         left: var(--space-3);
         bottom: var(--space-3);
-        align-items: stretch;
+        align-items: center;
     }
-    .notice { max-width: none; }
 }
 .metadata-overlay {
     display: none;
@@ -424,8 +428,9 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     font-size: var(--text-sm);
     font-weight: 400;
     color: var(--color-text-muted);
-    margin: var(--space-1) 0 0;
+    margin-top: var(--space-1);
 }
+.meta-author { margin-bottom: 0; }
 .meta-author-input::placeholder { font-style: italic; }
 
 /* --- Body: cover + fields, two columns --- */
@@ -475,6 +480,10 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     opacity: 1;
 }
 .meta-cover__change:focus-visible { outline: 2px solid #fff; outline-offset: calc(-1 * var(--space-1)); }
+/* No hover on touch: the way to change the cover sits on it as a small label. */
+@media (hover: none) {
+    .meta-cover__change { opacity: 1; inset: auto var(--space-2) var(--space-2); flex-direction: row; padding: var(--space-2) var(--space-3); border-radius: var(--radius-pill); }
+}
 
 /* --- Fields stack --- */
 .meta-fields {
@@ -549,14 +558,13 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     align-items: center;
     gap: var(--space-3);
 }
-/* Download, Delete and Save: one size, one height; only colour and weight differ. */
+/* Download, Delete and Save: one size and height, each as wide as its words. */
 .meta-footer-actions .btn {
     font-size: var(--text-sm);
     line-height: 1.2;
-    padding: var(--space-2) var(--space-3);
-    min-height: 36px;
+    padding: var(--space-1) var(--space-3);
+    min-height: 32px;
     gap: var(--space-1);
-    width: 7.5rem;                       /* all three the same width */
 }
 
 /* --- Buttons (preserve legacy class names so JS keeps working) --- */
@@ -575,10 +583,12 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     color: var(--color-on-accent);
 }
 .btn-primary:active:not(:disabled) { transform: translateY(1px); }
-/* Save in the details panel: the one filled button, in the accent (slate by
-   day, gold at night), beside the quiet Download and Delete. */
-.btn.save-button { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-on-accent); font-weight: 500; padding-left: var(--space-4); padding-right: var(--space-4); }
-.btn.save-button:hover:not(:disabled) { background: var(--color-accent-hover); border-color: var(--color-accent-hover); color: var(--color-on-accent); }
+/* Save in the details panel: quiet words in the accent until there's
+   something to save, then filled (slate by day, gold at night). */
+.btn.save-button { color: var(--color-accent); font-weight: 500; padding-left: var(--space-4); padding-right: var(--space-4); transition: background var(--dur-fast) ease, color var(--dur-fast) ease; }
+.btn.save-button:hover:not(:disabled) { color: var(--color-accent-hover); background: var(--color-highlight-soft); }
+.meta-footer.is-dirty .btn.save-button { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-on-accent); }
+.meta-footer.is-dirty .btn.save-button:hover:not(:disabled) { background: var(--color-accent-hover); border-color: var(--color-accent-hover); }
 
 /* Delete in the details panel: a quiet text button like Download beside it,
    in red; the solid red is for the confirmation that follows. */
@@ -599,8 +609,8 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     line-height: 1;
     color: var(--color-text-muted);
     transition: transform 0.2s ease, background 0.15s ease, color 0.15s ease;
-    width: 32px;
-    height: 32px;
+    width: 44px;
+    height: 44px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -647,6 +657,7 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
         gap: var(--space-5);
     }
     .meta-cover {
+        width: 100%;
         max-width: 200px;
         margin: 0 auto;
     }
@@ -654,7 +665,7 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     .meta-footer { flex-wrap: wrap; align-items: center; row-gap: var(--space-2); }
     .meta-footer-info { flex-basis: 100%; text-align: center; }
     .meta-footer-actions { flex: 1; justify-content: center; gap: var(--space-3); }
-    .meta-footer-actions .btn { white-space: nowrap; min-height: 44px; width: auto; flex: 1 1 0; max-width: 8rem; }   /* equal thirds of the row */
+    .meta-footer-actions .btn { white-space: nowrap; min-height: 40px; }
     .meta-fields { padding-bottom: var(--space-4); }
 }
 .tag-input-container {
@@ -724,6 +735,16 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 }
 
 .tag .remove-tag {
+    min-width: 22px;
+    min-height: 22px;
+    margin: -3px -6px -3px 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: none;
+    color: inherit;
+    padding: 0;
     cursor: pointer;
     opacity: 0.7;
     transition: opacity 0.2s;
@@ -951,12 +972,14 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     border-bottom-color: var(--color-accent);
 }
 .status-filter button:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }
+/* A search covers every tab, so none is chosen while it's on. */
+.is-searching .status-filter button { color: var(--color-text-muted); border-bottom-color: transparent; }
 .meta-status { align-self: flex-start; }
 @media (max-width: 640px) {
     .library-search-row { max-width: none; flex-basis: 100%; }
     /* Left-aligned and compact, so every tab fits on any phone. */
-    .library-toolbar .status-filter button { min-height: 44px; }
-
+    .library-toolbar .status-filter button,
+    .meta-status button { min-height: 44px; }
 }
 
 /* Under a shelf's search (admins): a quiet offer to look further, then
@@ -968,12 +991,14 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     padding: 0;
     border: none;
     background: none;
-    color: var(--color-text-muted);
+    color: var(--color-accent);
     font: inherit;
-    font-size: var(--text-sm);
+    font-weight: 500;
     cursor: pointer;
 }
-.shelf-get__ask:hover { color: var(--color-accent); }
+.shelf-get__ask:hover { color: var(--color-accent-hover); }
+.shelf-get__title { margin: 0 0 var(--space-1); }
+.shelf-get__title[hidden] { display: none; }
 .shelf-get__ask[hidden] { display: none; }
 .shelf-get__note { margin: 0 0 var(--space-4); color: var(--color-text-muted); font-size: var(--text-sm); }
 .shelf-get__note:empty { display: none; }
@@ -1010,8 +1035,8 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
         font-size: var(--text-base);
     }
     .meta-author-input { font-size: var(--text-base); }
-    .book-button { width: 40px; height: 40px; }
-    .tag .remove-tag { padding: var(--space-1) var(--space-2); margin: calc(-1 * var(--space-1)) calc(-1 * var(--space-2)) calc(-1 * var(--space-1)) 0; }
+    .tag { padding-right: 0; }
+    .tag .remove-tag { min-width: 36px; min-height: 36px; margin: -6px 0; }
 }
 
 .meta-download {
@@ -1046,8 +1071,10 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     .is-new .book { animation: none; outline: 3px solid var(--color-accent); }
 }
 
-/* "You have unsaved changes" bar inside the details panel footer */
+/* "You have unsaved changes" bar inside the details panel footer: while it's
+   up, its two answers are the only buttons. */
 .meta-footer { flex-wrap: wrap; }
+.meta-footer:has(.discard-bar) > :not(.discard-bar) { display: none; }
 .discard-bar {
     flex: 1 0 100%;
     display: flex;
@@ -1062,7 +1089,13 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     color: var(--color-text-secondary);
 }
 .discard-bar span { flex: 1 1 12rem; }
-.discard-bar .btn { font-size: var(--text-sm); }
+.discard-bar .btn { font-size: var(--text-sm); white-space: nowrap; }
+.discard-bar .discard-button { color: var(--color-danger); }
+.discard-bar .discard-button:hover { color: var(--color-danger-hover); background: transparent; }
+@media (max-width: 640px) {
+    .discard-bar span { flex-basis: 100%; }
+    .discard-bar { justify-content: flex-end; }
+}
 
 #library.is-refreshing { opacity: 0.45; transition: opacity var(--dur-base) ease; pointer-events: none; }
 

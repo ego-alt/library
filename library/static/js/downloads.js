@@ -52,7 +52,7 @@ async function pickRelease({kind, id, label, onGrab}) {
             try {
                 const data = await apiFetch(`/api/wanted/${kind}/${id}/grab`, {method: 'POST', body: {token, index}});
                 overlay.style.display = 'none';
-                showToast(`Downloading ${label}`, 'success');
+                showToast(`Downloading ${label}`);
                 if (onGrab) onGrab(data);
             } catch (e) { showToast(e.message, 'error'); }
         });
@@ -116,7 +116,7 @@ function initWanted() {
     function findItem(row) {
         looking(row, () => run(() => apiFetch(`/api/wanted/${row.dataset.kind}/${row.dataset.itemId}/search`, {method: 'POST'}), data => {
             if (data.found === false) return showToast(data.message);
-            showToast(`Downloading ${row.dataset.label}`, 'success');
+            showToast(`Downloading ${row.dataset.label}`);
             removeRows([row]);
             boost();
         }));
@@ -139,7 +139,7 @@ function initWanted() {
         return [
             canSearch ? {label: many ? `Find all ${rows.length} now` : 'Find now', onClick: () => looking(series.querySelector('summary'), () => run(() => apiFetch(`/comics/api/series/${series.dataset.seriesId}/search`, {method: 'POST'}), data => {
                 if (data.error) showToast(data.grabbed ? `Found ${data.grabbed}, but ${data.error}` : data.error, 'error');
-                else showToast(data.grabbed ? `Downloading ${data.grabbed} issue${data.grabbed === 1 ? '' : 's'}` : 'Nothing new yet', data.grabbed ? 'success' : 'info');
+                else showToast(data.grabbed ? `Downloading ${data.grabbed} issue${data.grabbed === 1 ? '' : 's'}` : 'Nothing new yet');
                 if (data.grabbed) setTimeout(() => window.location.reload(), 1200);
             }))} : null,
             {label: many ? `Skip all ${rows.length}` : 'Skip', onClick: () => run(() => apiFetch('/comics/api/issues/bulk', {method: 'POST', body: {ids: rows.map(r => Number(r.dataset.itemId)), status: 'skipped'}}), () => removeRows(rows))},
@@ -213,7 +213,7 @@ function initDownloadLists() {
     }
 
     async function act(path, method, done, body) {
-        await run(() => apiFetch(path, {method, body}), (data) => showToast(data && data.found === false ? data.message : done, data && data.found === false ? 'info' : 'success'));
+        await run(() => apiFetch(path, {method, body}), (data) => showToast(data && data.found === false ? data.message : done));
         boost();
     }
 

@@ -94,7 +94,7 @@ function initSettings() {
         await busy(button, async () => {
             try {
                 fill(await settingsApi('', {method: 'PUT', body: collect()}));
-                showToast('Settings saved', 'success');
+                showToast('Settings saved');
             } catch (e) { showToast(e.message, 'error'); }
         });
     }
@@ -113,7 +113,7 @@ function initSettings() {
         await busy(button, async () => {
             try {
                 const data = await settingsApi('/test', {method: 'POST', body: {what, values}});
-                showToast(data.message, 'success');
+                showToast(data.message);
             } catch (e) { showToast(e.message, 'error'); }
         });
         button.textContent = label;

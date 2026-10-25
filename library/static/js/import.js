@@ -77,7 +77,7 @@ async function reviewOne(file) {
                 const issue = await apiFetch(stagePath, {method: 'POST', body});
                 filed = true;
                 close();
-                showToast(`Added ${issue.series} #${issue.number}`, 'success', {label: 'Open', onClick: () => { window.location = appUrl(`/comics/series/${issue.series_id}`); }});
+                showToast(`Added ${issue.series} #${issue.number}`, 'info', {label: 'Open', onClick: () => { window.location = appUrl(`/comics/series/${issue.series_id}`); }});
                 setTimeout(() => window.location.reload(), 900);
             } catch (err) { showToast(err.message, 'error'); }
         });

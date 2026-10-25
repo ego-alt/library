@@ -255,17 +255,25 @@ html:not(.paginated) #chapter-content { max-width: var(--reader-measure, 70ch); 
 .rs-note[hidden] { display: none; }
 .rs-stepper { display: flex; align-items: center; gap: 8px; }
 .rs-stepper span { min-width: 3ch; text-align: center; font-variant-numeric: tabular-nums; }
+/* A little "A" in each theme's own page and ink, so it reads as a preview,
+   not as a radio button or checkbox (which the one matching the panel used to). */
 .rs-swatch {
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
+    width: 16px;
+    height: 16px;
+    border-radius: 4px;
     border: 1px solid color-mix(in srgb, var(--color-text-muted) 60%, transparent);
     flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font: 600 10px/1 var(--font-reading-serif);
+    font-style: normal;
 }
-.rs-swatch--day { background: #f6f1e7; }
-.rs-swatch--sepia { background: #efe4cc; }
-.rs-swatch--night { background: #1e1c19; }
-.rs-swatch--black { background: #000; }
+.rs-swatch::after { content: "A"; }
+.rs-swatch--day { background: #f6f1e7; color: #3d3730; }
+.rs-swatch--sepia { background: #efe4cc; color: #46392a; }
+.rs-swatch--night { background: #1e1c19; color: #c4b7a0; }
+.rs-swatch--black { background: #000; color: #b9ad97; }
 .rs-themes button { padding: 0 4px; }
 .toc-menu {
     position: fixed;

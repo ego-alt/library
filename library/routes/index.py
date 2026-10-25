@@ -150,6 +150,7 @@ def get_covers(offset=0, limit=BOOKS_PER_LOAD, filters=None, view=VIEW_ALL):
             "cover": cover_url(book, width=400),
             "access_level": book.access_level,
             "progress": _progress(book, status, chapter, position),
+            "finished": status == BookProgressChoice.FINISHED,
         }
         for book, status, chapter, position in rows
     ]
