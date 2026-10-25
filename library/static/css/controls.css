@@ -1,29 +1,131 @@
-/* One button for the whole app, shelves and reader alike, after the
- * reader's settings: a 1px outline with small corners, never a filled block.
- * Quiet ones have the plain border and take the accent on hover; the main
- * action (Continue, Save once there's a change, Sign in) has the accent
- * outline; a chosen setting doubles it. Loaded after structural.css by
- * _layout.html and reader.html. */
-.btn { border-radius: var(--radius-sm); }
-.btn-secondary,
-.rs-seg button,
-.rs-stepper button {
-    background: transparent;
-    border: 1px solid var(--color-border);
+/* Controls — buttons, inputs, checkboxes, dropdowns and icons, shelves and
+ * reader alike. Loaded after tokens.css on every page.
+ *
+ * One button, after the reader's settings: a 1px outline with small corners,
+ * never a filled block. Quiet ones have the plain border and take the accent
+ * on hover; the main action (Continue, Save once there's a change, Sign in)
+ * has the accent outline; a chosen setting doubles it. */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    font: inherit;
+    border: 1px solid transparent;
     border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background-color var(--dur-base) ease, border-color var(--dur-base) ease, color var(--dur-base) ease;
 }
-.btn-secondary:hover:not(:disabled),
-.rs-seg button:hover,
-.rs-stepper button:hover { background: transparent; border-color: var(--color-accent); }
+.btn:focus-visible { outline: 2px solid var(--color-accent-hover); outline-offset: 2px; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
 /* Low and wide, both kinds. */
 .btn-primary,
 .btn-secondary { font-size: var(--text-sm); line-height: 1.4; padding: 5px 24px; }
-.btn-primary {
-    background: transparent;
-    border: 1px solid var(--color-accent);
-    color: var(--color-accent);
-    font-weight: 600;
-}
+.btn-primary { background: transparent; border-color: var(--color-accent); color: var(--color-accent); font-weight: 600; }
 .btn-primary:hover:not(:disabled) { background: var(--color-highlight-soft); border-color: var(--color-accent-hover); color: var(--color-accent-hover); }
 .btn-primary:active:not(:disabled) { transform: translateY(1px); }
+.btn-secondary,
+.rs-seg button,
+.rs-stepper button { background: transparent; border: 1px solid var(--color-border); border-radius: var(--radius-sm); }
+.btn-secondary { color: var(--color-text-secondary); }
+.btn-secondary:hover:not(:disabled),
+.rs-seg button:hover,
+.rs-stepper button:hover { background: transparent; border-color: var(--color-accent); }
+.btn-secondary:hover:not(:disabled) { color: var(--color-text-primary); }
 .rs-seg button[aria-pressed="true"] { border-color: var(--color-accent); box-shadow: inset 0 0 0 1px var(--color-accent); }
+/* Words, no outline: Download, Delete, the bar's icons. */
+.btn-ghost { background: transparent; border-color: transparent; color: var(--color-text-muted); padding: var(--space-2); }
+.btn-ghost:hover:not(:disabled) { color: var(--color-text-primary); }
+
+.input {
+    background-color: var(--color-bg-inset);
+    color: var(--color-text-primary);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: var(--space-2);
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    transition: border-color var(--dur-base) ease;
+}
+.input:focus { outline: none; border-color: var(--color-accent); }
+.input::placeholder { color: var(--color-text-muted); }
+
+/* Icons: one set (static/icons.svg, Lucide), one stroke, sized by the text. */
+.icon {
+    width: 1.15em;
+    height: 1.15em;
+    flex: none;
+    vertical-align: -0.2em;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+.icon-slot { display: inline-flex; }
+/* The same icons where CSS draws them (disclosure chevrons, a ticked menu
+   item, an arrow after a link): masks of the same paths, in currentColor. */
+:root {
+    --i-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 18 6-6-6-6'/%3E%3C/svg%3E");
+    --i-check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
+    --i-arrow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h14'/%3E%3Cpath d='m12 5 7 7-7 7'/%3E%3C/svg%3E");
+}
+.disclosure::before {
+    content: "";
+    display: inline-block;
+    width: 1em;
+    height: 1em;
+    flex: none;
+    vertical-align: -0.12em;
+    background: currentColor;
+    -webkit-mask: var(--i-chevron) center / contain no-repeat;
+    mask: var(--i-chevron) center / contain no-repeat;
+    opacity: 0.6;
+    transition: transform var(--dur-fast, 0.15s) ease;
+}
+details[open] > summary .disclosure::before, details[open] > summary.disclosure::before, .disclosure[aria-expanded="true"]::before { transform: rotate(90deg); }
+.arrow-after::after {
+    content: "";
+    display: inline-block;
+    width: 0.95em;
+    height: 0.95em;
+    margin-left: 0.3em;
+    vertical-align: -0.12em;
+    background: currentColor;
+    -webkit-mask: var(--i-arrow) center / contain no-repeat;
+    mask: var(--i-arrow) center / contain no-repeat;
+}
+
+/* Checkboxes and dropdowns in the app's own look, not the browser's: a
+   rounded box that fills with the accent and a tick, and a field with the
+   same chevron as the rest. */
+input[type="checkbox"] {
+    -webkit-appearance: none;
+    appearance: none;
+    flex: none;
+    width: 1.15em;
+    height: 1.15em;
+    margin: 0;
+    vertical-align: -0.2em;
+    border: 1.5px solid var(--color-text-muted);
+    border-radius: 4px;
+    background: transparent;
+    cursor: pointer;
+    transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease;
+}
+input[type="checkbox"]:checked {
+    border-color: var(--color-accent);
+    background: var(--color-accent) center / 85% no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
+}
+input[type="checkbox"]:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+select {
+    -webkit-appearance: none;
+    appearance: none;
+    padding-right: 2.2em !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23857f78' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.7em center;
+    background-size: 1em;
+    cursor: pointer;
+}

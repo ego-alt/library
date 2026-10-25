@@ -13,7 +13,7 @@
 // Served from the app root (see routes/pwa.py), so the scope is the whole
 // mount: "/" standalone, "/library/" behind the dashboard proxy.
 
-const SHELL_CACHE = 'shell-v30';
+const SHELL_CACHE = 'shell-v31';
 const BOOKS_CACHE = 'books-v1';
 const COVERS_CACHE = 'covers-v1';
 const COMICS_CACHE = 'comics-v1';
@@ -29,7 +29,7 @@ const ONLINE_ONLY = ['downloads'];
 // The look of every page, cached at install so the first offline launch
 // isn't unstyled.
 const SHELL_ASSETS = [
-    'static/css/base.css', 'static/css/structural.css', 'static/css/tokens.css', 'static/css/index.css',
+    'static/css/base.css', 'static/css/tokens.css', 'static/css/controls.css', 'static/css/index.css',
     'static/css/comics.css', 'static/css/manage.css', 'static/css/settings.css', 'static/css/reader.css', 'static/css/comic_reader.css',
     'static/js/app_root.js', 'static/js/signed_out.js', 'static/js/darkmode.js', 'static/js/ui.js', 'static/js/main.js',
     'static/js/pwa.js', 'static/js/comics.js', 'static/js/get.js', 'static/js/import.js', 'static/js/settings.js', 'static/js/reader.js', 'static/js/read_aloud.js', 'static/js/comic_reader.js',

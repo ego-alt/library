@@ -1,18 +1,44 @@
-/* Theme tokens — a gallery wall by day, the same gallery after hours at night.
+/* Tokens — every size and colour the app uses, and nothing outside this file
+ * sets a raw font size (tests/test_style_tokens.py checks).
+ *
+ * Colours: a gallery wall by day, the same gallery after hours at night.
  * The accent is slate by day (quiet on the paper, so the covers carry the
  * colour) and gold at night (lamplight on the warm dark). Tapes is Gruvbox
  * orange, calendar Gruvbox green. The light, grain and frosted panes are in
  * index.css; the reader's own calmer page is in reader.css.
- *
- * Structural tokens (spacing, radii, type, fonts, motion) live in
- * structural.css, shared byte-identical across the home stack. Role names match
- * dashboard/docs/ui-spec.md; only colours diverge here. */
+ * Role names follow dashboard/docs/ui-spec.md. */
 :root {
-    /* Type: five sizes for the whole app — xs 12, sm 14, base 16, lg 20 and
-       xl 24 (structural.css has the middle three; the stack's 32px xl is
-       too big here). Text inside a book keeps its own sizes. */
-    --text-xs: 0.75rem;
-    --text-xl: 1.5rem;
+    /* Spacing (× 4px) */
+    --space-1: 4px;
+    --space-2: 8px;
+    --space-3: 12px;
+    --space-4: 16px;
+    --space-5: 20px;
+    --space-8: 40px;
+
+    /* Corners: small for buttons, inputs and the reader's settings; medium
+       for cards and menus; large for the phone sheet. */
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 16px;
+    --radius-pill: 9999px;
+
+    /* Type: five sizes for the whole app. Text inside a book keeps its own
+       (sized in em, so it follows Aa › Text size). */
+    --text-xs: 0.75rem;     /* 12: labels, notes, small capitals under covers */
+    --text-sm: 0.875rem;    /* 14: captions, buttons, secondary text */
+    --text-base: 1rem;      /* 16: body, inputs, the shelf's tabs and search */
+    --text-lg: 1.25rem;     /* 20: section and dialog titles */
+    --text-xl: 1.5rem;      /* 24: a book's title in its card */
+    --font-sans: 'Inter', Arial, Helvetica, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+    /* Motion: `ease` by default; --ease-emphasized for entrances. */
+    --dur-fast: 0.12s;
+    --dur-base: 0.2s;
+    --dur-slow: 0.3s;
+    --ease-emphasized: cubic-bezier(0.16, 1, 0.3, 1);
+
     --color-bg-base: #f6f4ef;            /* gallery wall */
     --color-bg-elevated: #f6f4ef;
     /* Solid, for what floats over content: menus, cover buttons, the save bar. */
@@ -60,3 +86,6 @@
     --wood: #4a3a26;
     --wood-edge: #2f2418;
 }
+
+/* One breakpoint: 640px (CSS can't read a var() inside @media, so it's a
+   convention, not a token — use `@media (max-width: 640px)`). */

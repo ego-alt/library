@@ -1,5 +1,5 @@
 /* Downloads (and Settings at its foot): cards of plain rows on the app's own type scale
- * (structural.css): titles at --text-lg, row titles at --text-base, and
+ * (tokens.css): titles at --text-lg, row titles at --text-base, and
  * everything secondary — details, dates, hints — at --text-sm. One row
  * component serves every list: what it is on the left, details under it,
  * a date or state on the right, then ⋯. */

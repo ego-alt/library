@@ -137,6 +137,15 @@ html:not(.paginated) #chapter-content { max-width: var(--reader-measure, 70ch); 
     100% { background: transparent; }
 }
 @media (prefers-reduced-motion: reduce) { #chapter-content .your-place { animation: none; } }
+/* A book's headings, unless its own style says otherwise: in em, so they grow
+   with Aa › Text size (at 17px these are the sizes they used to be). Low
+   specificity, so the book's styling still wins. */
+:where(#chapter-content) h1 { font-size: 2.35em; }
+:where(#chapter-content) h2 { font-size: 1.9em; }
+:where(#chapter-content) h3 { font-size: 1.65em; }
+:where(#chapter-content) h4 { font-size: 1.4em; }
+:where(#chapter-content) h5 { font-size: 1.2em; }
+:where(#chapter-content) h6 { font-size: 1em; }
 #chapter-content :is(h1, h2, h3, h4, h5, h6) {
     font-weight: 600;
     line-height: 1.25;
