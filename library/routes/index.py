@@ -17,6 +17,7 @@ from ..choices import AccessLevelChoice, BookProgressChoice, UserRoleChoice
 from ..matching import DEFAULT_MATCH_THRESHOLD, rank_matches
 from ..models import Book, Bookmark, Tag, _utcnow, book_tags, db
 from ..utils import (
+    COVER_STYLE,
     book_progress,
     cover_mimetype,
     display_author,
@@ -241,7 +242,7 @@ def cover(filename):
 
     mtime = int(os.path.getmtime(epub_path))
     width = _snap_width(request.args.get("w", type=int))
-    etag = f"{book.id}-{mtime}-{width or 'full'}"
+    etag = f"{book.id}-{mtime}.{COVER_STYLE}-{width or 'full'}"
     if request.if_none_match.contains(etag):
         return "", 304
 
@@ -249,7 +250,7 @@ def cover(filename):
     # library/__init__.py -> routes -> here -> library.cache.
     from .. import cache
 
-    cache_key = f"cover:{book.id}:{mtime}"
+    cache_key = f"cover:{book.id}:{mtime}.{COVER_STYLE}"
     cover_bytes = cache.get(cache_key)
     if cover_bytes is None:
         try:

@@ -7,7 +7,7 @@ from flask_login import current_user
 
 from ..choices import AccessLevelChoice, UserRoleChoice
 from ..models import Book, db
-from ..utils import book_style_subset, spine_chapter_sizes
+from ..utils import COVER_STYLE, book_style_subset, spine_chapter_sizes
 
 
 def json_login_required(view):
@@ -66,7 +66,7 @@ def cover_url(book: Book, width: int | None = None) -> str:
     params = {}
     mtime = book_mtime(book)
     if mtime is not None:
-        params["v"] = mtime
+        params["v"] = f"{mtime}.{COVER_STYLE}"   # a new fallback drawing is a new cover too
     if width:
         params["w"] = width
     return url_for("index_routes.cover", filename=book.filename, **params)

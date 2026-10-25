@@ -241,16 +241,18 @@ def make_thumbnail(image_bytes: bytes, width: int) -> bytes:
         return out.getvalue()
 
 
-# Fallback cover colours: muted spines from the shelf palette, each paired
-# with a light ink. Picked per book from a hash of the title, so a book keeps
-# its colour.
-_FALLBACK_COVERS = [
-    ("#34495E", "#FFF1E5"),
-    ("#8B6F47", "#FFF1E5"),
-    ("#5F7F74", "#FFF1E5"),
-    ("#7A5C6E", "#FFF1E5"),
-    ("#4F6D8F", "#FFF1E5"),
+# Fallback covers: two saturated inks per book, picked from a hash of the
+# title so a book keeps its colours. Bump COVER_STYLE when the drawing
+# changes, so browsers and the server cache fetch the new one.
+_FALLBACK_INKS = [
+    ("#e8473c", "#f2b134"),
+    ("#3c6fe8", "#e8478f"),
+    ("#1f9e89", "#f2d134"),
+    ("#e86a3c", "#7a4ce8"),
+    ("#d93a6b", "#38a8e0"),
+    ("#2f8f4e", "#e8c13c"),
 ]
+COVER_STYLE = 2
 
 
 def _wrap_words(text: str, max_chars: int, max_lines: int) -> list[str]:
@@ -267,37 +269,34 @@ def _wrap_words(text: str, max_chars: int, max_lines: int) -> list[str]:
 
 
 def fallback_cover_svg(title: str, author: str) -> bytes:
-    """A typographic 2:3 cover for books whose EPUB has none: title and author
-    set in a serif on a coloured board, like a cloth-bound hardback."""
+    """A 2:3 cover for books whose EPUB has none, as colour under vellum: the
+    title's first letter huge in two inks, blurred as if under a sheet of
+    tracing paper, with the title and author printed crisp on top."""
     from html import escape
     from zlib import crc32
 
-    bg, ink = _FALLBACK_COVERS[crc32((title or "").encode()) % len(_FALLBACK_COVERS)]
+    one, two = _FALLBACK_INKS[crc32((title or "").encode()) % len(_FALLBACK_INKS)]
+    glyph = escape((title or "?").strip()[:1].upper())
     title_lines = _wrap_words(title or "Untitled", 16, 5)
     author_lines = _wrap_words(author or "", 24, 2)
     title_size = 40 if max(map(len, title_lines)) <= 12 else 34
     serif = "Georgia, 'Times New Roman', serif"
     line_gap = round(title_size * 1.15)
-    tspans = "".join(
-        f'<tspan x="40" dy="{0 if i == 0 else line_gap}">{escape(line)}</tspan>'
-        for i, line in enumerate(title_lines)
-    )
-    author_tspans = "".join(
-        f'<tspan x="40" dy="{0 if i == 0 else 28}">{escape(line)}</tspan>'
-        for i, line in enumerate(author_lines)
-    )
+    tspans = "".join(f'<tspan x="40" dy="{0 if i == 0 else line_gap}">{escape(line)}</tspan>' for i, line in enumerate(title_lines))
+    author_tspans = "".join(f'<tspan x="40" dy="{0 if i == 0 else 28}">{escape(line)}</tspan>' for i, line in enumerate(author_lines))
     svg = "\n".join([
-        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 600"'
-        ' width="400" height="600">',
-        f'<rect width="400" height="600" fill="{bg}"/>',
-        f'<rect x="20" y="20" width="360" height="560" fill="none" stroke="{ink}"'
-        ' stroke-opacity="0.35" stroke-width="2"/>',
-        f'<text x="40" y="{110 + title_size}" fill="{ink}" font-family="{serif}"'
-        f' font-size="{title_size}" font-weight="600">{tspans}</text>',
-        f'<line x1="40" x2="140" y1="470" y2="470" stroke="{ink}"'
-        ' stroke-opacity="0.6" stroke-width="2"/>',
-        f'<text x="40" y="510" fill="{ink}" fill-opacity="0.85" font-family="{serif}"'
-        f' font-size="22" font-style="italic">{author_tspans}</text>',
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 600" width="400" height="600">',
+        # The blur that makes it read as under paper, and the paper's tooth.
+        '<defs><filter id="soft" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="9"/></filter>'
+        '<filter id="tooth"><feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="3" stitchTiles="stitch"/>'
+        '<feColorMatrix values="0 0 0 0 .45 0 0 0 0 .38 0 0 0 0 .3 0 0 0 .22 0"/></filter></defs>',
+        '<rect width="400" height="600" fill="#f4efe6"/>',
+        f'<g filter="url(#soft)" style="mix-blend-mode:multiply"><text x="210" y="520" text-anchor="middle" font-family="{serif}" font-size="560" font-weight="700" fill="{one}" fill-opacity=".85">{glyph}</text>'
+        f'<text x="250" y="560" text-anchor="middle" font-family="{serif}" font-size="560" font-weight="700" fill="{two}" fill-opacity=".7">{glyph}</text></g>',
+        '<rect width="400" height="600" fill="#f7f3ec" fill-opacity=".5"/>',
+        '<rect width="400" height="600" filter="url(#tooth)"/>',
+        f'<text x="40" y="{110 + title_size}" fill="#1f1d1a" font-family="{serif}" font-size="{title_size}" font-weight="600">{tspans}</text>',
+        f'<text x="40" y="530" fill="#1f1d1a" fill-opacity=".8" font-family="{serif}" font-size="22" font-style="italic">{author_tspans}</text>',
         "</svg>",
     ])
     return svg.encode("utf-8")
