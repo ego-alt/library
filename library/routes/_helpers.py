@@ -69,6 +69,8 @@ def cover_url(book: Book, width: int | None = None) -> str:
         params["v"] = f"{mtime}.{COVER_STYLE}"   # a new fallback drawing is a new cover too
     if width:
         params["w"] = width
+    if not book.cover_path:
+        params["drawn"] = 1   # one we draw (utils.fallback_cover_svg), which night mode recolours
     return url_for("index_routes.cover", filename=book.filename, **params)
 
 

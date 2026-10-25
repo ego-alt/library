@@ -160,6 +160,11 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     text-align: center;
     line-height: 1.25;
 }
+/* Covers we draw for books without one are paper by day; at night the paper
+   turns dark grey and the ink light, keeping the colours of the letters. */
+.dark-mode .book img[src*="drawn=1"],
+.dark-mode img[src*="drawn=1"],
+.dark-mode img[src^="data:image/svg"] { filter: invert(0.88) hue-rotate(180deg) saturate(1.3) brightness(0.85); }
 /* Once the cover has loaded, the title in type under it is done with. */
 .is-loaded > .cover-blank { visibility: hidden; }
 /* The wall label: title, then author (and how far in you are) in spaced
