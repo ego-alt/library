@@ -2,16 +2,6 @@
 
 const comicsApi = (path, options) => apiFetch(`/comics/api${path}`, options);
 
-// "/" puts you in the search box, as on the books shelf.
-function bindSearchKey(input) {
-    if (!input) return;
-    document.addEventListener('keydown', (e) => {
-        if (e.key !== '/' || e.metaKey || e.ctrlKey || e.altKey) return;
-        if (e.target.closest && e.target.closest('input, textarea, select, [contenteditable]')) return;
-        e.preventDefault();
-        input.focus();
-    });
-}
 
 // --- The wall of series: one search box and All / Unread / Reading / Finished,
 // like the books (main.js), filtered here since every series is on the page.
@@ -26,7 +16,7 @@ const SERIES_EMPTY = {
 function initSeries() {
     const grid = document.getElementById('library');
     const search = document.getElementById('librarySearch');
-    bindSearchKey(search);
+    bindSearchBox(search);
     if (!grid) return;
     const empty = document.getElementById('emptyState');
     const filter = document.querySelector('.status-filter[aria-label="Reading status"]');
@@ -63,15 +53,6 @@ function initSeries() {
         apply();
     });
     search.addEventListener('input', apply);
-    search.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            search.blur();  // drops the phone keyboard so the results show
-        } else if (e.key === 'Escape' && search.value) {
-            e.stopPropagation();
-            search.value = '';
-            search.dispatchEvent(new Event('input'));
-        }
-    });
     apply();
 }
 

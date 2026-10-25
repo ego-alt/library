@@ -119,6 +119,42 @@ function timeAgo(iso) {
 
 /** Remembers a shelf's tab (All, Unread, Reading, Finished) so it opens on
  * it next time; the server reads the cookie. */
+/** A shelf's search box: "/" jumps to it, Enter puts a phone's keyboard away
+ * so the results show, Esc clears it (as an input event, so whatever listens
+ * to the box hears it). */
+function bindSearchBox(input) {
+    if (!input) return;
+    document.addEventListener('keydown', (e) => {
+        if (e.key !== '/' || e.metaKey || e.ctrlKey || e.altKey) return;
+        if (e.target.closest && e.target.closest('input, textarea, select, [contenteditable]')) return;
+        if ([...document.querySelectorAll('.metadata-overlay, .login-overlay')].some(el => getComputedStyle(el).display !== 'none')) return;
+        e.preventDefault();
+        input.focus();
+    });
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            input.blur();
+        } else if (e.key === 'Escape' && input.value) {
+            e.stopPropagation();
+            input.value = '';
+            input.dispatchEvent(new Event('input'));
+        }
+    });
+}
+
+/** Asks before a card with unsaved changes closes: a bar in its footer with
+ * Keep editing and a quiet red discard, which stand in for the footer's own
+ * buttons while it's up. */
+function askToDiscard(footer, {message, discard, onDiscard}) {
+    if (footer.querySelector('.discard-bar')) return;   // already asking
+    const keep = h('button', {type: 'button', class: 'btn btn-secondary', onclick: () => bar.remove()}, 'Keep editing');
+    const bar = h('div', {class: 'discard-bar', role: 'alertdialog', 'aria-label': 'Unsaved changes'},
+        h('span', {}, message), keep,
+        h('button', {type: 'button', class: 'btn btn-ghost danger-text', onclick: () => { bar.remove(); onDiscard(); }}, discard));
+    footer.prepend(bar);
+    keep.focus();
+}
+
 function rememberShelfView(shelf, view) {
     document.cookie = `shelf_view_${shelf}=${view}; path=${window.APP_ROOT || ''}/; max-age=31536000; samesite=lax`;
 }

@@ -4,7 +4,6 @@
  * but ⋯. Downloads is in manage.css, its Settings in settings.css. */
 
 .comics-hint { color: var(--color-text-muted); font-size: var(--text-sm); }
-.danger-text { color: var(--color-danger) !important; }
 
 /* --- One series: a compact header (a small cover beside the title and its
    lines, the description folded to a few lines, one button), then the
@@ -80,7 +79,6 @@
 .release.is-rejected { opacity: 0.55; }
 
 /* --- Issue covers: read ones a little dimmed, missing ones faded. --- */
-.is-busy .book { opacity: 0.6; }
 .issue-wall .is-read .book img { opacity: 0.7; }
 .issue-wall .is-read .book-caption { opacity: 0.7; }
 .book-buttons > .book-button { text-decoration: none; }

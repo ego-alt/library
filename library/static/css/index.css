@@ -53,7 +53,7 @@ body {
     font-family: var(--font-sans);
 }
 
-/* Unified type for top-level headings (overrides Bootstrap's reboot). */
+/* Unified type for top-level headings. */
 h1 { font-size: var(--text-xl); font-weight: 550; letter-spacing: -0.01em; line-height: 1.2; }
 h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 /* The bar all but disappears: the name in spaced capitals on the left, the
@@ -226,6 +226,7 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     .book .book-button::after { inset: -9px; }
 }
 .book-button {
+    position: relative;
     width: 32px;
     height: 32px;
     border-radius: var(--radius-pill);
@@ -242,7 +243,6 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     background: var(--color-bg-base);
 }
 /* A finger-sized hit area around the small round button. */
-.book-button { position: relative; }
 .book-button::after { content: ""; position: absolute; inset: -6px; }
 /* Admin-only marker — top-left so it clears the top-right .book-buttons. */
 .book-lock {
@@ -302,6 +302,9 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     max-width: calc(100vw - 2 * var(--space-5));
 }
 .notice {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
     background: var(--color-text-secondary);
     color: var(--color-bg-base);
     padding: var(--space-3) var(--space-4);
@@ -330,7 +333,10 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
         align-items: center;
     }
 }
-.metadata-overlay {
+/* The details card and sign-in: a dimmed, blurred backdrop and a frosted
+   pane, where the glow shows softly through. */
+.metadata-overlay,
+.login-overlay {
     display: none;
     position: fixed;
     top: 0;
@@ -344,11 +350,8 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     backdrop-filter: blur(5px);
 }
 
-/* ============================================================
-   Metadata panel — sleeker rebuild
-   ============================================================ */
-/* Frosted glass: the glow shows softly through the details card and sign-in. */
-.metadata-content {
+.metadata-content,
+.login-content {
     background: var(--pane);
     -webkit-backdrop-filter: blur(22px) saturate(1.25);
     backdrop-filter: blur(22px) saturate(1.25);
@@ -363,6 +366,7 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     animation: slideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
     padding: var(--space-5);
 }
+.login-content { max-width: 400px; }
 .dark-mode .metadata-overlay,
 .dark-mode .login-overlay { background: rgba(0, 0, 0, 0.45); }
 @keyframes slideIn {
@@ -475,11 +479,8 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     transition: opacity 0.2s ease;
 }
 .meta-cover__change .icon { width: 1.4em; height: 1.4em; }
-.meta-cover--editable:hover .meta-cover__change,
-.meta-cover__change:focus-visible {
-    opacity: 1;
-}
-.meta-cover__change:focus-visible { outline: 2px solid #fff; outline-offset: calc(-1 * var(--space-1)); }
+.meta-cover--editable:hover .meta-cover__change { opacity: 1; }
+.meta-cover__change:focus-visible { opacity: 1; outline: 2px solid #fff; outline-offset: calc(-1 * var(--space-1)); }
 /* No hover on touch: the way to change the cover sits on it as a small label. */
 @media (hover: none) {
     .meta-cover__change { opacity: 1; inset: auto var(--space-2) var(--space-2); flex-direction: row; padding: var(--space-2) var(--space-3); border-radius: var(--radius-pill); }
@@ -498,12 +499,15 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     gap: var(--space-1);
     margin: 0;
 }
-.meta-label {
+/* The one small-capitals label: fields in the details card, sign-in and
+   Settings, Downloads' sub-heads, Get's heading. */
+.meta-label,
+.sub-head {
     color: var(--color-text-muted);
     font-weight: 600;
-    font-size: var(--text-sm);
+    font-size: 0.75rem;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.1em;
 }
 .meta-input,
 .meta-value {
@@ -536,7 +540,7 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     cursor: pointer;
 }
 .meta-checkbox-field input { cursor: pointer; }
-.meta-checkbox-field .meta-label { text-transform: none; letter-spacing: normal; }
+.meta-checkbox-field .meta-label { font-size: var(--text-sm); font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--color-text-secondary); }
 
 /* --- Footer: created-on + actions, with a hairline divider above --- */
 .meta-footer {
@@ -544,6 +548,7 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     padding-top: var(--space-4);
     border-top: 1px solid var(--color-border);
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
     gap: var(--space-3);
@@ -590,39 +595,52 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 .meta-footer.is-dirty .btn.save-button { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-on-accent); }
 .meta-footer.is-dirty .btn.save-button:hover:not(:disabled) { background: var(--color-accent-hover); border-color: var(--color-accent-hover); }
 
-/* Delete in the details panel: a quiet text button like Download beside it,
-   in red; the solid red is for the confirmation that follows. */
-.btn.delete-book-button { color: var(--color-danger); }
-.btn.delete-book-button:hover:not(:disabled) { color: var(--color-danger-hover); background: transparent; }
-.delete-book-button:disabled { opacity: 0.5; cursor: not-allowed; }
+/* Red words for what removes something (Delete, Discard, a menu's Delete the
+   file…): quiet like the buttons beside them, never a red block. */
+.danger-text,
+.btn.danger-text,
+.float-menu > .danger-text { color: var(--color-danger); }
+.btn.danger-text:hover:not(:disabled),
+.float-menu > .danger-text:hover { color: var(--color-danger-hover); background: transparent; }
 
-/* --- Close button --- */
+/* Round, quiet icon buttons: the shelf's +, ⋯ on Downloads' rows, a card's ×. */
+.library-add,
+.entry__more,
 .close-metadata,
 .close-login {
-    position: absolute;
-    top: var(--space-3);
-    right: var(--space-3);
-    cursor: pointer;
-    border: none;
-    background: none;
-    font-size: var(--text-lg);
-    line-height: 1;
-    color: var(--color-text-muted);
-    transition: transform 0.2s ease, background 0.15s ease, color 0.15s ease;
-    width: 44px;
-    height: 44px;
     display: flex;
     align-items: center;
     justify-content: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: none;
     border-radius: var(--radius-pill);
+    background: none;
+    color: var(--color-text-muted);
+    font: inherit;
+    line-height: 1;
+    cursor: pointer;
+    transition: transform 0.2s ease, background 0.15s ease, color 0.15s ease;
+}
+.library-add:hover, .library-add:focus-visible,
+.entry__more:hover, .entry__more:focus-visible,
+.close-metadata:hover,
+.close-login:hover {
+    background: var(--color-highlight-soft);
+    color: var(--color-text-primary);
+    outline: none;
+}
+.close-metadata,
+.close-login {
+    font-size: var(--text-lg);
+    position: absolute;
+    top: var(--space-3);
+    right: var(--space-3);
     z-index: 1;
 }
 .close-metadata:hover,
-.close-login:hover {
-    transform: rotate(90deg);
-    background: var(--color-highlight-soft);
-    color: var(--color-text-primary);
-}
+.close-login:hover { transform: rotate(90deg); }
 
 /* --- Phones: the panel becomes a bottom sheet, cover above fields, with the
    actions pinned to the bottom so Save is always reachable --- */
@@ -642,16 +660,8 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
         background: var(--color-bg-base);
         margin: var(--space-5) calc(-1 * var(--space-4)) 0;
         padding: var(--space-3) var(--space-4) calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
+        row-gap: var(--space-2);
     }
-}
-@keyframes sheetUp {
-    from { transform: translateY(100%); }
-    to   { transform: translateY(0); }
-}
-@media (prefers-reduced-motion: reduce) {
-    .metadata-content { animation: none; }
-}
-@media (max-width: 640px) {
     .meta-body {
         grid-template-columns: 1fr;
         gap: var(--space-5);
@@ -662,11 +672,17 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
         margin: 0 auto;
     }
     /* When it was added on a line of its own, then the actions in one row, centred. */
-    .meta-footer { flex-wrap: wrap; align-items: center; row-gap: var(--space-2); }
     .meta-footer-info { flex-basis: 100%; text-align: center; }
-    .meta-footer-actions { flex: 1; justify-content: center; gap: var(--space-3); }
+    .meta-footer-actions { flex: 1; justify-content: center; }
     .meta-footer-actions .btn { white-space: nowrap; min-height: 40px; }
     .meta-fields { padding-bottom: var(--space-4); }
+}
+@keyframes sheetUp {
+    from { transform: translateY(100%); }
+    to   { transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .metadata-content { animation: none; }
 }
 .tag-input-container {
     background: var(--color-bg-inset);
@@ -752,32 +768,6 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 .tag .remove-tag:hover {
     opacity: 1;
 }
-.login-overlay {
-    display: none;
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(30, 22, 14, 0.28);
-    z-index: 1000;
-    justify-content: center;
-    align-items: center;
-    backdrop-filter: blur(5px);
-}
-.login-content {
-    background: var(--pane);
-    -webkit-backdrop-filter: blur(22px) saturate(1.25);
-    backdrop-filter: blur(22px) saturate(1.25);
-    border: 1px solid var(--pane-edge);
-    padding: var(--space-5);
-    border-radius: var(--radius-lg);
-    max-width: 400px;
-    width: 90%;
-    position: relative;
-    box-shadow: inset 0 1px 0 var(--pane-edge), 0 18px 40px -20px rgba(40, 25, 10, 0.45);
-    animation: slideIn 0.3s ease-out;
-}
 .login-content h3 {
     margin-bottom: var(--space-5);
     color: var(--color-text-secondary);
@@ -787,35 +777,9 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     margin-bottom: var(--space-5);
 }
 
-.login-field label {
-    display: block;
-    margin-bottom: var(--space-1);
-    color: var(--color-text-muted);
-    font-weight: 600;
-    font-size: var(--text-sm);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-}
-.login-field.checkbox label {
-    text-transform: none;
-    letter-spacing: normal;
-    font-weight: 400;
-    color: var(--color-text-primary);
-    margin: 0;
-}
-.login-field input:not([type="checkbox"]) {
-    width: 100%;
-    padding: var(--space-3);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
-    color: var(--color-text-primary);
-    background: var(--color-bg-inset);
-}
-.login-field.checkbox {
-    display: flex;
-    align-items: center;
-    gap: var(--space-2);
-}
+.login-field .meta-label { display: block; margin-bottom: var(--space-1); }
+.login-field .input { width: 100%; }
+.login-field.checkbox label { display: flex; align-items: center; gap: var(--space-2); margin: 0; }
 .login-submit {
     width: 100%;
     min-height: 44px;
@@ -831,11 +795,6 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     color: var(--color-text-secondary);
 }
 /* Toast action (e.g. Undo after delete) */
-.notice {
-    display: flex;
-    align-items: center;
-    gap: var(--space-4);
-}
 .notice > span { flex: 1; }
 .notice__action {
     flex: 0 0 auto;
@@ -899,17 +858,7 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 /* The search box and, at its end, + to add files to this shelf. */
 .library-search-row { display: flex; align-items: center; gap: var(--space-2); flex: 1 1 300px; max-width: 476px; }
 .library-search { position: relative; flex: 1; min-width: 0; }
-.library-add {
-    flex: 0 0 auto;
-    width: 44px;
-    height: 44px;
-    border: none;
-    border-radius: var(--radius-pill);
-    background: none;
-    color: var(--color-text-muted);
-    cursor: pointer;
-}
-.library-add:hover, .library-add:focus-visible { background: var(--color-highlight-soft); color: var(--color-text-primary); outline: none; }
+.library-add { flex: 0 0 auto; }
 .library-search > .icon {
     position: absolute;
     left: 0;   /* flush left, under the name */
@@ -946,13 +895,17 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 .library-search__input::-webkit-search-cancel-button:hover { opacity: 1; }
 .library-search__input:focus { outline: none; border-color: var(--color-accent); }
 
-/* Radio group of words with an underline on the chosen one; used for the
-   library view and the details panel. */
+/* Words with an underline on the chosen one: the shelves' filter, the
+   details card's status and Downloads | Settings. */
 .status-filter {
     display: inline-flex;
     gap: 20px;
 }
-.status-filter button {
+.status-filter button,
+.status-filter a {
+    display: inline-flex;
+    align-items: center;
+    text-decoration: none;
     border: none;
     border-bottom: 1px solid transparent;
     background: transparent;
@@ -966,8 +919,11 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     transition: color var(--dur-fast) ease, border-color var(--dur-fast) ease;
 }
 .meta-status button { font-size: var(--text-sm); }
-.status-filter button:hover { color: var(--color-text-primary); }
-.status-filter button[aria-checked="true"] {
+.status-filter button:hover,
+.status-filter a:hover { color: var(--color-text-primary); }
+.status-filter a { min-height: 44px; }
+.status-filter button[aria-checked="true"],
+.status-filter a[aria-current="page"] {
     color: var(--color-text-primary);
     border-bottom-color: var(--color-accent);
 }
@@ -1002,7 +958,7 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 .shelf-get__ask[hidden] { display: none; }
 .shelf-get__note { margin: 0 0 var(--space-4); color: var(--color-text-muted); font-size: var(--text-sm); }
 .shelf-get__note:empty { display: none; }
-.shelf-get .is-busy .book { opacity: 0.6; }
+.is-busy .book { opacity: 0.6; }
 
 /* Empty shelves and searches that found nothing: plain lines at the left,
    where the "Get …" offer under them starts too. */
@@ -1030,11 +986,9 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 }
 @media (max-width: 640px) {
     /* 16px stops iOS zooming the page when an input is focused. */
-    .meta-input, .meta-author-input, .tag-input-container input,
-    .login-field input:not([type="checkbox"]) {
+    .meta-input, .meta-author-input, .tag-input-container input {
         font-size: var(--text-base);
     }
-    .meta-author-input { font-size: var(--text-base); }
     .tag { padding-right: 0; }
     .tag .remove-tag { min-width: 36px; min-height: 36px; margin: -6px 0; }
 }
@@ -1073,7 +1027,6 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 
 /* "You have unsaved changes" bar inside the details panel footer: while it's
    up, its two answers are the only buttons. */
-.meta-footer { flex-wrap: wrap; }
 .meta-footer:has(.discard-bar) > :not(.discard-bar) { display: none; }
 .discard-bar {
     flex: 1 0 100%;
@@ -1090,8 +1043,6 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
 }
 .discard-bar span { flex: 1 1 12rem; }
 .discard-bar .btn { font-size: var(--text-sm); white-space: nowrap; }
-.discard-bar .discard-button { color: var(--color-danger); }
-.discard-bar .discard-button:hover { color: var(--color-danger-hover); background: transparent; }
 /* On phones, centred like the footer it stands in for. */
 @media (max-width: 640px) {
     .discard-bar span { flex-basis: 100%; text-align: center; }
@@ -1150,4 +1101,3 @@ h2 { font-size: var(--text-lg); font-weight: 600; line-height: 1.3; }
     border-color: rgba(255, 230, 190, 0.16);
     box-shadow: 0 18px 44px -10px rgba(0, 0, 0, 0.75);
 }
-.dark-mode .float-menu .danger-text { color: var(--color-danger-hover) !important; }

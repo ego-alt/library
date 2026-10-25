@@ -32,19 +32,11 @@
     margin: var(--space-5) 0 0;
     padding-bottom: var(--space-2);
     border-bottom: 1px solid var(--color-border);
-    color: var(--color-text-muted);
-    font-size: 0.75rem;
-    font-weight: 600;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
 }
 .section__title .muted { color: var(--color-text-muted); font-size: var(--text-sm); font-weight: 400; }
 
-/* Downloads | Settings: the shelves' tabs, as links. */
+/* Downloads | Settings: the shelves' tabs (index.css), as links. */
 .admin-tabs { margin: var(--page-top) 0 var(--space-5); }
-.admin-tabs a { color: var(--color-text-muted); text-decoration: none; font-size: 1rem; font-weight: 500; min-height: 44px; display: inline-flex; align-items: center; border-bottom: 1px solid transparent; }
-.admin-tabs a:hover { color: var(--color-text-primary); }
-.admin-tabs a[aria-current="page"] { color: var(--color-text-primary); border-bottom-color: var(--color-accent); }
 
 /* --- Rows --- */
 .entries { list-style: none; padding: 0; margin: 0; }
@@ -69,17 +61,9 @@
 /* A download's state: its percentage, quietly, like a date; only a failure
    stands out. */
 .entry__state.is-bad { color: var(--color-danger); font-weight: 600; }
-.entry__more {
-    width: 36px;
-    height: 36px;
-    border: none;
-    border-radius: var(--radius-pill);
-    background: none;
-    color: var(--color-text-muted);
-    font: inherit;
-    cursor: pointer;
-}
-.entry__more:hover, .entry__more:focus-visible { background: var(--color-highlight-soft); color: var(--color-text-primary); outline: none; }
+/* The round ⋯ (index.css), a little smaller to fit the row, with its hit area kept. */
+.entry__more { position: relative; width: 36px; height: 36px; }
+.entry__more::after { content: ""; position: absolute; inset: -4px; }
 .entry__more--text { width: auto; padding: 0 var(--space-3); font-size: var(--text-sm); color: var(--color-accent); }
 
 /* A group that folds open (a comic series and its wanted issues). */
@@ -98,18 +82,12 @@
 
 .entry--more { grid-template-columns: minmax(0, 1fr); min-height: 44px; }
 .entry--more .entry__more--text { justify-self: start; padding-left: 1.1em; }
-.entry__more { position: relative; }
-.entry__more::after { content: ""; position: absolute; inset: -4px; }
 
 /* Only when something needs saying: a client that isn't answering in the
    danger colour, the reassuring "paused" in plain muted text. */
 .status-line { padding: 0 0 var(--space-3); color: var(--color-text-muted); }
 .status-line.is-bad { color: var(--color-danger); }
 body.is-stale .section { opacity: 0.55; transition: opacity var(--dur-base) ease; }
-
-@media (max-width: 640px) {
-    /* Rows stay one line on a phone too; a long title ends in "…". */
-}
 
 
 /* Downloads and Settings, set like the shelves: everything on the lit
@@ -141,7 +119,7 @@ body[data-page] .section__title .muted, body[data-page] .section__title .count {
 body[data-page] .section__hint { margin-top: var(--space-1); }
 /* Sub-heads drop to the rows' own small capitals without a rule of their
    own, so a section has one line: under its name. */
-body[data-page] .sub-head { border-bottom: none; padding-bottom: 0; font-size: 0.6875rem; letter-spacing: 0.16em; }
+body[data-page] .sub-head { border-bottom: none; padding-bottom: 0; }
 body[data-page] .entry { border-bottom-color: color-mix(in srgb, var(--color-border) 60%, transparent); }
 body[data-page] .section__actions .btn { border: none; background: none; padding: 0; min-height: 0; color: var(--color-text-muted); font-size: var(--text-sm); text-transform: none; letter-spacing: 0; }
 body[data-page] .section__actions .btn:hover { color: var(--color-accent); }

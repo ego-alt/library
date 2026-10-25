@@ -34,7 +34,7 @@ async function reviewOne(file) {
     const newField = h('label', {class: 'meta-field', hidden: true}, h('span', {class: 'meta-label'}, 'New series'), newName);
     const number = h('input', {class: 'meta-input', type: 'text', inputmode: 'decimal', enterkeyhint: 'done', value: (staged.issue && staged.issue.number) || staged.parsed.number || '', placeholder: '#'});
     const save = h('button', {type: 'button', class: 'save-button btn btn-ghost'}, 'Add to library');
-    const footer = h('footer', {class: 'meta-footer'},
+    const footer = h('footer', {class: 'meta-footer is-dirty'},   // a comic not yet added is always something to save
         h('span', {class: 'meta-footer-info'}, staged.issue ? 'Matched by its name and details.' : staged.reason),
         h('div', {class: 'meta-footer-actions'}, save));
     const cover = h('figure', {class: 'meta-cover'},
@@ -91,13 +91,7 @@ async function reviewOne(file) {
     }
     // As the book card does: closing before adding asks first.
     function requestClose() {
-        if (footer.querySelector('.discard-bar')) return;
-        const keep = h('button', {type: 'button', class: 'btn btn-secondary', onclick: () => bar.remove()}, 'Keep editing');
-        const bar = h('div', {class: 'discard-bar', role: 'alertdialog', 'aria-label': 'Not added yet'},
-            h('span', {}, 'This comic hasn’t been added yet.'), keep,
-            h('button', {type: 'button', class: 'btn btn-danger', onclick: close}, 'Discard comic'));
-        footer.prepend(bar);
-        keep.focus();
+        askToDiscard(footer, {message: 'This comic hasn’t been added yet.', discard: 'Discard comic', onDiscard: close});
     }
     function onKey(e) {
         if (e.key !== 'Escape') return;

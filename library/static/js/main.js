@@ -336,16 +336,9 @@ function applyFilters() {
 
 const debouncedApplyFilters = debounce(applyFilters, 250);
 $('#librarySearch').on('input', debouncedApplyFilters);
-$('#librarySearch').on('keydown', function(e) {
-    if (e.key === 'Enter') {
-        applyFilters();
-        this.blur();  // drops the phone keyboard so the results show
-    } else if (e.key === 'Escape' && this.value) {
-        e.stopPropagation();
-        this.value = '';
-        applyFilters();
-    }
-});
+// Enter searches at once rather than after the pause.
+$('#librarySearch').on('keydown', (e) => { if (e.key === 'Enter') applyFilters(); });
+bindSearchBox(document.getElementById('librarySearch'));
 
 
 // <== FUNCTIONS FOR VIEWING AND EDITING METADATA ==>
@@ -444,7 +437,7 @@ function generateMetadataHtml(data, isUpload = false) {
               title="Download the EPUB">${icon('download')}<span>Download</span></a>`
         : '';
     const deleteButton = (isAdmin && !isUpload)
-        ? `<button type="button" class="delete-book-button btn btn-ghost"
+        ? `<button type="button" class="delete-book-button btn btn-ghost danger-text"
                    data-action="delete-book" data-filename="${escapeHtml(data.filename)}">
               ${icon('trash-2')}<span>Delete</span>
            </button>`
@@ -592,26 +585,9 @@ function refreshDirty() {
 // Close from Esc, the backdrop or ×: ask first if something would be lost.
 function requestCloseMetadata() {
     if (!panelIsDirty()) return closeMetadataOverlay();
-    if (document.querySelector('.discard-bar')) return;  // already asking
-    const bar = document.createElement('div');
-    bar.className = 'discard-bar';
-    bar.setAttribute('role', 'alertdialog');
-    bar.setAttribute('aria-label', 'Unsaved changes');
-    const text = document.createElement('span');
-    text.textContent = pendingUpload ? "This book hasn't been added yet." : 'You have unsaved changes.';
-    const keep = document.createElement('button');
-    keep.type = 'button';
-    keep.className = 'btn btn-secondary';
-    keep.textContent = 'Keep editing';
-    keep.addEventListener('click', () => bar.remove());
-    const discard = document.createElement('button');
-    discard.type = 'button';
-    discard.className = 'btn btn-ghost discard-button';
-    discard.textContent = pendingUpload ? 'Discard book' : 'Discard changes';
-    discard.addEventListener('click', () => { bar.remove(); closeMetadataOverlay(); });
-    bar.append(text, keep, discard);
-    document.querySelector('.meta-footer').prepend(bar);
-    keep.focus();
+    askToDiscard(document.querySelector('#metadataContent .meta-footer'), pendingUpload
+        ? {message: 'This book hasn’t been added yet.', discard: 'Discard book', onDiscard: closeMetadataOverlay}
+        : {message: 'You have unsaved changes.', discard: 'Discard changes', onDiscard: closeMetadataOverlay});
 }
 
 function closeMetadataOverlay() {
@@ -624,7 +600,7 @@ function closeMetadataOverlay() {
 }
 
 // <== KEYBOARD + FOCUS ==>
-// "/" search, "U" add a book, Esc closes whatever panel is open.
+// "U" adds a book, Esc closes whatever panel is open ("/" is bindSearchBox's).
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
         if (document.querySelector('.discard-bar')) document.querySelector('.discard-bar').remove();
@@ -635,10 +611,7 @@ document.addEventListener('keydown', (e) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     if (e.target.closest && e.target.closest('input, textarea, select, [contenteditable]')) return;
     if ($('#metadataOverlay').is(':visible') || $('#loginOverlay').is(':visible')) return;
-    if (e.key === '/') {
-        e.preventDefault();
-        document.getElementById('librarySearch')?.focus();
-    } else if (e.key.toLowerCase() === 'u' && window.isAuthenticated) {
+    if (e.key.toLowerCase() === 'u' && window.isAuthenticated) {
         e.preventDefault();
         document.getElementById('fileUploadInput').click();
     }

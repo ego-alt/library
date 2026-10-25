@@ -6,10 +6,8 @@
 /* Full width like Downloads, text and fields alike. */
 .settings .section { scroll-margin-top: var(--space-4); }
 
-/* The same small capitals as Downloads' sub-heads, and the same text size
-   as its rows (phones keep 16px fields so iOS doesn't zoom). */
-.settings .meta-label { font-size: 0.75rem; letter-spacing: 0.1em; }
-.settings .meta-checkbox-field .meta-label { font-size: var(--text-sm); font-weight: 400; letter-spacing: 0; color: var(--color-text-secondary); }
+/* Fields at the same text size as Downloads' rows (phones keep 16px fields
+   so iOS doesn't zoom). */
 @media (min-width: 641px) { .settings .meta-input { font-size: var(--text-sm); } }
 
 /* Fields, one under another; a pair side by side where there's room. */
