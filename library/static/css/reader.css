@@ -148,7 +148,6 @@ html:not(.paginated) #chapter-content { max-width: var(--reader-measure, 70ch); 
     display: block;
     margin: 1em auto;
 }
-.btn-secondary { font-size: var(--text-sm); }
 .display-controls {
     display: flex;
     align-items: center;
@@ -156,6 +155,7 @@ html:not(.paginated) #chapter-content { max-width: var(--reader-measure, 70ch); 
 }
 /* Toolbar buttons are plain icons that turn the accent on hover, not boxes. */
 .top-controls .btn-secondary {
+    padding: var(--space-2);
     background: transparent;
     border-color: transparent;
     color: var(--color-text-muted);
@@ -207,7 +207,7 @@ html:not(.paginated) #chapter-content { max-width: var(--reader-measure, 70ch); 
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
     box-shadow: 0 16px 40px -12px rgba(0, 0, 0, 0.35);
-    font-size: 0.875rem;
+    font-size: var(--text-sm);
     /* Never taller than the screen below the bar: scroll inside instead. */
     max-height: calc(100dvh - 96px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));   /* below the bar, with a margin */
     overflow-y: auto;
@@ -218,7 +218,7 @@ html:not(.paginated) #chapter-content { max-width: var(--reader-measure, 70ch); 
 .rs-row[hidden] { display: none; }
 .rs-label {
     color: var(--color-text-muted);
-    font-size: 0.6875rem;
+    font-size: var(--text-xs);
     letter-spacing: 0.12em;
     text-transform: uppercase;
 }
@@ -241,7 +241,7 @@ html:not(.paginated) #chapter-content { max-width: var(--reader-measure, 70ch); 
     font-weight: 600;
 }
 .rs-seg button:disabled { opacity: 0.4; cursor: default; border-color: var(--color-border); }
-.rs-note { margin: -6px 0 0; color: var(--color-text-muted); font-size: 0.75rem; }
+.rs-note { margin: -6px 0 0; color: var(--color-text-muted); font-size: var(--text-xs); }
 .rs-note[hidden] { display: none; }
 .rs-stepper { display: flex; align-items: center; gap: 8px; }
 .rs-stepper span { min-width: 3ch; text-align: center; font-variant-numeric: tabular-nums; }
@@ -346,7 +346,7 @@ html:not(.paginated) #chapter-content { max-width: var(--reader-measure, 70ch); 
     padding-left: var(--text-left, calc(24px + env(safe-area-inset-left, 0px)));
     padding-right: var(--text-right, calc(24px + env(safe-area-inset-right, 0px)));
     color: var(--color-text-muted);
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
     letter-spacing: 0.02em;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
@@ -414,7 +414,7 @@ html.pointer-idle, html.pointer-idle * { cursor: none !important; }
 
 .toc-title {
     margin: 0 0 var(--space-1);
-    font-size: 1.25rem;
+    font-size: var(--text-lg);
     font-weight: 500;
     color: var(--color-text-primary);
 }
@@ -677,7 +677,7 @@ html.vertical .running-head { text-align: right; }
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
     box-shadow: 0 12px 32px -8px var(--color-shadow);
-    font-size: 0.9375rem;
+    font-size: var(--text-base);
     line-height: 1.6;
 }
 .note-popover__head {
@@ -686,7 +686,7 @@ html.vertical .running-head { text-align: right; }
     align-items: center;
     margin-bottom: var(--space-2);
     color: var(--color-text-muted);
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
     letter-spacing: 0.08em;
     text-transform: uppercase;
 }
@@ -695,7 +695,7 @@ html.vertical .running-head { text-align: right; }
     background: none;
     border: none;
     color: var(--color-text-muted);
-    font-size: 1.25rem;
+    font-size: var(--text-lg);
     line-height: 1;
     cursor: pointer;
 }
@@ -707,7 +707,7 @@ html.vertical .running-head { text-align: right; }
     border: none;
     color: var(--color-accent);
     font: inherit;
-    font-size: 0.8125rem;
+    font-size: var(--text-xs);
     cursor: pointer;
 }
 /* "↩ Back to where you were", after a jump inside the book. */
@@ -733,7 +733,7 @@ html.vertical .running-head { text-align: right; }
     padding: 0;
     color: var(--color-accent);
     font: inherit;
-    font-size: 0.875rem;
+    font-size: var(--text-sm);
     cursor: pointer;
 }
 
@@ -934,9 +934,9 @@ html.vertical .running-head { text-align: right; }
 .read-aloud__btn { width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center; }
 .read-aloud__btn svg { width: 20px; height: 20px; }
 .read-aloud__play { color: var(--color-accent) !important; }
-.read-aloud__rate { min-width: 44px; height: 40px; font-variant-numeric: tabular-nums; font-size: 0.875rem; }
-.read-aloud__close { width: 36px; height: 36px; color: var(--color-text-muted) !important; font-size: 1.25rem; line-height: 1; }
-.read-aloud__note { flex-basis: 100%; text-align: center; padding: 0 var(--space-2) 4px; color: var(--color-text-muted); font-size: 0.75rem; }
+.read-aloud__rate { min-width: 44px; height: 40px; font-variant-numeric: tabular-nums; font-size: var(--text-sm); }
+.read-aloud__close { width: 36px; height: 36px; color: var(--color-text-muted) !important; font-size: var(--text-lg); line-height: 1; }
+.read-aloud__note { flex-basis: 100%; text-align: center; padding: 0 var(--space-2) 4px; color: var(--color-text-muted); font-size: var(--text-xs); }
 .read-aloud__note[hidden] { display: none; }
 /* Room for the player under the last lines, and the "back" pill above it. */
 body.reading-aloud #chapter-content { padding-bottom: 72px; }

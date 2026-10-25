@@ -8,6 +8,11 @@
  * structural.css, shared byte-identical across the home stack. Role names match
  * dashboard/docs/ui-spec.md; only colours diverge here. */
 :root {
+    /* Type: five sizes for the whole app — xs 12, sm 14, base 16, lg 20 and
+       xl 24 (structural.css has the middle three; the stack's 32px xl is
+       too big here). Text inside a book keeps its own sizes. */
+    --text-xs: 0.75rem;
+    --text-xl: 1.5rem;
     --color-bg-base: #f6f4ef;            /* gallery wall */
     --color-bg-elevated: #f6f4ef;
     /* Solid, for what floats over content: menus, cover buttons, the save bar. */
