@@ -575,9 +575,13 @@ function panelIsDirty() {
     return Boolean(pendingUpload) || Boolean(pendingCover)
         || (_panelSnapshot !== null && panelState() !== _panelSnapshot);
 }
-// Save fills in only once there's something to save.
+// Save takes the main action's outline only once there's something to save.
 function refreshDirty() {
-    document.querySelector('#metadataContent .meta-footer')?.classList.toggle('is-dirty', panelIsDirty());
+    const save = document.querySelector('#metadataContent .save-button');
+    if (!save) return;
+    const dirty = panelIsDirty();
+    save.classList.toggle('btn-primary', dirty);
+    save.classList.toggle('btn-ghost', !dirty);
 }
 ['input', 'change', 'click', 'keyup'].forEach(type =>
     document.getElementById('metadataContent')?.addEventListener(type, () => requestAnimationFrame(refreshDirty)));

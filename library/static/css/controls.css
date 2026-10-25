@@ -1,0 +1,29 @@
+/* One button for the whole app, shelves and reader alike, after the
+ * reader's settings: a 1px outline with small corners, never a filled block.
+ * Quiet ones have the plain border and take the accent on hover; the main
+ * action (Continue, Save once there's a change, Sign in) has the accent
+ * outline; a chosen setting doubles it. Loaded after structural.css by
+ * _layout.html and reader.html. */
+.btn { border-radius: var(--radius-sm); }
+.btn-secondary,
+.rs-seg button,
+.rs-stepper button {
+    background: transparent;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+}
+.btn-secondary:hover:not(:disabled),
+.rs-seg button:hover,
+.rs-stepper button:hover { background: transparent; border-color: var(--color-accent); }
+.btn-primary {
+    background: transparent;
+    border: 1px solid var(--color-accent);
+    color: var(--color-accent);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    line-height: 1.4;
+    padding: 5px 28px;   /* low and wide */
+}
+.btn-primary:hover:not(:disabled) { background: var(--color-highlight-soft); border-color: var(--color-accent-hover); color: var(--color-accent-hover); }
+.btn-primary:active:not(:disabled) { transform: translateY(1px); }
+.rs-seg button[aria-pressed="true"] { border-color: var(--color-accent); box-shadow: inset 0 0 0 1px var(--color-accent); }

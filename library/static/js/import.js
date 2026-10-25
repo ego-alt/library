@@ -33,8 +33,8 @@ async function reviewOne(file) {
     const newName = h('input', {class: 'meta-input', type: 'text', value: staged.parsed.series || '', placeholder: 'Series name'});
     const newField = h('label', {class: 'meta-field', hidden: true}, h('span', {class: 'meta-label'}, 'New series'), newName);
     const number = h('input', {class: 'meta-input', type: 'text', inputmode: 'decimal', enterkeyhint: 'done', value: (staged.issue && staged.issue.number) || staged.parsed.number || '', placeholder: '#'});
-    const save = h('button', {type: 'button', class: 'save-button btn btn-ghost'}, 'Add to library');
-    const footer = h('footer', {class: 'meta-footer is-dirty'},   // a comic not yet added is always something to save
+    const save = h('button', {type: 'button', class: 'save-button btn btn-primary'}, 'Add to library');   // a comic not yet added is always something to save
+    const footer = h('footer', {class: 'meta-footer'},
         h('span', {class: 'meta-footer-info'}, staged.issue ? 'Matched by its name and details.' : staged.reason),
         h('div', {class: 'meta-footer-actions'}, save));
     const cover = h('figure', {class: 'meta-cover'},
