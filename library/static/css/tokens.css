@@ -20,7 +20,6 @@
     --color-text-muted: #67625b;           /* 4.5:1 even on the lamp glow */
     --color-accent: #535f5f;             /* slate: 6:1 on the wall */
     --color-accent-hover: #414b4b;
-    --color-on-accent: #f7f2e8;
     --color-danger: #a6352b;
     --color-danger-hover: #8c2a21;
     --color-success: #4f7a3a;
@@ -46,7 +45,6 @@
     --color-text-muted: #9a8e7a;
     --color-accent: #d4b36a;             /* gold: 9:1 on the dark */
     --color-accent-hover: #e3c88a;
-    --color-on-accent: #141210;
     --color-danger: #e46b5f;             /* 4.5:1 on the raised panels */
     --color-danger-hover: #f08a7f;
     --color-success: #98971a;
