@@ -92,7 +92,7 @@ function attachShelfGet({kind, input, after}) {
     // Once there are results, a heading says they come from outside the library.
     const title = h('h2', {class: 'shelf-get__title meta-label', hidden: true}, `From ${source}`);
     const note = h('p', {class: 'shelf-get__note', 'aria-live': 'polite'});
-    const results = h('div', {class: 'row library get-results'});
+    const results = h('div', {class: 'library get-results'});
     const section = h('section', {class: 'shelf-get', hidden: true, 'aria-label': kind === 'books' ? 'Books to get' : 'Comic series to follow'}, ask, title, note, results);
     after.after(section);
     let generation = 0;
@@ -120,7 +120,7 @@ function attachShelfGet({kind, input, after}) {
         ask.hidden = true;
         title.hidden = false;
         note.textContent = '';
-        results.replaceChildren(...Array.from({length: 4}, () => h('div', {class: 'col-md-3 mb-3 book-skeleton-wrapper', 'aria-hidden': 'true'}, h('div', {class: 'book-skeleton'}))));
+        results.replaceChildren(...Array.from({length: 4}, () => h('div', {class: 'cover-card book-skeleton-wrapper', 'aria-hidden': 'true'}, h('div', {class: 'book-skeleton'}))));
         let data;
         try {
             data = await apiFetch(`/api/get/search/${kind}?q=${encodeURIComponent(q)}`);

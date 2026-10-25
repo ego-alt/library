@@ -35,7 +35,7 @@
 </section>
 
 {% if issues %}
-<div class="row library issue-wall" id="issueWall">
+<div class="library issue-wall" id="issueWall">
     {% for issue in issues %}
     {% set started = issue.page and not issue.finished %}
     {% set next = up_next and issue.id == up_next.id %}

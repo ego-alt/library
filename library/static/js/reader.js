@@ -1488,15 +1488,6 @@ document.addEventListener('DOMContentLoaded', () => {
     updateReadingModeButton();
 });
 
-// Resolve in-content chapter links via the same path as TOC clicks.
-function handleChapterLink(element) {
-    const href = element.getAttribute('chapter-link');
-    const sectionId = element.getAttribute('section-link');
-    const targetChapter = chapterForHref(href);
-    if (targetChapter === undefined) return;
-    jumpToChapter(targetChapter, sectionId);
-}
-
 // surroundContents throws if the selection straddles element boundaries.
 // Fall back to extractContents/insertNode, which always works.
 function wrapRangeInHighlight(range) {
@@ -1819,7 +1810,7 @@ document.addEventListener('click', (e) => {
     const raw = link.getAttribute('href') || '';
     if (chapterHref == null && !raw.startsWith('#')) return;   // an outside link
     e.preventDefault();
-    e.stopPropagation();   // capture phase: beats the link's inline handler
+    e.stopPropagation();
     const index = chapterHref != null ? chapterForHref(chapterHref) : currentChapterNum;
     const id = chapterHref != null ? link.getAttribute('section-link') : raw.slice(1);
     if (index === undefined) return;

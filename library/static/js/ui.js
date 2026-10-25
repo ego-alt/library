@@ -214,7 +214,7 @@ function enableDropZone(zone, onFiles) {
  * for covers added after the page loads. `extras` float over the cover. */
 function coverCard({href, label, title, meta = [], cover = null, attrs = {}, imgAttrs = {}, classes = '', extras = []}) {
     const line = meta.filter(Boolean).join(' · ');
-    return h('div', {class: `col-6 col-sm-4 col-md-3 mb-3${classes ? ` ${classes}` : ''}`, ...attrs},
+    return h('div', {class: `cover-card${classes ? ` ${classes}` : ''}`, ...attrs},
         h('div', {class: 'book'},
             h('a', {href, 'aria-label': label},
                 h('span', {class: 'cover-blank', 'aria-hidden': 'true'}, title),

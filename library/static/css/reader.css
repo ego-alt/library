@@ -442,7 +442,10 @@ html.pointer-idle, html.pointer-idle * { cursor: none !important; }
     background-color: transparent;
 }
 
-.toc-menu h5 {
+.toc-title {
+    margin: 0 0 var(--space-1);
+    font-size: 1.25rem;
+    font-weight: 500;
     color: var(--color-text-primary);
 }
 .toc-author {
@@ -903,18 +906,20 @@ html.vertical .running-head { text-align: right; }
     color: var(--color-text-primary);
 }
 
-/* Loading: a quiet ring in the theme's muted ink, not Bootstrap blue. */
-#loading-spinner .spinner-border {
-    color: var(--color-text-muted);
-    width: 2.5rem !important;
-    height: 2.5rem !important;
-    border-width: 0.2em;
+/* Loading: a quiet ring in the theme's muted ink, and the book's name. */
+#loading-spinner { margin: 3rem 0; text-align: center; color: var(--color-text-muted); }
+#loading-spinner .spinner {
+    display: inline-block;
+    width: 2.5rem;
+    height: 2.5rem;
+    border: 0.2em solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.75s linear infinite;
 }
-#loading-spinner p {
-    color: var(--color-text-muted);
-    font-size: var(--text-base);
-    font-weight: 400;
-}
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { #loading-spinner .spinner { animation-duration: 1.5s; } }
+#loading-spinner p { margin-top: 1rem; font-size: var(--text-base); }
 
 /* <== READ ALOUD (read_aloud.js) ==> */
 .listen-button { min-width: 44px; display: inline-flex; align-items: center; justify-content: center; }

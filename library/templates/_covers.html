@@ -3,7 +3,7 @@
    underneath is the title, then a line in spaced small capitals.
    main.js builds the same markup for books loaded as you scroll. #}
 {% macro cover_card(href, label, title, meta=[], cover=None, attrs={}, img_attrs={}, classes='') %}
-<div class="col-6 col-sm-4 col-md-3 mb-3{% if classes %} {{ classes }}{% endif %}"{{ attrs|xmlattr }}>
+<div class="cover-card{% if classes %} {{ classes }}{% endif %}"{{ attrs|xmlattr }}>
     <div class="book">
         <a href="{{ href }}" aria-label="{{ label }}">
             {# The title in type sits under the image, so a cover that's slow

@@ -91,10 +91,10 @@
 .issue-wall .status-wanted .book-caption__author { color: var(--color-accent); }
 /* Denser than the books: seven across on a laptop, three on a phone, with
    a smaller label. */
-.library.row.issue-wall { grid-template-columns: repeat(7, 1fr); gap: 14px 18px; }
-@media (max-width: 991.98px) { .library.row.issue-wall { grid-template-columns: repeat(5, 1fr); } }
-@media (max-width: 767.98px) { .library.row.issue-wall { grid-template-columns: repeat(4, 1fr); gap: 12px 14px; } }
-@media (max-width: 640px)    { .library.row.issue-wall { grid-template-columns: repeat(3, 1fr); gap: 10px 12px; } }
+.library.issue-wall { grid-template-columns: repeat(7, 1fr); gap: 14px 18px; }
+@media (max-width: 991.98px) { .library.issue-wall { grid-template-columns: repeat(5, 1fr); } }
+@media (max-width: 767.98px) { .library.issue-wall { grid-template-columns: repeat(4, 1fr); gap: 12px 14px; } }
+@media (max-width: 640px)    { .library.issue-wall { grid-template-columns: repeat(3, 1fr); gap: 10px 12px; } }
 /* The number, then what it's up to (Up next, 50%, Read, Wanted, Out 1 Nov)
    on the same line. */
 .issue-wall .book-caption { flex-direction: row; align-items: baseline; gap: var(--space-2); margin-top: 6px; }

@@ -197,18 +197,6 @@ def get_book():
     return jsonify({"id": book_request.id, "status": book_request.status, "created": created}), 201 if created else 200
 
 
-@downloads_blueprint.patch("/api/book-requests/<int:request_id>")
-@json_admin_required
-def update_book_request(request_id):
-    book_request = _wanted_item(KIND_BOOK, request_id)
-    status = (request.get_json(silent=True) or {}).get("status")
-    if status not in (WANTED, SKIPPED):
-        return jsonify({"error": "A request can be wanted or skipped."}), 400
-    book_request.status = status
-    db.session.commit()
-    return jsonify({"id": book_request.id, "status": book_request.status})
-
-
 @downloads_blueprint.delete("/api/book-requests/<int:request_id>")
 @json_admin_required
 def delete_book_request(request_id):

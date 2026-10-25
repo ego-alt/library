@@ -140,7 +140,7 @@ function computeSkeletonCount() {
     // If we don't know the total yet (e.g. anonymous browse before first
     // /load_more response), assume a full page worth of cards.
     if (totalBooks == null) return SKELETON_COUNT;
-    const displayed = document.querySelectorAll('#library .col-md-3:not(.book-skeleton-wrapper)').length;
+    const displayed = document.querySelectorAll('#library .cover-card:not(.book-skeleton-wrapper)').length;
     return Math.min(SKELETON_COUNT, Math.max(0, totalBooks - displayed));
 }
 
@@ -151,7 +151,7 @@ function appendSkeletons(count) {
     const created = [];
     for (let i = 0; i < count; i++) {
         const el = document.createElement('div');
-        el.className = 'col-md-3 mb-3 book-skeleton-wrapper';
+        el.className = 'cover-card book-skeleton-wrapper';
         el.innerHTML = '<div class="book-skeleton" aria-hidden="true"></div>';
         grid.appendChild(el);
         created.push(el);
@@ -297,7 +297,7 @@ $(function() {
 
 // <== THE WALL'S MIRROR ==>
 function seedLoadedBooksFromDOM() {
-    document.querySelectorAll('#library .col-md-3').forEach((col) => {
+    document.querySelectorAll('#library .cover-card').forEach((col) => {
         const link = col.querySelector('a[href*="/read/"]');
         const img = col.querySelector('img');
         if (!link) return;  // (a cover that failed to load has no img)
@@ -769,7 +769,7 @@ function updateCoverEverywhere(filename, urls) {
     if (book) book.cover = coverUrl;
     const readHref = appUrl(`/read/${encodeURIComponent(filename)}`);
     document.querySelectorAll(`a[href="${CSS.escape(readHref)}"]`).forEach(link => {
-        const card = link.closest('.col-md-3');
+        const card = link.closest('.cover-card');
         if (!card) return;
         const img = card.querySelector('img');
         if (img) img.src = coverUrl;
@@ -1092,7 +1092,7 @@ function insertNewBook(book) {
     offset += 1;  // keep infinite scroll from re-fetching it
     rerenderLibrary();
     const link = document.querySelector(`#library a[href="${CSS.escape(appUrl(`/read/${encodeURIComponent(book.filename)}`))}"]`);
-    const card = link?.closest('.col-md-3');
+    const card = link?.closest('.cover-card');
     if (card) {
         card.classList.add('is-new');
         card.scrollIntoView({block: 'nearest', behavior: 'smooth'});

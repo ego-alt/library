@@ -29,7 +29,7 @@
 </div>
 {% endif %}
 {% if cards %}
-<div class="row library" id="library">
+<div class="library" id="library">
     {% for card in cards %}
     {% set s = card.series %}
     {% set attrs = {'data-name': s.name|lower, 'data-state': card.state, 'data-last': card.last, 'hidden': True if current_view != 'all' and card.state != current_view else None} %}

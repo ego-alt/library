@@ -46,7 +46,7 @@
             </div>
             {% endif %}
         </div>
-        <div class="row library" id="library">
+        <div class="library" id="library">
             {% for book in images %}
                 {% set label = book.title ~ (' by ' ~ book.author if book.author else '') %}
                 {% set pct = ((book.progress or 0) * 100)|round(0, 'floor')|int %}
@@ -89,7 +89,7 @@
         <div class="login-content">
             <button class="close-login btn btn-ghost" aria-label="Close">{{ icon('x') }}</button>
             <h3 id="loginTitle">Sign in</h3>
-            <div id="loginError" class="alert alert-danger" style="display: none;"></div>
+            <div id="loginError" class="login-error" style="display: none;"></div>
             <form id="loginForm" onsubmit="handleLogin(event)">
                 <div class="login-field">
                     <label class="meta-label" for="username">Username</label>

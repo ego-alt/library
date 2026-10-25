@@ -1009,7 +1009,6 @@ def process_chapter_content(
                     element["chapter-link"] = href_path
                     element["section-link"] = section
                     element["href"] = "javascript:void(0);"
-                    element["onclick"] = "handleChapterLink(this)"
 
         # Rewrite image refs to point at the asset URL route
         image_attributes = ["src", "href", "xlink:href"]
