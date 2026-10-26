@@ -149,10 +149,10 @@ def get_search_books():
     requested = {r.ol_key: r for r in BookRequest.query.filter(BookRequest.ol_key.in_([b["ol_key"] for b in found]))}
     owned = {}
     for book in Book.query.filter(Book.deleted_at.is_(None)).with_entities(Book.title, Book.author, Book.filename):
-        owned.setdefault((book.title or "").lower(), []).append((books._surname(book.author), book.filename))
+        owned.setdefault((book.title or "").lower(), []).append((books.author_surname(book.author), book.filename))
     for row in found:
         request_row = requested.get(row["ol_key"])
-        surname = books._surname(row.get("author"))
+        surname = books.author_surname(row.get("author"))
         match = next((filename for owner, filename in owned.get(row["title"].lower(), []) if not surname or not owner or owner == surname), None)
         if match is None and request_row is not None and request_row.book is not None:
             match = request_row.book.filename

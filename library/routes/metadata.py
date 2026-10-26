@@ -7,6 +7,7 @@ from ..choices import AccessLevelChoice, UserRoleChoice
 from ..models import Bookmark, BookProgressChoice, Tag, book_tags, db
 from ..utils import display_author, update_epub_cover
 from ._helpers import (
+    book_status,
     commit_or_rollback,
     cover_url,
     get_accessible_book_or_404,
@@ -15,14 +16,9 @@ from ._helpers import (
 
 metadata_blueprint = Blueprint("metadata_routes", __name__)
 
-def _book_status(book_id: int, user_id: int) -> str:
-    bookmark = Bookmark.query.filter_by(book_id=book_id, user_id=user_id).first()
-    return (bookmark.status if bookmark else BookProgressChoice.UNREAD).value
-
-
 def _list_book_tags(book_id: int, user_id: int) -> list[str]:
     """Return the custom tag names a user has on a book. Reading status is
-    separate (see _book_status)."""
+    separate (see book_status)."""
     user_tag_names = [
         name
         for (name,) in db.session.query(Tag.name)
@@ -135,7 +131,7 @@ def book_metadata(filename):
 
     if current_user.is_authenticated:
         response["tags"] = _list_book_tags(book.id, current_user.id)
-        response["status"] = _book_status(book.id, current_user.id)
+        response["status"] = book_status(book.id, current_user.id)
 
     return jsonify(response)
 

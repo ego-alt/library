@@ -35,7 +35,7 @@ def _title_words(title: str) -> list[str]:
     return words or _words(main)
 
 
-def _surname(author: str | None) -> str | None:
+def author_surname(author: str | None) -> str | None:
     """The first author's surname: "Ursula K. Le Guin" -> guin, "Terry
     Pratchett, Neil Gaiman" -> pratchett, catalogue-style "Judt, Tony" -> judt."""
     words = [w for w in _words((author or "").split(",")[0]) if w not in ("jr", "sr", "ii", "iii")]
@@ -55,7 +55,7 @@ def score_release(release, request: BookRequest, opts: dict, blocked: set[str]) 
     if len(present) < len(wanted):
         release.note = "Another title"
         return None
-    surname = _surname(request.author)
+    surname = author_surname(request.author)
     if surname and surname not in words:
         release.note = "No author name"
         return None
@@ -125,7 +125,7 @@ class BookKind:
     def queries(self, request: BookRequest) -> list[str]:
         """Title and author, then the title alone."""
         title = " ".join(re.split(r"[:(\[]", request.title, maxsplit=1)[0].split())
-        surname = _surname(request.author)
+        surname = author_surname(request.author)
         return [f"{title} {surname}", title] if surname else [title]
 
     def score(self, release, request, opts, blocked):

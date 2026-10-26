@@ -6,7 +6,7 @@ from flask import abort, current_app, jsonify, url_for
 from flask_login import current_user
 
 from ..choices import AccessLevelChoice, UserRoleChoice
-from ..models import Book, db
+from ..models import Book, Bookmark, BookProgressChoice, db
 from ..utils import COVER_STYLE, book_style_subset, spine_chapter_sizes
 
 
@@ -34,6 +34,12 @@ def json_admin_required(view):
         return view(*args, **kwargs)
 
     return wrapper
+
+
+def book_status(book_id: int, user_id: int) -> str:
+    """A user's reading status for a book: Unread, In Progress or Finished."""
+    bookmark = Bookmark.query.filter_by(book_id=book_id, user_id=user_id).first()
+    return (bookmark.status if bookmark else BookProgressChoice.UNREAD).value
 
 
 def get_book_or_404(filename: str, include_deleted: bool = False) -> Book:

@@ -29,6 +29,7 @@ from ..utils import (
 from ._helpers import (
     book_css,
     book_mtime,
+    book_status,
     commit_or_rollback,
     get_accessible_book_or_404,
     get_book_or_404,
@@ -62,9 +63,7 @@ def read_book(filename):
     if not user_can_access_book(book):
         abort(403, description="Forbidden")
     # So the reader doesn't offer to mark a finished book finished again.
-    finished = current_user.is_authenticated and db.session.query(
-        Bookmark.query.filter_by(user_id=current_user.id, book_id=book.id, status=BookProgressChoice.FINISHED).exists()
-    ).scalar()
+    finished = current_user.is_authenticated and book_status(book.id, current_user.id) == BookProgressChoice.FINISHED.value
     # The version keys the browser's offline copy of the book, so it changes
     # whenever the EPUB is rewritten.
     return render_template(

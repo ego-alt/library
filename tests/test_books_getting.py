@@ -47,10 +47,10 @@ def test_score_picks_the_epub_and_says_why_not_the_rest(app, wanted):
 
 
 def test_surname():
-    assert getting._surname("Ursula K. Le Guin") == "guin"
-    assert getting._surname("Terry Pratchett, Neil Gaiman") == "pratchett"
-    assert getting._surname("Judt, Tony") == "judt"
-    assert getting._surname("Martin Luther King Jr.") == "king"
+    assert getting.author_surname("Ursula K. Le Guin") == "guin"
+    assert getting.author_surname("Terry Pratchett, Neil Gaiman") == "pratchett"
+    assert getting.author_surname("Judt, Tony") == "judt"
+    assert getting.author_surname("Martin Luther King Jr.") == "king"
 
 
 class FakeClient:

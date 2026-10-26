@@ -933,10 +933,6 @@ function attachTagAutocomplete(input, container) {
     let visible = [];
     let highlight = -1;   // nothing picked until an arrow key moves to a suggestion
 
-    const takenLower = () => new Set(
-        Array.from(container.getElementsByClassName('tag'))
-            .map(t => t.textContent.replace(/×/g, '').trim().toLowerCase())
-    );
 
     function render() {
         dropdown.innerHTML = '';
@@ -958,7 +954,7 @@ function attachTagAutocomplete(input, container) {
     async function refresh() {
         const all = await fetchUserTags();
         const query = input.value.trim().toLowerCase();
-        const taken = takenLower();
+        const taken = new Set(tagNames(container));
         visible = all
             .filter(name => !taken.has(name.toLowerCase()))
             .filter(name => !query || name.toLowerCase().includes(query));
@@ -1055,11 +1051,16 @@ function initializeTagInput(inputId, containerId, initialTags = []) {
         }
     });
 }
+// The tags already in a tag box, lower-cased, for matching.
+function tagNames(container) {
+    return Array.from(container.getElementsByClassName('tag'))
+        .map(t => t.textContent.replace(/×/g, '').trim().toLowerCase());
+}
+
 function addTag(text, container) {
     const cleanText = text.replace(/×/g, '').trim();
     if (!cleanText) return;
-    const taken = Array.from(container.getElementsByClassName('tag')).map(t => t.textContent.trim().toLowerCase());
-    if (taken.includes(cleanText.toLowerCase())) return;
+    if (tagNames(container).includes(cleanText.toLowerCase())) return;
 
     // Build via DOM nodes so user-supplied tag text is never interpreted as HTML.
     const tag = document.createElement('span');
@@ -1228,7 +1229,7 @@ async function handleLogin(event) {
         if (response.ok) {
             // Sent here from a page that needs signing in: go back to it (same site only).
             const next = new URLSearchParams(location.search).get('next');
-            if (next && /^\/(?![\/\\])/.test(next) && !next.includes('\\')) location.assign(next);
+            if (next && next.startsWith('/') && !next.startsWith('//') && !next.includes('\\')) location.assign(next);
             else location.reload();
         } else {
             $('#loginError').text(data.error).show();

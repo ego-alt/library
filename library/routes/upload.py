@@ -9,7 +9,7 @@ from flask import Blueprint, current_app, jsonify, request
 from flask_login import current_user
 
 from ..books.files import generate_filename, has_toc
-from ..books.getting import _surname
+from ..books.getting import author_surname
 from ..models import Book, Tag, book_tags, db
 from ..utils import (
     cover_mimetype,
@@ -69,7 +69,7 @@ def _already_have(title: str, author: str) -> bool:
     if not title.strip():
         return False
     same_title = Book.query.filter(Book.deleted_at.is_(None), db.func.lower(Book.title) == title.strip().lower())
-    return any(_surname(b.author) == _surname(author) and user_can_access_book(b) for b in same_title)
+    return any(author_surname(b.author) == author_surname(author) and user_can_access_book(b) for b in same_title)
 
 
 @upload_blueprint.route("/upload_book", methods=["POST"])
