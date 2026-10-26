@@ -2,7 +2,7 @@ import io
 import os
 
 from library.books.files import generate_filename
-from library.models import Book
+from library.models import Book, db
 from tests._epub_builder import build_epub3
 
 # --- generate_filename ----------------------------------------------------------
@@ -71,6 +71,14 @@ def test_upload_book_stages_file_without_adding_it(standard_client, app, book_di
     assert (book_dir / ".incoming" / f"{payload['upload_id']}.epub").exists()
     assert [p.name for p in book_dir.glob("*.epub")] == []
     assert Book.query.count() == 0
+
+
+def test_staging_a_book_already_in_the_library_says_so(standard_client, app):
+    assert _stage(standard_client, title="Brave New World", author="Aldous Huxley")["already_have"] is False
+    db.session.add(Book(title="Brave new world", author="Huxley, Aldous", filename="bnw.epub"))
+    db.session.commit()
+    assert _stage(standard_client, title="Brave New World", author="Aldous Huxley")["already_have"] is True
+    assert _stage(standard_client, title="Brave New World", author="Someone Else")["already_have"] is False
 
 
 def test_upload_book_accepts_epub2_with_ncx_only(standard_client, monkeypatch):

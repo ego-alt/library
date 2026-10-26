@@ -41,3 +41,9 @@ def test_admin_required_endpoint_rejects_standard(standard_client, book):
 def test_admin_required_endpoint_rejects_anonymous(client, book):
     r = client.delete(f"/book/{book.filename}")
     assert r.status_code == 401
+
+
+def test_signed_out_pages_send_you_to_the_library_to_sign_in(client):
+    r = client.get("/comics/")
+    assert r.status_code == 302
+    assert r.headers["Location"].startswith("/?next=")

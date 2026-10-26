@@ -94,6 +94,12 @@ def test_tag_finished_marks_bookmark(standard_client, book, standard_user):
     assert bm.status == BookProgressChoice.FINISHED
 
 
+def test_reader_knows_a_finished_book_is_finished(standard_client, book):
+    assert b"window.BOOK_FINISHED = false" in standard_client.get(f"/read/{book.filename}").data
+    standard_client.post(f"/tag_finished/{book.filename}")
+    assert b"window.BOOK_FINISHED = true" in standard_client.get(f"/read/{book.filename}").data
+
+
 def test_tag_finished_requires_auth(client, book):
     r = client.post(f"/tag_finished/{book.filename}")
     assert r.status_code == 401
@@ -225,6 +231,14 @@ def test_bookmark_post_keeps_finished_status(standard_client, book, standard_use
 
 def test_missing_book_page_is_html_for_browsers(client):
     r = client.get("/read/nope.epub", headers={"Accept": "text/html,application/xhtml+xml"})
+    assert r.status_code == 404
+    assert b"This book isn't in the library" in r.data
+
+
+def test_missing_book_page_is_html_for_chrome(client):
+    """Chrome's Accept header ends with types at full weight that aren't HTML."""
+    chrome = "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7"
+    r = client.get("/read/nope.epub", headers={"Accept": chrome})
     assert r.status_code == 404
     assert b"This book isn't in the library" in r.data
 

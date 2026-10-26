@@ -9,6 +9,7 @@ from flask import Blueprint, current_app, jsonify, request
 from flask_login import current_user
 
 from ..books.files import generate_filename, has_toc
+from ..books.getting import _surname
 from ..models import Book, Tag, book_tags, db
 from ..utils import (
     cover_mimetype,
@@ -19,7 +20,12 @@ from ..utils import (
     guess_cover_mimetype_from_bytes,
     read_epub_cover,
 )
-from ._helpers import commit_or_rollback, cover_url, json_login_required
+from ._helpers import (
+    commit_or_rollback,
+    cover_url,
+    json_login_required,
+    user_can_access_book,
+)
 
 upload_blueprint = Blueprint("upload_routes", __name__)
 
@@ -55,6 +61,15 @@ def _sweep_incoming():
                 os.remove(path)
         except OSError:
             pass
+
+
+def _already_have(title: str, author: str) -> bool:
+    """Whether the library already has this book (same title, same author's
+    surname), so the review panel can say so before a second copy goes in."""
+    if not title.strip():
+        return False
+    same_title = Book.query.filter(Book.deleted_at.is_(None), db.func.lower(Book.title) == title.strip().lower())
+    return any(_surname(b.author) == _surname(author) and user_can_access_book(b) for b in same_title)
 
 
 @upload_blueprint.route("/upload_book", methods=["POST"])
@@ -111,6 +126,7 @@ def upload_book():
                 "author": metadata.get("author", ""),
                 "cover": cover,
                 "cover_path": cover_path,
+                "already_have": _already_have(metadata.get("title", ""), metadata.get("author", "")),
             }
         )
     except Exception as e:

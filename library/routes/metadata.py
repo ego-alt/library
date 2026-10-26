@@ -79,7 +79,8 @@ def book_metadata(filename):
         ):
             book.access_level = data["access_level"]
 
-        custom_tag_names = [t.strip() for t in data.get("tags", []) if t.strip()]
+        # A tag typed twice would break the (book, tag, user) unique key.
+        custom_tag_names = list(dict.fromkeys(t.strip()[:50] for t in data.get("tags", []) if t.strip()))
         status_value = data.get("status")
         if status_value is not None and status_value not in {
             c.value for c in BookProgressChoice

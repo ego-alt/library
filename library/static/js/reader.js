@@ -1118,7 +1118,7 @@ function nextChapter() {
 const FINISH_OFFER_AT = 0.9;
 let _finishOffered = false;
 function maybeOfferFinished() {
-    if (_finishOffered || !currentBook || !window.IS_AUTHENTICATED) return;
+    if (_finishOffered || window.BOOK_FINISHED || !currentBook || !window.IS_AUTHENTICATED) return;
     if (bookProgressFraction() < FINISH_OFFER_AT) return;
     _finishOffered = true;
     const offer = document.createElement('div');

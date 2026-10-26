@@ -430,7 +430,7 @@ function generateMetadataHtml(data, isUpload = false) {
     // --- Footer: timestamp on the left, actions on the right ---
     const created = (!isUpload && data.created_at)
         ? `<span class="meta-footer-info">Added ${escapeHtml(formatAddedDate(data.created_at))}</span>`
-        : `<span class="meta-footer-info"></span>`;
+        : `<span class="meta-footer-info">${isUpload && data.already_have ? 'You already have this book.' : ''}</span>`;
 
     const downloadButton = !isUpload
         ? `<a class="btn btn-ghost meta-download" href="${appUrl(`/download/${encodeURIComponent(data.filename)}`)}" download
@@ -746,6 +746,14 @@ $('#metadataOverlay').on('click', function(e) {
     if (e.target === this) requestCloseMetadata();
 });
 
+// A book that joins or leaves the shelf on screen moves the server's list
+// under us; shift the paging offset with it so the next page neither skips
+// nor repeats a book.
+function shiftLoaded(n) {
+    offset = Math.max(0, offset + n);
+    if (totalBooks != null) totalBooks = Math.max(0, totalBooks + n);
+}
+
 // After a save, the wall shows the new title, author and status at once; a
 // book whose status no longer fits the tab you're on leaves it.
 const VIEW_STATUS = {unread: 'Unread', reading: 'In Progress', finished: 'Finished'};
@@ -759,7 +767,10 @@ function updateBookOnWall(filename, metadata) {
         book.finished = metadata.status === 'Finished';
         if (metadata.status !== 'In Progress') book.progress = null;
         const wanted = VIEW_STATUS[shownView()];
-        if (wanted && wanted !== metadata.status) loadedBooks.splice(loadedBooks.indexOf(book), 1);
+        if (wanted && wanted !== metadata.status) {
+            loadedBooks.splice(loadedBooks.indexOf(book), 1);
+            shiftLoaded(-1);
+        }
     }
     rerenderLibrary();
     if (!loadedBooks.length) renderEmptyState();
@@ -805,6 +816,7 @@ async function deleteBook(filename) {
     // re-render doesn't bring it back. Keep both for Undo.
     const index = loadedBooks.findIndex(b => b.filename === filename);
     const removed = index !== -1 ? loadedBooks.splice(index, 1)[0] : null;
+    if (removed) shiftLoaded(-1);
     rerenderLibrary();
     closeMetadataOverlay();
 
@@ -826,6 +838,7 @@ async function restoreBook(filename, title, removed, index) {
     }
     if (removed) {
         loadedBooks.splice(Math.min(index, loadedBooks.length), 0, removed);
+        shiftLoaded(1);
         rerenderLibrary();
     }
     showToast(`Restored “${title}”`);
@@ -918,7 +931,7 @@ function attachTagAutocomplete(input, container) {
     input.insertAdjacentElement('afterend', dropdown);
 
     let visible = [];
-    let highlight = 0;
+    let highlight = -1;   // nothing picked until an arrow key moves to a suggestion
 
     const takenLower = () => new Set(
         Array.from(container.getElementsByClassName('tag'))
@@ -932,7 +945,6 @@ function attachTagAutocomplete(input, container) {
             return;
         }
         if (highlight >= visible.length) highlight = visible.length - 1;
-        if (highlight < 0) highlight = 0;
         visible.forEach((name, i) => {
             const el = document.createElement('div');
             el.className = 'tag-suggestion' + (i === highlight ? ' active' : '');
@@ -950,6 +962,7 @@ function attachTagAutocomplete(input, container) {
         visible = all
             .filter(name => !taken.has(name.toLowerCase()))
             .filter(name => !query || name.toLowerCase().includes(query));
+        highlight = -1;
         render();
     }
 
@@ -1000,7 +1013,7 @@ function attachTagAutocomplete(input, container) {
                 dropdown.style.display = 'none';
                 return true;
             }
-            if (e.key === 'Enter' && visible.length > 0) {
+            if (e.key === 'Enter' && highlight >= 0) {
                 e.preventDefault();
                 pick(highlight);
                 return true;
@@ -1045,6 +1058,8 @@ function initializeTagInput(inputId, containerId, initialTags = []) {
 function addTag(text, container) {
     const cleanText = text.replace(/×/g, '').trim();
     if (!cleanText) return;
+    const taken = Array.from(container.getElementsByClassName('tag')).map(t => t.textContent.trim().toLowerCase());
+    if (taken.includes(cleanText.toLowerCase())) return;
 
     // Build via DOM nodes so user-supplied tag text is never interpreted as HTML.
     const tag = document.createElement('span');
@@ -1092,8 +1107,7 @@ function insertNewBook(book) {
     $('.library-toolbar').prop('hidden', false);
     $('#library').show();
     loadedBooks.unshift(book);
-    if (totalBooks != null) totalBooks += 1;
-    offset += 1;  // keep infinite scroll from re-fetching it
+    shiftLoaded(1);  // keep infinite scroll from re-fetching it
     rerenderLibrary();
     const link = document.querySelector(`#library a[href="${CSS.escape(appUrl(`/read/${encodeURIComponent(book.filename)}`))}"]`);
     const card = link?.closest('.cover-card');
@@ -1212,7 +1226,10 @@ async function handleLogin(event) {
         const data = await response.json();
 
         if (response.ok) {
-            location.reload();
+            // Sent here from a page that needs signing in: go back to it (same site only).
+            const next = new URLSearchParams(location.search).get('next');
+            if (next && /^\/(?![\/\\])/.test(next) && !next.includes('\\')) location.assign(next);
+            else location.reload();
         } else {
             $('#loginError').text(data.error).show();
         }
@@ -1220,6 +1237,11 @@ async function handleLogin(event) {
         console.error('Login error:', error);
         $('#loginError').text("Couldn't reach the library. Try again.").show();
     }
+}
+
+// Sent here to sign in (a page that needs it redirects with ?next=).
+if (!window.isAuthenticated && new URLSearchParams(location.search).has('next') && document.getElementById('loginForm')) {
+    showLoginDialog();
 }
 
 // Close dialog when clicking outside or on close button

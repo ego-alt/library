@@ -92,14 +92,17 @@ def create_app(config_overrides: dict | None = None):
     @app.errorhandler(HTTPException)
     def handle_http_exception(e):
         # Pages opened in the browser get a readable page; API calls (fetch
-        # sends */*) keep getting JSON.
-        if request.accept_mimetypes.best == "text/html":
+        # sends */*) keep getting JSON. best_match, not best: Chrome lists
+        # several types at full weight and the last of them wins `best`.
+        if request.accept_mimetypes.best_match(["application/json", "text/html"]) == "text/html":
             return render_template("error.html", code=e.code), e.code
         return jsonify({"error": e.description}), e.code
 
     login_manager = LoginManager()
     login_manager.init_app(app)
-    login_manager.login_view = "auth.login"
+    # Signing in is a dialog on the library page (auth.login only takes the
+    # form's POST); it comes back to `next` afterwards.
+    login_manager.login_view = "index_routes.index"
 
     @login_manager.user_loader
     def load_user(user_id):

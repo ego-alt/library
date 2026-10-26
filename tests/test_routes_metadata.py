@@ -43,6 +43,12 @@ def test_post_metadata_creates_user_tags(standard_client, book, standard_user):
     assert {t.name for t in tags} == {"scifi", "favorite"}
 
 
+def test_a_tag_given_twice_is_saved_once(standard_client, book):
+    r = standard_client.post(f"/book_metadata/{book.filename}", json={"tags": ["scifi", " scifi ", "favorite"]})
+    assert r.status_code == 200
+    assert standard_client.get(f"/book_metadata/{book.filename}").get_json()["tags"] == ["scifi", "favorite"]
+
+
 def test_saving_without_status_leaves_it_alone(standard_client, book, standard_user):
     standard_client.post(f"/book_metadata/{book.filename}", json={"status": "Finished"})
     standard_client.post(f"/book_metadata/{book.filename}", json={"tags": ["x"]})

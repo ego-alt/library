@@ -31,6 +31,7 @@
         window.APP_ROOT = "{{ request.script_root }}";
         window.BOOK_VERSION = {{ book_version|tojson }};
         window.IS_AUTHENTICATED = {{ 'true' if current_user.is_authenticated else 'false' }};
+        window.BOOK_FINISHED = {{ 'true' if finished else 'false' }};
     </script>
     <title>{{ book.title }}</title>
     <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
