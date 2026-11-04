@@ -371,15 +371,16 @@ function generateMetadataHtml(data, isUpload = false) {
                   data-raw="${escapeHtml(data.author || '')}" data-shown="${escapeHtml(data.author_display || data.author || '')}">`
         : `<p id="${ids.author}" class="meta-author">${escapeHtml(data.author_display || data.author || 'Unknown author')}</p>`;
 
-    // --- Cover with hover overlay for admins ---
-    const coverChange = (isAdmin && !isUpload)
-        ? `<button type="button" class="meta-cover__change"
-                   data-action="change-cover" data-filename="${escapeHtml(data.filename)}">
-              ${icon('camera')}<span>Change cover</span>
+    // --- Cover: whoever can edit the book clicks it to choose a new one ---
+    // (an incoming book has no filename yet: its cover is applied once it's added)
+    const coverChange = editable
+        ? `<button type="button" class="meta-cover__change" aria-label="Change cover"
+                   data-action="change-cover" data-filename="${isUpload ? '' : escapeHtml(data.filename)}">
+              <span class="meta-cover__label">${icon('camera')}<span>Change cover</span></span>
            </button>`
         : '';
     const cover = `
-        <figure class="meta-cover${isAdmin && !isUpload ? ' meta-cover--editable' : ''}">
+        <figure class="meta-cover${editable ? ' meta-cover--editable' : ''}">
             <span class="cover-blank" aria-hidden="true">${escapeHtml(data.title || '')}</span>
             <img id="cover-preview-image" src="${escapeHtml(data.cover || '')}" onerror="this.hidden = true" onload="this.hidden = false"
                  alt="Cover of ${escapeHtml(data.title || 'this book')}">
@@ -690,19 +691,7 @@ function saveMetadata(filename) {
     // If a new cover is selected, update it on the server first
     function updateCover() {
         if (pendingCover && pendingCover.filename === filename) {
-            const formData = new FormData();
-            formData.append('cover', pendingCover.file);
-            formData.append('filename', filename);
-            return fetch(appUrl('/update_cover'), {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => {
-                if (!response.ok) {
-                    return response.json().then(data => new Promise((_, reject) => reject(data.error)));
-                }
-                return response.json();
-            })
+            return sendCover(filename, pendingCover.file)
             .then(data => {
                 document.getElementById('cover-preview-image').src = data.cover;
                 pendingCover = null;
@@ -778,6 +767,18 @@ function updateBookOnWall(filename, metadata) {
 
 // After a cover change, swap the new (versioned) thumbnail URL into the
 // book's card and into the mirror used to re-render the wall.
+// Upload a book's new cover; resolves to its {cover, thumb} urls, rejects with the reason.
+function sendCover(filename, file) {
+    const formData = new FormData();
+    formData.append('cover', file);
+    formData.append('filename', filename);
+    return fetch(appUrl('/update_cover'), {method: 'POST', body: formData})
+        .then(response => response.json().catch(() => ({})).then(data => {
+            if (!response.ok) throw data.error || "Couldn't change the cover. Try a JPG or PNG.";
+            return data;
+        }));
+}
+
 function updateCoverEverywhere(filename, urls) {
     const coverUrl = urls.thumb || urls.cover;
     const book = loadedBooks.find(b => b.filename === filename);
@@ -1163,9 +1164,19 @@ async function saveNewBook() {
     try {
         const book = await confirmUpload(body);
         pendingUpload = null;  // it's in the library now; nothing to discard
+        const newCover = pendingCover?.filename === '' ? pendingCover.file : null;
+        pendingCover = null;
         closeMetadataOverlay();
         insertNewBook(book);
         showToast(`Added “${book.title}”`);
+        if (newCover) {
+            // The cover chosen while adding it: the book has a filename now.
+            try {
+                updateCoverEverywhere(book.filename, await sendCover(book.filename, newCover));
+            } catch (err) {
+                showToast(`Added, but the cover didn't change: ${err}`, 'error');
+            }
+        }
     } catch (err) {
         button.text('Add to library').prop('disabled', false);
         showToast(err.message, 'error');

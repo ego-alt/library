@@ -118,7 +118,7 @@
     </div>
 
     <!-- Hidden input for cover image uploads -->
-    <input type="file" id="coverUploadInput" style="display: none;" onchange="handleCoverUpload(this.files)">
+    <input type="file" id="coverUploadInput" accept="image/*" style="display: none;" onchange="handleCoverUpload(this.files)">
 
 {% endblock %}
 {% block scripts %}
