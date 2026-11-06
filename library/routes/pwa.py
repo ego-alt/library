@@ -23,8 +23,8 @@ def manifest():
         "start_url": root,
         "scope": root,
         "display": "standalone",
-        "background_color": "#f6f4ef",
-        "theme_color": "#f6f4ef",
+        "background_color": "#141210",   # the night base: it opens dark, like the other apps
+        "theme_color": "#141210",
         "icons": [
             {"src": icon("icon-192.png"), "sizes": "192x192", "type": "image/png"},
             {"src": icon("icon-512.png"), "sizes": "512x512", "type": "image/png"},
