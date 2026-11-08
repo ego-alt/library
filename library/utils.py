@@ -728,7 +728,7 @@ def _walk_ncx_points(points, ncx_dir: str) -> list[dict]:
     return entries
 
 
-def _read_epub_toc(z, opf_root, rootfile_dir: str, manifest, spine_elem) -> list[dict]:
+def _read_epub_toc(z, rootfile_dir: str, manifest, spine_elem) -> list[dict]:
     """Return raw TOC entries (with full zip paths). Prefers EPUB3 nav doc, falls back to EPUB2 NCX."""
     nav_item = next(
         (m for m in manifest.values() if "nav" in (m.get("properties") or "").split()),
@@ -937,7 +937,7 @@ def get_epub_structure(epub_path: str) -> dict:
             )
 
         # 1) Publisher's nav/NCX
-        toc_raw = _read_epub_toc(z, root, rootfile_dir, manifest, spine_elem)
+        toc_raw = _read_epub_toc(z, rootfile_dir, manifest, spine_elem)
         toc = _resolve_toc_to_spine(toc_raw, spine_paths)
 
         # 2) An in-content Contents page (covers "calibre-y" EPUBs whose NCX is

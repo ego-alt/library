@@ -199,10 +199,11 @@ function initDownloadLists() {
         const retry = d.item ? {label: 'Try another release', onClick: () => act(`/api/downloads/${d.id}/retry`, 'POST', 'Looking for another release')} : null;
         // A failure's reason heads its menu; the row itself stays one line.
         const why = showError ? {note: d.error} : null;
+        // Once it's being added to the library it's too late to cancel (pipeline.cancel).
         const actions = where === 'active'
-            ? [{label: 'Cancel…', danger: true, onClick: () => confirmMenu(more, `Cancel ${label}?`, [{label: 'Keep downloading'}, {label: 'Cancel the download', danger: true, onClick: () => act(`/api/downloads/${d.id}/cancel`, 'POST', 'Cancelled')}])}]
+            ? d.status === 'importing' ? [] : [{label: 'Cancel…', danger: true, onClick: () => confirmMenu(more, `Cancel ${label}?`, [{label: 'Keep downloading'}, {label: 'Cancel the download', danger: true, onClick: () => act(`/api/downloads/${d.id}/cancel`, 'POST', 'Cancelled')}])}]
             : [why, retry, d.item ? {label: 'Stop looking…', danger: true, onClick: () => stopLooking(d, more)} : null, {label: 'Dismiss', onClick: () => act(`/api/downloads/${d.id}`, 'DELETE', 'Dismissed')}];
-        const more = h('button', {type: 'button', class: 'entry__more', 'aria-label': `More for ${label}`, dataset: {menuAnchor: ''}, onclick: (e) => openMenu(e.currentTarget, actions)}, iconEl('ellipsis'));
+        const more = !actions.length ? h('span', {class: 'entry__more', 'aria-hidden': 'true'}) : h('button', {type: 'button', class: 'entry__more', 'aria-label': `More for ${label}`, dataset: {menuAnchor: ''}, onclick: (e) => openMenu(e.currentTarget, actions)}, iconEl('ellipsis'));
         // One line: what it is, then its state on the right (like Wanted's
         // dates). When, the release, indexer and size are in its tooltip.
         return h('li', {class: 'entry', title: [d.title, d.indexer, formatSize(d.size), timeAgo(d.updated_at || d.created_at), showError ? d.error : null].filter(Boolean).join(' · ')},
