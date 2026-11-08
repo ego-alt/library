@@ -25,13 +25,18 @@ from ..models import _utcnow, db
 from . import clients, indexers
 from .models import (
     DL_ACTIVE,
+    DL_BLOCKED,
+    DL_CANCELLED,
     DL_DONE,
     DL_DOWNLOADING,
     DL_FAILED,
     DL_IMPORTING,
-    SNATCHED,
+    DOWNLOADED,
     WANTED,
     Download,
+    set_wanted,
+    snatched,
+    unsnatched,
 )
 
 logger = logging.getLogger(__name__)
@@ -65,7 +70,7 @@ def find_releases(kind: str, item, cache: dict | None = None) -> tuple[list[inde
     kind_handler = handler(kind)
     opts = settings.get_all()
     cache = cache if cache is not None else {}
-    blocked = {d.title for d in Download.query.filter_by(status=DL_FAILED, **{kind_handler.fk: item.id})}
+    blocked = {d.title for d in Download.query.filter(Download.status.in_(DL_BLOCKED)).filter_by(**{kind_handler.fk: item.id})}
     found, errors = [], []
     for indexer in opts["indexers"]:
         if not indexer.get("enabled", True) or not indexer.get("url"):
@@ -109,7 +114,7 @@ def grab(kind: str, item, release: indexers.Release) -> Download:
         db.session.commit()
         raise
     download.status = DL_DOWNLOADING
-    item.status = SNATCHED
+    snatched(item)
     db.session.commit()
     return download
 
@@ -149,12 +154,11 @@ def search_wanted(limit: int = 50) -> int:
     return grabbed
 
 
-def fail(download: Download, error: str) -> None:
-    download.status = DL_FAILED
+def fail(download: Download, error: str, status: str = DL_FAILED) -> None:
+    download.status = status
     download.error = error
-    item = download.item
-    if item is not None and item.status == SNATCHED:
-        item.status = WANTED
+    if download.item is not None:
+        unsnatched(download.item)
     db.session.commit()
 
 
@@ -203,7 +207,13 @@ def check_downloads() -> int:
     how many are still active."""
     client_problems.clear()
     for download in Download.query.filter(Download.status.in_(DL_ACTIVE)).all():
-        if download.status == DL_IMPORTING:
+        # Only this worker imports, one download at a time, so one still
+        # importing was cut off by a restart. If its file made it in, it's
+        # done; otherwise it's imported again (which replaces what's there).
+        if download.status == DL_IMPORTING and download.item is not None and download.item.status == DOWNLOADED:
+            download.status = DL_DONE
+            download.progress = 1.0
+            db.session.commit()
             continue
         try:
             state = clients.client_for(download.protocol, download.client).state(download.client_ref)
@@ -236,21 +246,27 @@ def mark_imported(kind: str, item_ids: list[int]) -> None:
     db.session.commit()
 
 
+class ImportingError(Exception):
+    """It's being added to the library: too late to cancel."""
+
+
 def cancel(download: Download) -> None:
+    if download.status == DL_IMPORTING:
+        raise ImportingError
     try:
         clients.client_for(download.protocol, download.client).remove(download.client_ref)
     except clients.ClientError:
         pass
-    fail(download, "Cancelled.")
+    fail(download, "Cancelled.", DL_CANCELLED)
 
 
 def retry(download: Download) -> Download | None:
     """Block this release and grab the next best, if any."""
     if download.status in DL_ACTIVE:
         cancel(download)
-    download.status = DL_FAILED
     item = download.item
-    if item is not None and item.status != "downloaded":
-        item.status = WANTED
+    if item is None:
+        return None
+    set_wanted(item, WANTED)
     db.session.commit()
-    return search_item(download.kind, item) if item is not None else None
+    return search_item(download.kind, item)

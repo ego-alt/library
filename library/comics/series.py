@@ -3,7 +3,7 @@ up to date."""
 
 from datetime import date, datetime, timedelta
 
-from ..downloads.models import DOWNLOADED, SKIPPED, SNATCHED, WANTED
+from ..downloads.models import SKIPPED, WANTED, set_wanted
 from ..models import _utcnow, db
 from . import names
 from .models import MONITOR_ALL, MONITOR_FUTURE, ComicIssue, ComicSeries
@@ -25,8 +25,6 @@ def _apply_series(series: ComicSeries, data: dict) -> None:
 
 def _status_for_new_issue(series: ComicSeries, issue: ComicIssue, first_sync: bool) -> str:
     """Whether an issue we've just learned about is wanted."""
-    if issue.filename:
-        return DOWNLOADED
     if series.monitor == MONITOR_ALL:
         return WANTED
     if series.monitor == MONITOR_FUTURE:
@@ -65,7 +63,7 @@ def sync_issues(series: ComicSeries, rows: list[dict], first_sync: bool = False)
             if row.get(key) not in (None, ""):
                 setattr(issue, key, row[key])
         if is_new:
-            issue.status = _status_for_new_issue(series, issue, first_sync)
+            set_wanted(issue, _status_for_new_issue(series, issue, first_sync))
         by_provider_id[issue.provider_id] = issue
         by_number[number] = issue
     # Metron gives no series cover: use the first issue's.
@@ -127,14 +125,12 @@ def set_monitor(series: ComicSeries, monitor: str) -> int:
     issues are wanted now."""
     series.monitor = monitor
     for issue in series.issues:
-        if issue.status in (DOWNLOADED, SNATCHED) or issue.filename:
-            continue
         if monitor == MONITOR_ALL:
-            issue.status = WANTED
+            set_wanted(issue, WANTED)
         elif monitor == MONITOR_FUTURE:
-            issue.status = WANTED if not issue.released else SKIPPED
+            set_wanted(issue, WANTED if not issue.released else SKIPPED)
         else:
-            issue.status = SKIPPED
+            set_wanted(issue, SKIPPED)
     db.session.commit()
     return sum(1 for i in series.issues if i.status == WANTED)
 

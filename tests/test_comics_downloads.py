@@ -10,9 +10,11 @@ from library.comics import downloads, providers
 from library.comics.models import ComicIssue, ComicSeries
 from library.downloads import clients, indexers, pipeline
 from library.downloads.models import (
+    DL_CANCELLED,
     DL_DONE,
     DL_DOWNLOADING,
     DL_FAILED,
+    DL_IMPORTING,
     DOWNLOADED,
     SKIPPED,
     SNATCHED,
@@ -145,6 +147,61 @@ def test_done_but_invisible_path_fails_with_a_hint(app, comic_dir, issue, fake_c
     fake_client.states[download.client_ref] = clients.JobState("done", 1.0, "/nowhere/Saga")
     pipeline.check_downloads()
     assert download.status == DL_FAILED and "where finished downloads are" in download.error
+
+
+def test_an_import_cut_off_by_a_restart_is_done_again(app, comic_dir, tmp_path, issue, fake_client):
+    pipeline.search_wanted()
+    download = ComicDownload.query.one()
+    done = tmp_path / "complete" / "Saga 066"
+    done.mkdir(parents=True)
+    make_cbz(done / "Saga 066 (2024).cbz")
+    fake_client.states[download.client_ref] = clients.JobState("done", 1.0, str(done))
+    download.status = DL_IMPORTING  # as finish() leaves it when the worker stops mid-import
+    db.session.commit()
+    assert pipeline.check_downloads() == 0
+    assert download.status == DL_DONE and issue.status == DOWNLOADED
+
+
+def test_an_import_cut_off_after_its_file_went_in_is_done(app, issue, fake_client):
+    pipeline.search_wanted()
+    download = ComicDownload.query.one()
+    download.status = DL_IMPORTING
+    issue.status = DOWNLOADED
+    db.session.commit()
+    fake_client.states[download.client_ref] = clients.JobState("done", 1.0, "/gone")
+    assert pipeline.check_downloads() == 0
+    assert download.status == DL_DONE and download.error is None
+
+
+def test_cancelled_is_its_own_status_and_blocks_that_release(app, admin_client, issue, fake_client):
+    pipeline.search_wanted()
+    download = ComicDownload.query.one()
+    assert admin_client.post(f"/api/downloads/{download.id}/cancel").status_code == 200
+    assert download.status == DL_CANCELLED and issue.status == WANTED
+    assert admin_client.get("/api/downloads").get_json()["attention"] == []
+    pipeline.search_wanted()
+    assert fake_client.added[-1][1] == "Saga 066 (2024) (webrip)"
+
+
+def test_an_importing_download_cant_be_cancelled(app, admin_client, issue, fake_client):
+    pipeline.search_wanted()
+    download = ComicDownload.query.one()
+    download.status = DL_IMPORTING
+    db.session.commit()
+    assert admin_client.post(f"/api/downloads/{download.id}/cancel").status_code == 409
+    assert admin_client.post(f"/api/downloads/{download.id}/retry").status_code == 409
+    assert download.status == DL_IMPORTING
+
+
+def test_a_downloading_issue_cant_be_wanted_again(app, admin_client, issue, fake_client):
+    """Or the next search would grab a second release while the first runs."""
+    pipeline.search_wanted()
+    for status in (WANTED, SKIPPED):
+        r = admin_client.patch(f"/comics/api/issues/{issue.id}", json={"status": status})
+        assert r.status_code == 409 and "downloading" in r.get_json()["error"]
+    assert issue.status == SNATCHED
+    assert admin_client.post("/comics/api/issues/bulk", json={"ids": [issue.id], "status": SKIPPED}).get_json()["changed"] == 0
+    assert issue.status == SNATCHED
 
 
 def test_unreleased_issues_are_not_searched(app, issue, fake_client):

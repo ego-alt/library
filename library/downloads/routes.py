@@ -45,6 +45,7 @@ from . import clients, indexers, jobs, pipeline
 from .models import (
     DL_ACTIVE,
     DL_FAILED,
+    DL_IMPORTING,
     KIND_BOOK,
     KIND_COMIC,
     KINDS,
@@ -201,6 +202,8 @@ def get_book():
 @json_admin_required
 def delete_book_request(request_id):
     book_request = _wanted_item(KIND_BOOK, request_id)
+    if any(d.status == DL_IMPORTING for d in book_request.downloads):
+        return jsonify({"error": "It's being added to the library. Too late to cancel."}), 409
     for download in book_request.downloads:
         if download.status in DL_ACTIVE:
             pipeline.cancel(download)
@@ -283,7 +286,7 @@ def activity():
     latest = {}
     for d in Download.query.order_by(Download.created_at.desc()):
         latest.setdefault((d.kind, d.issue_id or d.book_request_id), d.id)
-    attention = [d for d in finished if d.status == DL_FAILED and d.item is not None and d.item.status == WANTED and d.error != "Cancelled." and latest.get((d.kind, d.issue_id or d.book_request_id)) == d.id]
+    attention = [d for d in finished if d.status == DL_FAILED and d.item is not None and d.item.status == WANTED and latest.get((d.kind, d.issue_id or d.book_request_id)) == d.id]
     worker = jobs.status()
     failed_jobs = [job for job in jobs.JOBS if worker.get(job) and not worker[job].get("ok", True)]
     return jsonify({
@@ -307,7 +310,10 @@ def run_job(job):
 @json_admin_required
 def cancel_download(download_id):
     download = db.session.get(Download, download_id) or abort(404)
-    pipeline.cancel(download)
+    try:
+        pipeline.cancel(download)
+    except pipeline.ImportingError:
+        return jsonify({"error": "It's being added to the library. Too late to cancel."}), 409
     return jsonify(download_json(download))
 
 
@@ -318,7 +324,10 @@ def retry_download(download_id):
     download = db.session.get(Download, download_id) or abort(404)
     if download.item is None:
         return jsonify({"error": "That isn't wanted any more."}), 404
-    grabbed = pipeline.retry(download)
+    try:
+        grabbed = pipeline.retry(download)
+    except pipeline.ImportingError:
+        return jsonify({"error": "It's being added to the library. Too late to cancel."}), 409
     if grabbed is None:
         return jsonify({"found": False, "message": "Nothing else yet. It'll be looked for again."})
     return jsonify(download_json(grabbed))

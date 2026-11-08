@@ -9,7 +9,7 @@ import unicodedata
 from flask import url_for
 
 from ..downloads import pipeline
-from ..downloads.models import DOWNLOADED, KIND_BOOK, WANTED, Download
+from ..downloads.models import KIND_BOOK, WANTED, Download, downloaded, set_wanted
 from ..models import db
 from .files import NotABookError, add_epub
 from .models import BookRequest
@@ -109,7 +109,7 @@ def import_epub(path: str, request: BookRequest | None, keep: bool = False):
     if request is None:
         return add_epub(path, keep_source=keep)
     book = add_epub(path, title=request.title, author=request.author, uploaded_by=request.requested_by, keep_source=keep)
-    request.status = DOWNLOADED
+    downloaded(request)
     request.book_id = book.id
     db.session.commit()
     return book
@@ -157,8 +157,7 @@ def request_book(found: dict, user_id: int | None) -> tuple[BookRequest, bool]:
     """Ask for a book found on Open Library. Returns (request, new)."""
     existing = BookRequest.query.filter_by(ol_key=found.get("ol_key")).first() if found.get("ol_key") else None
     if existing is not None:
-        if existing.status not in (DOWNLOADED, "snatched"):
-            existing.status = WANTED
+        if set_wanted(existing, WANTED):
             db.session.commit()
         return existing, False
     request = BookRequest(ol_key=found.get("ol_key"), title=(found.get("title") or "").strip()[:300], author=(found.get("author") or "").strip()[:200] or None, year=found.get("year"), cover_url=found.get("cover_url"), requested_by=user_id)

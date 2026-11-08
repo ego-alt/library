@@ -23,7 +23,7 @@ from flask_login import current_user, login_required
 from werkzeug.utils import secure_filename
 
 from ..downloads import clients, jobs
-from ..downloads.models import SKIPPED, SNATCHED, WANTED
+from ..downloads.models import DOWNLOADED, SKIPPED, SNATCHED, WANTED, set_wanted
 from ..models import db
 from ..routes._helpers import json_admin_required, json_login_required
 from ..utils import make_thumbnail
@@ -371,9 +371,11 @@ def update_issue(issue_id):
     status = data.get("status")
     if status not in (WANTED, SKIPPED):
         return jsonify({"error": "An issue can be set to wanted or skipped."}), 400
-    if issue.filename:
+    if issue.status == DOWNLOADED:
         return jsonify({"error": "You already have that issue."}), 409
-    issue.status = status
+    if issue.status == SNATCHED:
+        return jsonify({"error": "It's downloading. Cancel it first, on the Downloads page."}), 409
+    set_wanted(issue, status)
     db.session.commit()
     return jsonify(issue_json(issue))
 
@@ -387,10 +389,7 @@ def bulk_update_issues():
         return jsonify({"error": "Issues can be set to wanted or skipped."}), 400
     changed = 0
     for issue in ComicIssue.query.filter(ComicIssue.id.in_([int(i) for i in data.get("ids", [])])):
-        if issue.filename or issue.status == SNATCHED:
-            continue
-        issue.status = status
-        changed += 1
+        changed += set_wanted(issue, status)
     db.session.commit()
     if status == WANTED and changed:
         jobs.request_run("search")

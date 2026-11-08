@@ -3,8 +3,9 @@
 A series comes from one metadata provider (ComicVine or Metron), or is "local"
 when it was made from files with no provider match. Issue status is what
 Mylar calls it: wanted issues get searched for, snatched ones are downloading,
-downloaded ones have a file in COMIC_DIR. Downloads themselves are shared with
-books (downloads/models.py).
+downloaded ones have a file in COMIC_DIR. It's changed only through the
+functions in downloads/models.py, where downloads themselves (shared with
+books) live too.
 """
 
 from datetime import date

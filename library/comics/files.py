@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from flask import current_app
 
 from .. import settings
-from ..downloads.models import DOWNLOADED, SKIPPED
+from ..downloads.models import downloaded, file_removed
 from ..models import db
 from . import archive, names
 from .models import ComicIssue, ComicSeries
@@ -122,7 +122,7 @@ def import_file(src: str, issue: ComicIssue, *, remove_source: bool = True) -> C
     issue.file_size = os.path.getsize(dest)
     issue.page_count = pages
     issue.original_filename = original
-    issue.status = DOWNLOADED
+    downloaded(issue)
     db.session.commit()
     if remove_source and os.path.abspath(src) != os.path.abspath(dest):
         try:
@@ -168,5 +168,5 @@ def delete_file(issue: ComicIssue) -> None:
     issue.filename = None
     issue.file_size = None
     issue.page_count = None
-    issue.status = SKIPPED
+    file_removed(issue)
     db.session.commit()
