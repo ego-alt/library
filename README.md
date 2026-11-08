@@ -87,7 +87,7 @@ APPLICATION_ROOT=/library
 
 Leave both unset for standalone development. Accounts are created on first visit.
 
-Commits merged to `master` that pass CI deploy to the Pi on their own (see the dashboard README). The container applies database migrations when it starts; release notes are in [`MIGRATION.md`](MIGRATION.md).
+Commits merged to `master` that pass CI deploy to the Pi on their own (see the dashboard README). The container applies database migrations when it starts, so an existing install upgrades by pulling (each migration's notes are in `migrations/versions/`).
 
 ## Commands
 

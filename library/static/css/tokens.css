@@ -6,7 +6,7 @@
  * colour) and gold at night (lamplight on the warm dark). Tapes is Gruvbox
  * orange, calendar Gruvbox green. The light, grain and frosted panes are in
  * index.css; the reader's own calmer page is in reader.css.
- * Role names follow dashboard/docs/ui-spec.md. */
+ * Role names follow dashboard/docs/design.md. */
 :root {
     /* Spacing (× 4px) */
     --space-1: 4px;
