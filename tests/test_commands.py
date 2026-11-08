@@ -108,14 +108,14 @@ def test_backup_db_ignores_unrelated_files_when_rotating(file_backed_app, tmp_pa
 
 
 def test_purge_trash_command_removes_expired_books(file_backed_app):
-    from datetime import datetime, timedelta
+    from datetime import datetime, timedelta, timezone
 
     from library.commands import purge_trash_command
 
     app, _ = file_backed_app
     with app.app_context():
         book = Book.query.one()
-        book.deleted_at = datetime.utcnow() - timedelta(days=45)
+        book.deleted_at = datetime.now(timezone.utc) - timedelta(days=45)
         db.session.commit()
     result = app.test_cli_runner().invoke(purge_trash_command)
     assert "Purged 1 book(s)" in result.output

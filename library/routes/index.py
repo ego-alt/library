@@ -349,8 +349,7 @@ def purge_trash(retention_days=None):
     the number purged."""
     if retention_days is None:
         retention_days = current_app.config.get("TRASH_RETENTION_DAYS", 30)
-    # SQLite hands back naive datetimes, so compare against a naive UTC cutoff.
-    cutoff = (_utcnow() - timedelta(days=retention_days)).replace(tzinfo=None)
+    cutoff = _utcnow() - timedelta(days=retention_days)
     expired = Book.query.filter(
         Book.deleted_at.isnot(None), Book.deleted_at < cutoff
     ).all()

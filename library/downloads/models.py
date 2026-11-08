@@ -8,7 +8,7 @@ A download's status is only changed in downloads/pipeline.py, and a wanted
 thing's only through the functions below (tests/test_states.py checks both).
 """
 
-from ..models import _utcnow, db
+from ..models import UtcDateTime, _utcnow, db
 
 KIND_COMIC = "comic"
 KIND_BOOK = "book"
@@ -83,8 +83,8 @@ class Download(db.Model):
     progress = db.Column(db.Float, default=0)
     error = db.Column(db.Text)
     path = db.Column(db.String(1000))  # where the client put the finished files
-    created_at = db.Column(db.DateTime, nullable=False, default=_utcnow)
-    updated_at = db.Column(db.DateTime, nullable=False, default=_utcnow, onupdate=_utcnow)
+    created_at = db.Column(UtcDateTime, nullable=False, default=_utcnow)
+    updated_at = db.Column(UtcDateTime, nullable=False, default=_utcnow, onupdate=_utcnow)
 
     issue = db.relationship("ComicIssue", back_populates="downloads")
     book_request = db.relationship("BookRequest", back_populates="downloads")

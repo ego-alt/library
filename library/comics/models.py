@@ -11,7 +11,7 @@ books) live too.
 from datetime import date
 
 from ..downloads.models import SKIPPED
-from ..models import _utcnow, db
+from ..models import UtcDateTime, _utcnow, db
 
 # Which issues of a series are wanted: every missing one, only those released
 # from now on, or none (you mark them yourself).
@@ -39,8 +39,8 @@ class ComicSeries(db.Model):
     monitor = db.Column(db.String(10), nullable=False, default=MONITOR_FUTURE)
     # Folder under COMIC_DIR holding this series' files.
     folder = db.Column(db.String(400))
-    added_at = db.Column(db.DateTime, nullable=False, default=_utcnow)
-    refreshed_at = db.Column(db.DateTime)
+    added_at = db.Column(UtcDateTime, nullable=False, default=_utcnow)
+    refreshed_at = db.Column(UtcDateTime)
 
     issues = db.relationship("ComicIssue", back_populates="series", cascade="all, delete-orphan", order_by="ComicIssue.sort_number")
 
@@ -71,9 +71,9 @@ class ComicIssue(db.Model):
     file_size = db.Column(db.Integer)
     page_count = db.Column(db.Integer)
     original_filename = db.Column(db.String(500))
-    added_at = db.Column(db.DateTime, nullable=False, default=_utcnow)
+    added_at = db.Column(UtcDateTime, nullable=False, default=_utcnow)
     # When the indexers were last asked for it (wanted issues only).
-    searched_at = db.Column(db.DateTime)
+    searched_at = db.Column(UtcDateTime)
 
     series = db.relationship("ComicSeries", back_populates="issues")
     downloads = db.relationship("Download", back_populates="issue", passive_deletes=True)
@@ -98,6 +98,6 @@ class ComicProgress(db.Model):
     issue_id = db.Column(db.Integer, db.ForeignKey("comic_issues.id", ondelete="CASCADE"), nullable=False)
     page = db.Column(db.Integer, nullable=False, default=0)
     finished = db.Column(db.Boolean, nullable=False, default=False)
-    updated_at = db.Column(db.DateTime, nullable=False, default=_utcnow, onupdate=_utcnow)
+    updated_at = db.Column(UtcDateTime, nullable=False, default=_utcnow, onupdate=_utcnow)
 
     __table_args__ = (db.UniqueConstraint("user_id", "issue_id", name="uq_comic_progress_user_issue"),)

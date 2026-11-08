@@ -158,7 +158,7 @@ def test_view_mine_orders_by_last_read_desc(standard_client, app, book_dir):
     db.session.add_all([a, b])
     db.session.commit()
 
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = datetime.now(timezone.utc)
     db.session.add(Bookmark(user_id=1, book_id=a.id,
                             status=BookProgressChoice.IN_PROGRESS,
                             last_read=now - timedelta(days=2)))
@@ -299,17 +299,17 @@ def test_restore_requires_admin(standard_client, book):
 
 
 def test_purge_trash_removes_only_expired_books(app, book, book_dir):
-    from datetime import datetime, timedelta
+    from datetime import datetime, timedelta, timezone
 
     from library.routes.index import purge_trash
 
     epub_path = os.path.join(app.config["BOOK_DIR"], book.filename)
-    book.deleted_at = datetime.utcnow() - timedelta(days=5)
+    book.deleted_at = datetime.now(timezone.utc) - timedelta(days=5)
     db.session.commit()
     assert purge_trash(retention_days=30) == 0
     assert os.path.exists(epub_path)
 
-    book.deleted_at = datetime.utcnow() - timedelta(days=31)
+    book.deleted_at = datetime.now(timezone.utc) - timedelta(days=31)
     db.session.commit()
     assert purge_trash(retention_days=30) == 1
     assert not os.path.exists(epub_path)
@@ -317,12 +317,12 @@ def test_purge_trash_removes_only_expired_books(app, book, book_dir):
 
 
 def test_purge_trash_succeeds_even_when_file_missing(app, book):
-    from datetime import datetime, timedelta
+    from datetime import datetime, timedelta, timezone
 
     from library.routes.index import purge_trash
 
     os.remove(os.path.join(app.config["BOOK_DIR"], book.filename))
-    book.deleted_at = datetime.utcnow() - timedelta(days=31)
+    book.deleted_at = datetime.now(timezone.utc) - timedelta(days=31)
     db.session.commit()
     assert purge_trash(retention_days=30) == 1
     assert Book.query.count() == 0

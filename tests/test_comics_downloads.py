@@ -302,10 +302,10 @@ def test_skipped_issue_is_not_searched(app, issue, fake_client):
 
 
 def test_search_records_when_and_takes_the_longest_waiting_first(app, issue, fake_client, monkeypatch):
-    from datetime import datetime, timedelta
+    from datetime import datetime, timedelta, timezone
 
-    other = ComicIssue(series=issue.series, number="67", sort_number=67, status=WANTED, cover_date=issue.cover_date, searched_at=datetime(2026, 1, 1))
-    issue.searched_at = datetime(2026, 1, 1) + timedelta(days=1)
+    other = ComicIssue(series=issue.series, number="67", sort_number=67, status=WANTED, cover_date=issue.cover_date, searched_at=datetime(2026, 1, 1, tzinfo=timezone.utc))
+    issue.searched_at = datetime(2026, 1, 1, tzinfo=timezone.utc) + timedelta(days=1)
     db.session.add(other)
     db.session.commit()
     seen = []

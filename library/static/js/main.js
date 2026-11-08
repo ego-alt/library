@@ -486,9 +486,10 @@ function generateMetadataHtml(data, isUpload = false) {
 let pendingCover = null;  // {filename, file}
 
 // "2026-05-10 13:45:53" (UTC) -> "10 May 2026" in the reader's own locale.
-function formatAddedDate(utcString) {
-    const d = new Date(utcString.replace(' ', 'T') + 'Z');
-    if (Number.isNaN(d.getTime())) return utcString.split(' ')[0];
+/** "8 Nov 2026" in the viewer's zone, from a time sent with its zone. */
+function formatAddedDate(iso) {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '';
     return d.toLocaleDateString(undefined, {day: 'numeric', month: 'short', year: 'numeric'});
 }
 

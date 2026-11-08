@@ -121,7 +121,7 @@ def book_metadata(filename):
         "title": book.title,
         "author": book.author,
         "author_display": display_author(book.author),
-        "created_at": book.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+        "created_at": book.created_at.isoformat(timespec="seconds"),
         "tags": [],
         "status": BookProgressChoice.UNREAD.value,
         "filename": book.filename,

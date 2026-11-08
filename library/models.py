@@ -3,6 +3,8 @@ from datetime import datetime, timezone
 
 from flask_login import UserMixin
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import DateTime
+from sqlalchemy.types import TypeDecorator
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from .choices import BookProgressChoice, UserRoleChoice
@@ -13,6 +15,28 @@ def _utcnow():
 
 
 db = SQLAlchemy()
+
+
+class UtcDateTime(TypeDecorator):
+    """A moment stored as naive UTC (SQLite keeps no zone) and always read back
+    as aware UTC, so code never mixes the two and isoformat() ends in +00:00,
+    which browsers read correctly (a time without a zone they read as local).
+    Every timestamp column uses it (tests/test_timestamps.py)."""
+
+    impl = DateTime
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            raise ValueError("UtcDateTime needs an aware datetime, not a naive one")
+        return value.astimezone(timezone.utc).replace(tzinfo=None)
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return None
+        return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
 
 # Junction table for book tags
 book_tags = db.Table(
@@ -47,7 +71,7 @@ class User(UserMixin, db.Model):
     role = db.Column(
         db.Enum(UserRoleChoice), nullable=False, default=UserRoleChoice.STANDARD
     )
-    created_at = db.Column(db.DateTime, nullable=False, default=_utcnow)
+    created_at = db.Column(UtcDateTime, nullable=False, default=_utcnow)
 
     # Add these methods
     def set_password(self, password):
@@ -75,11 +99,11 @@ class Book(db.Model):
     filename = db.Column(db.String(255), unique=True, nullable=False)
     cover_path = db.Column(db.String(255))  # Path to stored cover image
     access_level = db.Column(db.String(20), nullable=False, default="standard")
-    created_at = db.Column(db.DateTime, nullable=False, default=_utcnow)
+    created_at = db.Column(UtcDateTime, nullable=False, default=_utcnow)
     uploaded_by = db.Column(db.Integer, db.ForeignKey("users.id"))
     # Soft delete: set when a book is deleted, cleared by undo. Rows (and their
     # EPUBs) older than TRASH_RETENTION_DAYS are purged for good.
-    deleted_at = db.Column(db.DateTime, nullable=True, index=True)
+    deleted_at = db.Column(UtcDateTime, nullable=True, index=True)
 
     # Relationships
     tags = db.relationship(
@@ -97,7 +121,7 @@ class Tag(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(50), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
-    created_at = db.Column(db.DateTime, nullable=False, default=_utcnow)
+    created_at = db.Column(UtcDateTime, nullable=False, default=_utcnow)
 
     # Add user relationship
     user = db.relationship("User", back_populates="tags")
@@ -118,7 +142,7 @@ class Bookmark(db.Model):
     chapter_index = db.Column(db.Integer, default=0)
     position = db.Column(db.Float, default=0)  # Percentage through chapter
 
-    last_read = db.Column(db.DateTime, nullable=False, default=_utcnow)
+    last_read = db.Column(UtcDateTime, nullable=False, default=_utcnow)
     status = db.Column(
         db.Enum(BookProgressChoice),
         nullable=False,

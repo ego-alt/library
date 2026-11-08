@@ -2,7 +2,7 @@
 indexers, and added to the library when their EPUB arrives."""
 
 from ..downloads.models import WANTED
-from ..models import _utcnow, db
+from ..models import UtcDateTime, _utcnow, db
 
 
 class BookRequest(db.Model):
@@ -20,9 +20,9 @@ class BookRequest(db.Model):
     book_id = db.Column(db.Integer, db.ForeignKey("books.id", ondelete="SET NULL"))
     # Who asked: admins for now; later anyone, with an admin approving.
     requested_by = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"))
-    created_at = db.Column(db.DateTime, nullable=False, default=_utcnow)
+    created_at = db.Column(UtcDateTime, nullable=False, default=_utcnow)
     # When the indexers were last asked for it.
-    searched_at = db.Column(db.DateTime)
+    searched_at = db.Column(UtcDateTime)
 
     book = db.relationship("Book")
     downloads = db.relationship("Download", back_populates="book_request", passive_deletes=True)

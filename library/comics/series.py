@@ -106,7 +106,7 @@ def refresh_series(series: ComicSeries) -> int:
 
 
 def due_for_refresh(now: datetime | None = None) -> list[ComicSeries]:
-    now = (now or _utcnow()).replace(tzinfo=None)
+    now = now or _utcnow()
     due = []
     for series in ComicSeries.query.filter(ComicSeries.provider.in_(("comicvine", "metron"))).all():
         if series.refreshed_at is None:

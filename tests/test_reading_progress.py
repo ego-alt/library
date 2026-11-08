@@ -1,7 +1,7 @@
 """Books you're reading: the library opens on them, and their covers show how
 far in you are."""
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from library.choices import BookProgressChoice
 from library.models import Book, Bookmark, db
@@ -21,7 +21,7 @@ def _bookmark(user, book, status, minutes_ago=0, chapter=0, position=0.0):
     db.session.add(Bookmark(
         user_id=user.id, book_id=book.id, status=status,
         chapter_index=chapter, position=position,
-        last_read=datetime.utcnow() - timedelta(minutes=minutes_ago),
+        last_read=datetime.now(timezone.utc) - timedelta(minutes=minutes_ago),
     ))
     db.session.commit()
 
@@ -86,7 +86,7 @@ def test_reading_hides_trashed_and_restricted_books(
     standard_client, standard_user, book_dir
 ):
     trashed = _add_book(book_dir, "t.epub", "Trashed Book")
-    trashed.deleted_at = datetime.utcnow()
+    trashed.deleted_at = datetime.now(timezone.utc)
     secret = _add_book(book_dir, "s.epub", "Secret Book", access_level="restricted")
     db.session.commit()
     _bookmark(standard_user, trashed, BookProgressChoice.IN_PROGRESS)
