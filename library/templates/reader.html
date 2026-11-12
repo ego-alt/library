@@ -18,7 +18,7 @@
           if (leading) root.style.setProperty('--reader-leading', leading);
           var face = {classic: 'var(--font-reading-classic)', sans: 'var(--font-sans)'}[get('readerFont')];
           if (face) root.style.setProperty('--reader-font', face);
-          var measure = {narrow: '60ch', normal: '70ch', wide: '80ch'}[get('readerWidth')];
+          var measure = {narrow: '60ch', normal: '70ch', wide: '92ch'}[get('readerWidth')];
           if (measure) root.style.setProperty('--reader-measure', measure);
           if (get('readingMode') === 'paginate') root.classList.add('paginated');
           // A book you've set to vertical text (reader.js decides the rest once the book loads).

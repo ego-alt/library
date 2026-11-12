@@ -22,7 +22,7 @@ let spreadCount = 1;         // 1 (one page) or 2 (two-page spread)
 const PAGE_GAP = 72;           // the centre gap of a two-page spread
 // Page width caps, in ems of the default 17px text (about 62 characters a
 // line at that size). Wider screens get wider margins, not longer lines.
-const PAGE_MAX_EM = {narrow: 25, normal: 29, wide: 33};
+const PAGE_MAX_EM = {narrow: 25, normal: 29, wide: 38};
 const SPREAD_WIDTH_THRESHOLD = 1000; // px — show 2-up when viewport is at least this wide
 
 // Vertical text (直排), for Chinese and Japanese books: lines run top to
@@ -2001,7 +2001,7 @@ window.addEventListener('resize', alignRunningLines);
 // <head> script applies them before the first paint; this keeps them in sync.
 const LEADING = {tight: '1.5', normal: '1.7', loose: '1.9'};
 const FACES = {serif: 'var(--font-reading-serif)', classic: 'var(--font-reading-classic)', sans: 'var(--font-sans)'};
-const MEASURE = {narrow: '60ch', normal: '70ch', wide: '80ch'};
+const MEASURE = {narrow: '60ch', normal: '70ch', wide: '92ch'};
 const THEMES = ['day', 'sepia', 'night', 'black'];
 
 function readerSetting(key, fallback) {
